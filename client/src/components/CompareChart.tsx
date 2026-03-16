@@ -56,22 +56,25 @@ export function CompareChart({ data, nameA, nameB }: { data: CompareChartPoint[]
   const m = METRICS.find((m) => m.key === metric)!;
 
   return (
-    <div className="mb-8 rounded-lg bg-white p-4 shadow-sm">
-      <div className="mb-4 flex gap-2">
-        {METRICS.map((tab) => (
-          <button
-            key={tab.key}
-            onClick={() => setMetric(tab.key)}
-            className={`rounded-md px-3 py-1.5 text-sm transition-colors ${
-              metric === tab.key
-                ? 'bg-orange-50 text-orange-600 font-medium'
-                : 'text-gray-400 hover:text-gray-600'
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
+    <div className="mb-8 rounded-lg bg-white shadow-sm">
+      <div className="border-b border-gray-200">
+        <nav className="-mb-px flex justify-center space-x-8">
+          {METRICS.map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => setMetric(tab.key)}
+              className={`border-b-2 px-1 py-3 text-sm font-medium whitespace-nowrap transition-colors ${
+                metric === tab.key
+                  ? 'border-orange-500 text-orange-600'
+                  : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </nav>
       </div>
+      <div className="p-4">
       <ResponsiveContainer width="100%" height={300}>
         <LineChart data={data}>
           <XAxis dataKey="km" tick={{ fontSize: 12 }} />
@@ -118,6 +121,7 @@ export function CompareChart({ data, nameA, nameB }: { data: CompareChartPoint[]
           />
         </LineChart>
       </ResponsiveContainer>
+      </div>
     </div>
   );
 }
