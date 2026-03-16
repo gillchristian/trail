@@ -21,7 +21,14 @@
       "Bash(go mod tidy:*)",
       "Bash(go build:*)",
       "WebSearch",
-      "WebFetch(domain:fly.io)"
+      "WebFetch(domain:fly.io)",
+      "Bash(find /Users/bb8/dev/cadence -type f -name \"*.ts\" -o -name \"*.tsx\" -o -name \"*.go\" -o -name \"*.json\" | grep -E \"\\\\.\\(ts|tsx|go|json\\)$\" | head -50)",
+      "WebFetch(domain:developers.strava.com)",
+      "mcp__context7__resolve-library-id",
+      "mcp__context7__query-docs",
+      "WebFetch(domain:communityhub.strava.com)",
+      "WebFetch(domain:stackoverflow.com)",
+      "WebFetch(domain:groups.google.com)"
     ]
   }
 }
