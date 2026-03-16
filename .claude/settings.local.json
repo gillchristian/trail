@@ -28,7 +28,8 @@
       "mcp__context7__query-docs",
       "WebFetch(domain:communityhub.strava.com)",
       "WebFetch(domain:stackoverflow.com)",
-      "WebFetch(domain:groups.google.com)"
+      "WebFetch(domain:groups.google.com)",
+      "Bash(curl:*)"
     ]
   }
 }
