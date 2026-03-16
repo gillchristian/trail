@@ -52,6 +52,23 @@ var migrations = []Migration{
 			cached_at INTEGER NOT NULL
 		)`,
 	},
+	{
+		ID: "004_create_activities_table",
+		SQL: `CREATE TABLE IF NOT EXISTS activities (
+			activity_id INTEGER NOT NULL,
+			athlete_id  INTEGER NOT NULL,
+			type        TEXT NOT NULL DEFAULT '',
+			sport_type  TEXT NOT NULL DEFAULT '',
+			start_date  TEXT NOT NULL,
+			raw_json    TEXT NOT NULL,
+			cached_at   INTEGER NOT NULL,
+			PRIMARY KEY (athlete_id, activity_id)
+		)`,
+	},
+	{
+		ID:  "005_create_activities_index",
+		SQL: `CREATE INDEX IF NOT EXISTS idx_activities_athlete_date ON activities (athlete_id, start_date)`,
+	},
 }
 
 func RunMigrations(db *sql.DB) error {

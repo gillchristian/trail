@@ -11,7 +11,7 @@ export function useActivities(authenticated: boolean) {
   const fetchFromApi = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await apiFetch<StravaActivity[]>('/api/activities');
+      const data = await apiFetch<StravaActivity[]>('/api/activities?days=30');
       setActivities(data);
       setCachedActivities(data);
       setLastFetched(Date.now());

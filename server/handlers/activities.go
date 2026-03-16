@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"strconv"
 	"time"
 
 	"cadence-server/store"
@@ -11,14 +12,9 @@ import (
 )
 
 type ActivitiesHandler struct {
-	Store  *store.TokenStore
-	Strava *strava.Client
-}
-
-var runTypes = map[string]bool{
-	"Run":        true,
-	"TrailRun":   true,
-	"VirtualRun": true,
+	Store         *store.TokenStore
+	Strava        *strava.Client
+	ActivityStore *store.ActivityStore
 }
 
 func (h *ActivitiesHandler) GetActivities(w http.ResponseWriter, r *http.Request) {
@@ -58,31 +54,54 @@ func (h *ActivitiesHandler) GetActivities(w http.ResponseWriter, r *http.Request
 		}
 	}
 
-	now := time.Now().Unix()
-	thirtyDaysAgo := now - 30*24*60*60
+	// Parse ?days=N (default 30, clamp 1-365)
+	days := 30
+	if d, err := strconv.Atoi(r.URL.Query().Get("days")); err == nil && d > 0 && d <= 365 {
+		days = d
+	}
 
-	activities, err := h.Strava.FetchActivities(accessToken, thirtyDaysAgo, now)
+	// Incremental sync: only fetch new activities from Strava
+	latestDate, err := h.ActivityStore.LatestStartDate(tokens.AthleteID)
+	if err != nil {
+		log.Printf("Activities latest date error: %v", err)
+	}
+
+	var after int64
+	if latestDate == "" {
+		// First sync: seed with 30 days
+		after = time.Now().AddDate(0, 0, -30).Unix()
+	} else {
+		// Delta sync: from latest activity minus 1h overlap buffer
+		t, err := time.Parse(time.RFC3339, latestDate)
+		if err != nil {
+			after = time.Now().AddDate(0, 0, -30).Unix()
+		} else {
+			after = t.Add(-1 * time.Hour).Unix()
+		}
+	}
+
+	now := time.Now().Unix()
+	stravaActivities, err := h.Strava.FetchActivities(accessToken, after, now)
 	if err != nil {
 		log.Printf("Activities fetch error: %v", err)
+		// Non-fatal if we have cached data — continue to serve from SQLite
+	}
+
+	if len(stravaActivities) > 0 {
+		if err := h.ActivityStore.UpsertActivities(tokens.AthleteID, stravaActivities); err != nil {
+			log.Printf("Activities upsert error: %v", err)
+		}
+	}
+
+	// Query cached activities for the requested day range
+	since := time.Now().AddDate(0, 0, -days)
+	runs, err := h.ActivityStore.GetRunActivities(tokens.AthleteID, since)
+	if err != nil {
+		log.Printf("Activities query error: %v", err)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(map[string]string{"error": "Failed to fetch activities"})
 		return
-	}
-
-	// Filter to run types
-	var runs []json.RawMessage
-	for _, raw := range activities {
-		var activity struct {
-			Type      string `json:"type"`
-			SportType string `json:"sport_type"`
-		}
-		if err := json.Unmarshal(raw, &activity); err != nil {
-			continue
-		}
-		if runTypes[activity.Type] || runTypes[activity.SportType] {
-			runs = append(runs, raw)
-		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")
