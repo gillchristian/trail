@@ -76,7 +76,10 @@ func (h *ActivitiesHandler) GetActivities(w http.ResponseWriter, r *http.Request
 		if err != nil {
 			after = time.Now().AddDate(0, 0, -30).Unix()
 		} else {
-			after = t.Add(-1 * time.Hour).Unix()
+			// Always re-fetch at least the last 24h to catch metadata changes
+		afterLatest := t.Add(-1 * time.Hour).Unix()
+		oneDayAgo := time.Now().Add(-24 * time.Hour).Unix()
+		after = min(afterLatest, oneDayAgo)
 		}
 	}
 
