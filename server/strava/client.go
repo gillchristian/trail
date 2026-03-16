@@ -103,6 +103,108 @@ func (c *Client) GetValidAccessToken(tokens *store.Tokens) (accessToken string, 
 	return tokens.AccessToken, nil, nil
 }
 
+type Split struct {
+	Split               int     `json:"split"`
+	Distance            float64 `json:"distance"`
+	ElapsedTime         int     `json:"elapsed_time"`
+	MovingTime          int     `json:"moving_time"`
+	AverageSpeed        float64 `json:"average_speed"`
+	ElevationDifference float64 `json:"elevation_difference"`
+	PaceZone            int     `json:"pace_zone"`
+}
+
+type ActivityDetail struct {
+	ID             int64   `json:"id"`
+	Name           string  `json:"name"`
+	Distance       float64 `json:"distance"`
+	MovingTime     int     `json:"moving_time"`
+	ElapsedTime    int     `json:"elapsed_time"`
+	StartDateLocal string  `json:"start_date_local"`
+	Type           string  `json:"type"`
+	HasHeartrate   bool    `json:"has_heartrate"`
+	SplitsMetric   []Split `json:"splits_metric"`
+}
+
+func (c *Client) FetchActivityDetail(accessToken string, activityID int64) (*ActivityDetail, error) {
+	url := fmt.Sprintf("%s/activities/%d", stravaAPI, activityID)
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("strava activity detail request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("strava activity detail error: %d %s", resp.StatusCode, body)
+	}
+
+	var detail ActivityDetail
+	if err := json.NewDecoder(resp.Body).Decode(&detail); err != nil {
+		return nil, fmt.Errorf("activity detail decode failed: %w", err)
+	}
+
+	return &detail, nil
+}
+
+type streamEntry struct {
+	Type string    `json:"type"`
+	Data []float64 `json:"data"`
+}
+
+type ActivityStreams struct {
+	Distance  []float64
+	Heartrate []float64
+}
+
+func (c *Client) FetchActivityStreams(accessToken string, activityID int64) (*ActivityStreams, error) {
+	params := url.Values{
+		"keys":        {"distance,heartrate"},
+		"key_by_type": {"true"},
+	}
+	reqURL := fmt.Sprintf("%s/activities/%d/streams?%s", stravaAPI, activityID, params.Encode())
+
+	req, err := http.NewRequest("GET", reqURL, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("strava streams request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("strava streams error: %d %s", resp.StatusCode, body)
+	}
+
+	var entries []streamEntry
+	if err := json.NewDecoder(resp.Body).Decode(&entries); err != nil {
+		return nil, fmt.Errorf("streams decode failed: %w", err)
+	}
+
+	streams := &ActivityStreams{}
+	for _, e := range entries {
+		switch e.Type {
+		case "distance":
+			streams.Distance = e.Data
+		case "heartrate":
+			streams.Heartrate = e.Data
+		}
+	}
+
+	return streams, nil
+}
+
 func (c *Client) FetchActivities(accessToken string, after, before int64) ([]json.RawMessage, error) {
 	params := url.Values{
 		"after":    {strconv.FormatInt(after, 10)},

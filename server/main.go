@@ -57,6 +57,11 @@ func main() {
 		Strava: stravaClient,
 	}
 
+	compareHandler := &handlers.CompareHandler{
+		Store:  tokenStore,
+		Strava: stravaClient,
+	}
+
 	r := chi.NewRouter()
 
 	r.Use(cors.Handler(cors.Options{
@@ -70,6 +75,7 @@ func main() {
 	r.Get("/auth/status", authHandler.Status)
 	r.Post("/auth/logout", authHandler.Logout)
 	r.Get("/api/activities", activitiesHandler.GetActivities)
+	r.Get("/api/activities/{id}/detail", compareHandler.GetActivityDetail)
 
 	fmt.Printf("Server running on http://localhost:%s\n", port)
 	log.Fatal(http.ListenAndServe(":"+port, r))

@@ -1,14 +1,13 @@
+import { Routes, Route } from 'react-router-dom';
 import { Layout } from './components/Layout';
 import { LoginButton } from './components/LoginButton';
-import { ActivitiesTable } from './components/ActivitiesTable';
-import { TrendsChart } from './components/TrendsChart';
-import { RefreshButton } from './components/RefreshButton';
 import { useAuth } from './hooks/useAuth';
-import { useActivities } from './hooks/useActivities';
+import { DashboardPage } from './pages/DashboardPage';
+import { CompareInputPage } from './pages/CompareInputPage';
+import { CompareResultPage } from './pages/CompareResultPage';
 
 function App() {
   const { authenticated, loading: authLoading, login, logout } = useAuth();
-  const { activities, loading, lastFetched, refresh } = useActivities(authenticated);
 
   if (authLoading) {
     return (
@@ -29,29 +28,11 @@ function App() {
   }
 
   return (
-    <Layout>
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Cadence</h1>
-          {lastFetched && (
-            <p className="text-xs text-gray-400">
-              Last updated: {new Date(lastFetched).toLocaleString()}
-            </p>
-          )}
-        </div>
-        <div className="flex items-center gap-2">
-          <RefreshButton loading={loading} onClick={refresh} />
-          <button
-            onClick={logout}
-            className="rounded-md px-3 py-1.5 text-sm text-gray-500 hover:bg-gray-200 transition-colors"
-          >
-            Logout
-          </button>
-        </div>
-      </div>
-      <TrendsChart activities={activities} />
-      <ActivitiesTable activities={activities} />
-    </Layout>
+    <Routes>
+      <Route path="/" element={<DashboardPage logout={logout} />} />
+      <Route path="/compare" element={<CompareInputPage />} />
+      <Route path="/compare/:idA/:idB" element={<CompareResultPage />} />
+    </Routes>
   );
 }
 
