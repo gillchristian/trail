@@ -76,6 +76,7 @@ func main() {
 	r.Post("/auth/logout", authHandler.Logout)
 	r.Get("/api/activities", activitiesHandler.GetActivities)
 	r.Get("/api/activities/{id}/detail", compareHandler.GetActivityDetail)
+	r.Get("/api/resolve-link", compareHandler.ResolveShortLink)
 
 	fmt.Printf("Server running on http://localhost:%s\n", port)
 	log.Fatal(http.ListenAndServe(":"+port, r))

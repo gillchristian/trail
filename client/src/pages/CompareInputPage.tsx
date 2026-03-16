@@ -1,25 +1,47 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Layout } from '../components/Layout';
-import { parseActivityId } from '../lib/parseActivityId';
+import { parseActivityId, isStravaShortLink } from '../lib/parseActivityId';
+import { apiFetch } from '../lib/api';
+
+async function resolveInput(input: string): Promise<string | null> {
+  const id = parseActivityId(input);
+  if (id) return id;
+
+  if (isStravaShortLink(input)) {
+    const res = await apiFetch<{ id: string }>(`/api/resolve-link?url=${encodeURIComponent(input.trim())}`);
+    return res.id;
+  }
+
+  return null;
+}
 
 export function CompareInputPage() {
   const navigate = useNavigate();
   const [inputA, setInputA] = useState('');
   const [inputB, setInputB] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [resolving, setResolving] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const idA = parseActivityId(inputA);
-    const idB = parseActivityId(inputB);
+    setError(null);
+    setResolving(true);
 
-    if (!idA || !idB) {
-      setError('Please enter valid Strava activity URLs or IDs');
-      return;
+    try {
+      const [idA, idB] = await Promise.all([resolveInput(inputA), resolveInput(inputB)]);
+
+      if (!idA || !idB) {
+        setError('Please enter valid Strava activity URLs or IDs');
+        setResolving(false);
+        return;
+      }
+
+      navigate(`/compare/${idA}/${idB}`);
+    } catch {
+      setError('Failed to resolve one or more Strava links');
+      setResolving(false);
     }
-
-    navigate(`/compare/${idA}/${idB}`);
   };
 
   return (
@@ -69,9 +91,10 @@ export function CompareInputPage() {
 
         <button
           type="submit"
-          className="rounded-md bg-orange-500 px-6 py-2 text-sm font-medium text-white hover:bg-orange-600 transition-colors"
+          disabled={resolving}
+          className="rounded-md bg-orange-500 px-6 py-2 text-sm font-medium text-white hover:bg-orange-600 transition-colors disabled:opacity-50"
         >
-          Compare
+          {resolving ? 'Resolving...' : 'Compare'}
         </button>
       </form>
     </Layout>
