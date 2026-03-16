@@ -44,6 +44,14 @@ var migrations = []Migration{
 			expires_at INTEGER NOT NULL
 		)`,
 	},
+	{
+		ID: "003_create_activity_cache_table",
+		SQL: `CREATE TABLE IF NOT EXISTS activity_cache (
+			activity_id INTEGER PRIMARY KEY,
+			response_json TEXT NOT NULL,
+			cached_at INTEGER NOT NULL
+		)`,
+	},
 }
 
 func RunMigrations(db *sql.DB) error {

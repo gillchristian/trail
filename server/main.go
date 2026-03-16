@@ -38,6 +38,7 @@ func main() {
 	}
 
 	tokenStore := store.NewTokenStore(db)
+	activityCache := store.NewActivityCacheStore(db)
 
 	stravaClient := &strava.Client{
 		ClientID:     clientID,
@@ -58,8 +59,9 @@ func main() {
 	}
 
 	compareHandler := &handlers.CompareHandler{
-		Store:  tokenStore,
-		Strava: stravaClient,
+		Store:         tokenStore,
+		Strava:        stravaClient,
+		ActivityCache: activityCache,
 	}
 
 	r := chi.NewRouter()

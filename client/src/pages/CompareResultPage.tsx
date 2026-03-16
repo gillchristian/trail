@@ -5,6 +5,7 @@ import { CompareTable } from '../components/CompareTable';
 import { useCompareData } from '../hooks/useCompareData';
 import { useCompareChartData } from '../hooks/useCompareChartData';
 import { formatDistance, formatDuration, formatDate } from '../lib/format';
+import { getSessionToken } from '../lib/api';
 
 function ActivityBadge({ label, name, date, distance, time }: {
   label: string;
@@ -28,14 +29,17 @@ export function CompareResultPage() {
   const { idA, idB } = useParams<{ idA: string; idB: string }>();
   const { data, loading, error } = useCompareData(idA!, idB!);
   const chartData = useCompareChartData(data);
+  const isAuthenticated = !!getSessionToken();
 
   return (
     <Layout>
-      <div className="mb-6">
-        <Link to="/compare" className="text-sm text-gray-400 hover:text-gray-600 transition-colors">
-          &larr; Compare another pair
-        </Link>
-      </div>
+      {isAuthenticated && (
+        <div className="mb-6">
+          <Link to="/compare" className="text-sm text-gray-400 hover:text-gray-600 transition-colors">
+            &larr; Compare another pair
+          </Link>
+        </div>
+      )}
 
       {loading && (
         <p className="py-12 text-center text-gray-400">Loading activities...</p>
@@ -44,9 +48,11 @@ export function CompareResultPage() {
       {error && (
         <div className="py-12 text-center">
           <p className="mb-2 text-red-500">{error}</p>
-          <Link to="/compare" className="text-sm text-orange-600 hover:underline">
-            Try different activities
-          </Link>
+          {isAuthenticated && (
+            <Link to="/compare" className="text-sm text-orange-600 hover:underline">
+              Try different activities
+            </Link>
+          )}
         </div>
       )}
 

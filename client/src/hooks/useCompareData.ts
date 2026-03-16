@@ -31,7 +31,8 @@ export function useCompareData(idA: string, idB: string) {
       .catch((err) => {
         if (cancelled) return;
         if (err instanceof AuthError) {
-          window.location.reload();
+          setError('Authentication required. This activity may not be cached yet.');
+          setLoading(false);
           return;
         }
         setError(err.message || 'Failed to fetch activity data');
