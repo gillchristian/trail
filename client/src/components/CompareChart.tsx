@@ -57,15 +57,15 @@ export function CompareChart({ data, nameA, nameB }: { data: CompareChartPoint[]
 
   return (
     <div className="mb-8 rounded-lg bg-white p-4 shadow-sm">
-      <div className="mb-4 flex gap-1">
+      <div className="mb-4 flex gap-2">
         {METRICS.map((tab) => (
           <button
             key={tab.key}
             onClick={() => setMetric(tab.key)}
             className={`rounded-md px-3 py-1.5 text-sm transition-colors ${
               metric === tab.key
-                ? 'bg-gray-900 text-white'
-                : 'text-gray-500 hover:bg-gray-100'
+                ? 'bg-orange-50 text-orange-600 font-medium'
+                : 'text-gray-400 hover:text-gray-600'
             }`}
           >
             {tab.label}
@@ -82,7 +82,20 @@ export function CompareChart({ data, nameA, nameB }: { data: CompareChartPoint[]
             domain={['auto', 'auto']}
           />
           <Tooltip content={<CustomTooltip nameA={nameA} nameB={nameB} metric={metric} />} />
-          <Legend />
+          <Legend
+            content={() => (
+              <div className="flex justify-center gap-6 pt-2 text-sm">
+                <span className="flex items-center gap-1.5">
+                  <svg width="16" height="2"><line x1="0" y1="1" x2="16" y2="1" stroke={m.color} strokeWidth="2" /></svg>
+                  <span style={{ color: m.color }}>{nameA}</span>
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <svg width="16" height="2"><line x1="0" y1="1" x2="16" y2="1" stroke={m.color} strokeWidth="2" strokeDasharray="3 3" opacity="0.6" /></svg>
+                  <span style={{ color: m.color, opacity: 0.6 }}>{nameB}</span>
+                </span>
+              </div>
+            )}
+          />
           <Line
             type="monotone"
             dataKey={m.keyA as string}
