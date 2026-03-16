@@ -72,6 +72,7 @@ func main() {
 		AllowedOrigins: []string{frontendURL},
 		AllowedMethods: []string{"GET", "POST", "OPTIONS"},
 		AllowedHeaders: []string{"Authorization", "Content-Type"},
+		ExposedHeaders: []string{"X-Data-Source"},
 	}))
 
 	r.Get("/auth/strava", authHandler.StravaRedirect)

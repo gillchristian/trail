@@ -104,6 +104,11 @@ func (h *ActivitiesHandler) GetActivities(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	if len(stravaActivities) > 0 {
+		w.Header().Set("X-Data-Source", "strava")
+	} else {
+		w.Header().Set("X-Data-Source", "cache")
+	}
 	w.Header().Set("Content-Type", "application/json")
 	if runs == nil {
 		runs = []json.RawMessage{}

@@ -100,6 +100,7 @@ func (h *CompareHandler) serveFromCache(w http.ResponseWriter, activityID int64)
 		})
 		return
 	}
+	w.Header().Set("X-Data-Source", "cache")
 	w.Header().Set("Content-Type", "application/json")
 	w.Write(cached)
 }
@@ -224,6 +225,7 @@ func (h *CompareHandler) GetActivityDetail(w http.ResponseWriter, r *http.Reques
 		log.Printf("Cache write error for activity %d: %v", activityID, err)
 	}
 
+	w.Header().Set("X-Data-Source", "strava")
 	w.Header().Set("Content-Type", "application/json")
 	w.Write(respJSON)
 }
