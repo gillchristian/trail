@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 	"regexp"
 )
@@ -25,15 +26,7 @@ func (h *CompareHandler) ResolveShortLink(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	// Follow redirects but stop before the final page — we just need the Location header
-	client := &http.Client{
-		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			// Check each redirect URL for the activity ID
-			return nil
-		},
-	}
-
-	resp, err := client.Get(shortURL)
+	resp, err := http.Get(shortURL)
 	if err != nil {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadGateway)
@@ -42,16 +35,32 @@ func (h *CompareHandler) ResolveShortLink(w http.ResponseWriter, r *http.Request
 	}
 	defer resp.Body.Close()
 
-	// The final URL after redirects should contain the activity ID
+	// First check if HTTP redirects resolved to a strava.com/activities URL
 	finalURL := resp.Request.URL.String()
 	match := activityIDPattern.FindStringSubmatch(finalURL)
-	if match == nil {
+	if match != nil {
 		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"error": "Could not extract activity ID from link"})
+		json.NewEncoder(w).Encode(map[string]string{"id": match[1]})
+		return
+	}
+
+	// Branch.io deep links return HTML with the activity URL embedded in the page
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 256*1024))
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadGateway)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Failed to read response"})
+		return
+	}
+
+	match = activityIDPattern.FindStringSubmatch(string(body))
+	if match != nil {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{"id": match[1]})
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"id": match[1]})
+	w.WriteHeader(http.StatusBadRequest)
+	json.NewEncoder(w).Encode(map[string]string{"error": "Could not extract activity ID from link"})
 }
