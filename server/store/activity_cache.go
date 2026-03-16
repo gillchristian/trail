@@ -5,6 +5,11 @@ import (
 	"time"
 )
 
+type CacheEntry struct {
+	Data     []byte
+	CachedAt int64
+}
+
 type ActivityCacheStore struct {
 	db *sql.DB
 }
@@ -13,19 +18,20 @@ func NewActivityCacheStore(db *sql.DB) *ActivityCacheStore {
 	return &ActivityCacheStore{db: db}
 }
 
-func (s *ActivityCacheStore) Get(activityID int64) ([]byte, error) {
+func (s *ActivityCacheStore) Get(activityID int64) (*CacheEntry, error) {
 	var jsonData string
+	var cachedAt int64
 	err := s.db.QueryRow(
-		"SELECT response_json FROM activity_cache WHERE activity_id = ?",
+		"SELECT response_json, cached_at FROM activity_cache WHERE activity_id = ?",
 		activityID,
-	).Scan(&jsonData)
+	).Scan(&jsonData, &cachedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
 	if err != nil {
 		return nil, err
 	}
-	return []byte(jsonData), nil
+	return &CacheEntry{Data: []byte(jsonData), CachedAt: cachedAt}, nil
 }
 
 func (s *ActivityCacheStore) Set(activityID int64, responseJSON []byte) error {

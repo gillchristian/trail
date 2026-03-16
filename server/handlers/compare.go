@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"time"
 
 	"cadence-server/store"
 	"cadence-server/strava"
@@ -85,80 +86,15 @@ func computePerKmHeartRate(streams *strava.ActivityStreams, numSplits int) []*fl
 	return result
 }
 
-func (h *CompareHandler) serveFromCache(w http.ResponseWriter, activityID int64) {
-	cached, err := h.ActivityCache.Get(activityID)
-	if err != nil {
-		log.Printf("Cache read error for activity %d: %v", activityID, err)
-		http.Error(w, `{"error":"Internal server error"}`, http.StatusInternalServerError)
-		return
-	}
-	if cached == nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusNotFound)
-		json.NewEncoder(w).Encode(map[string]string{
-			"error": "Activity not found. It must be viewed by an authenticated user first.",
-		})
-		return
-	}
-	w.Header().Set("X-Data-Source", "cache")
-	w.Header().Set("Content-Type", "application/json")
-	w.Write(cached)
-}
 
-func (h *CompareHandler) GetActivityDetail(w http.ResponseWriter, r *http.Request) {
-	idStr := chi.URLParam(r, "id")
-	activityID, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid activity ID"})
-		return
-	}
-
-	sessionToken := getSessionToken(r)
-	if sessionToken == "" {
-		h.serveFromCache(w, activityID)
-		return
-	}
-
-	tokens, err := h.Store.GetTokensBySession(sessionToken)
-	if err != nil {
-		log.Printf("Compare token check error: %v", err)
-		http.Error(w, `{"error":"Internal server error"}`, http.StatusInternalServerError)
-		return
-	}
-	if tokens == nil {
-		h.serveFromCache(w, activityID)
-		return
-	}
-
-	accessToken, refreshed, err := h.Strava.GetValidAccessToken(tokens)
-	if err != nil {
-		log.Printf("Compare access token error: %v", err)
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"error": "Failed to get access token"})
-		return
-	}
-
-	if refreshed != nil {
-		if err := h.Store.UpdateTokens(*refreshed); err != nil {
-			log.Printf("Compare token update error: %v", err)
-		}
-	}
-
+func (h *CompareHandler) fetchAndCacheActivity(accessToken string, activityID int64) ([]byte, error) {
 	detail, err := h.Strava.FetchActivityDetail(accessToken, activityID)
 	if err != nil {
-		log.Printf("Compare activity detail error: %v", err)
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusNotFound)
-		json.NewEncoder(w).Encode(map[string]string{"error": "Activity not found or not accessible"})
-		return
+		return nil, err
 	}
 
 	log.Printf("Activity %d: has_heartrate=%v, splits=%d", activityID, detail.HasHeartrate, len(detail.SplitsMetric))
 
-	// Check if splits already have HR from Strava
 	splitsHaveHR := false
 	for _, s := range detail.SplitsMetric {
 		if s.AverageHeartrate != nil {
@@ -167,7 +103,6 @@ func (h *CompareHandler) GetActivityDetail(w http.ResponseWriter, r *http.Reques
 		}
 	}
 
-	// Fetch streams for HR computation if splits don't have HR
 	var perKmHR []*float64
 	if splitsHaveHR {
 		log.Printf("Activity %d: using HR from splits_metric", activityID)
@@ -215,17 +150,148 @@ func (h *CompareHandler) GetActivityDetail(w http.ResponseWriter, r *http.Reques
 
 	respJSON, err := json.Marshal(resp)
 	if err != nil {
-		log.Printf("Cache marshal error: %v", err)
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(resp)
-		return
+		return nil, err
 	}
 
 	if err := h.ActivityCache.Set(activityID, respJSON); err != nil {
 		log.Printf("Cache write error for activity %d: %v", activityID, err)
 	}
 
+	return respJSON, nil
+}
+
+func (h *CompareHandler) refreshActivityCache(accessToken string, activityID int64) {
+	log.Printf("Background revalidation for activity %d", activityID)
+	if _, err := h.fetchAndCacheActivity(accessToken, activityID); err != nil {
+		log.Printf("Background revalidation error for activity %d: %v", activityID, err)
+	}
+}
+
+func (h *CompareHandler) GetActivityDetail(w http.ResponseWriter, r *http.Request) {
+	idStr := chi.URLParam(r, "id")
+	activityID, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid activity ID"})
+		return
+	}
+
+	// Serve from cache if available (for all users, authenticated or not)
+	entry, err := h.ActivityCache.Get(activityID)
+	if err != nil {
+		log.Printf("Cache read error for activity %d: %v", activityID, err)
+	}
+	if entry != nil {
+		w.Header().Set("X-Data-Source", "cache")
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(entry.Data)
+
+		// Check if cache is stale and we can revalidate in the background
+		if sessionToken := getSessionToken(r); sessionToken != "" {
+			if h.isStale(entry) {
+				go func() {
+					accessToken, err := h.resolveAccessToken(sessionToken)
+					if err != nil {
+						log.Printf("Background revalidation auth error for activity %d: %v", activityID, err)
+						return
+					}
+					h.refreshActivityCache(accessToken, activityID)
+				}()
+			}
+		}
+		return
+	}
+
+	// Cache miss — need Strava auth to fetch
+	sessionToken := getSessionToken(r)
+	if sessionToken == "" {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(map[string]string{
+			"error": "Activity not found. It must be viewed by an authenticated user first.",
+		})
+		return
+	}
+
+	accessToken, err := h.resolveAccessToken(sessionToken)
+	if err != nil {
+		log.Printf("Compare access token error: %v", err)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Failed to get access token"})
+		return
+	}
+	if accessToken == "" {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(map[string]string{
+			"error": "Activity not found. It must be viewed by an authenticated user first.",
+		})
+		return
+	}
+
+	respJSON, err := h.fetchAndCacheActivity(accessToken, activityID)
+	if err != nil {
+		log.Printf("Compare activity detail error: %v", err)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Activity not found or not accessible"})
+		return
+	}
+
 	w.Header().Set("X-Data-Source", "strava")
 	w.Header().Set("Content-Type", "application/json")
 	w.Write(respJSON)
+}
+
+func (h *CompareHandler) isStale(entry *store.CacheEntry) bool {
+	// Parse start_date_local from cached JSON to determine activity age
+	var cached struct {
+		Activity struct {
+			StartDateLocal string `json:"start_date_local"`
+		} `json:"activity"`
+	}
+	if err := json.Unmarshal(entry.Data, &cached); err != nil {
+		return false // can't parse, don't revalidate
+	}
+
+	activityTime, err := time.Parse(time.RFC3339, cached.Activity.StartDateLocal)
+	if err != nil {
+		return false
+	}
+
+	now := time.Now()
+	activityAge := now.Sub(activityTime)
+	cacheAge := now.Sub(time.Unix(entry.CachedAt, 0))
+
+	// Only revalidate recent activities (<24h old) with stale cache (>1h)
+	if activityAge < 24*time.Hour {
+		return cacheAge > 1*time.Hour
+	}
+
+	return false
+}
+
+func (h *CompareHandler) resolveAccessToken(sessionToken string) (string, error) {
+	tokens, err := h.Store.GetTokensBySession(sessionToken)
+	if err != nil {
+		return "", err
+	}
+	if tokens == nil {
+		return "", nil
+	}
+
+	accessToken, refreshed, err := h.Strava.GetValidAccessToken(tokens)
+	if err != nil {
+		return "", err
+	}
+
+	if refreshed != nil {
+		if err := h.Store.UpdateTokens(*refreshed); err != nil {
+			log.Printf("Token update error: %v", err)
+		}
+	}
+
+	return accessToken, nil
 }
