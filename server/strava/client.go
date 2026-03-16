@@ -104,13 +104,14 @@ func (c *Client) GetValidAccessToken(tokens *store.Tokens) (accessToken string, 
 }
 
 type Split struct {
-	Split               int     `json:"split"`
-	Distance            float64 `json:"distance"`
-	ElapsedTime         int     `json:"elapsed_time"`
-	MovingTime          int     `json:"moving_time"`
-	AverageSpeed        float64 `json:"average_speed"`
-	ElevationDifference float64 `json:"elevation_difference"`
-	PaceZone            int     `json:"pace_zone"`
+	Split               int      `json:"split"`
+	Distance            float64  `json:"distance"`
+	ElapsedTime         int      `json:"elapsed_time"`
+	MovingTime          int      `json:"moving_time"`
+	AverageSpeed        float64  `json:"average_speed"`
+	ElevationDifference float64  `json:"elevation_difference"`
+	PaceZone            int      `json:"pace_zone"`
+	AverageHeartrate    *float64 `json:"average_heartrate"`
 }
 
 type ActivityDetail struct {

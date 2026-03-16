@@ -139,19 +139,40 @@ func (h *CompareHandler) GetActivityDetail(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	// Fetch streams for HR computation (best effort — activity may lack HR)
-	var streams *strava.ActivityStreams
-	if detail.HasHeartrate {
-		streams, err = h.Strava.FetchActivityStreams(accessToken, activityID)
-		if err != nil {
-			log.Printf("Compare streams fetch error (non-fatal): %v", err)
+	log.Printf("Activity %d: has_heartrate=%v, splits=%d", activityID, detail.HasHeartrate, len(detail.SplitsMetric))
+
+	// Check if splits already have HR from Strava
+	splitsHaveHR := false
+	for _, s := range detail.SplitsMetric {
+		if s.AverageHeartrate != nil {
+			splitsHaveHR = true
+			break
 		}
 	}
 
-	perKmHR := computePerKmHeartRate(streams, len(detail.SplitsMetric))
+	// Fetch streams for HR computation if splits don't have HR
+	var perKmHR []*float64
+	if splitsHaveHR {
+		log.Printf("Activity %d: using HR from splits_metric", activityID)
+	} else {
+		streams, err := h.Strava.FetchActivityStreams(accessToken, activityID)
+		if err != nil {
+			log.Printf("Activity %d: streams fetch error (non-fatal): %v", activityID, err)
+		} else {
+			log.Printf("Activity %d: streams fetched, distance=%d points, heartrate=%d points",
+				activityID, len(streams.Distance), len(streams.Heartrate))
+		}
+		perKmHR = computePerKmHeartRate(streams, len(detail.SplitsMetric))
+	}
 
 	splits := make([]splitResponse, len(detail.SplitsMetric))
 	for i, s := range detail.SplitsMetric {
+		var hr *float64
+		if splitsHaveHR {
+			hr = s.AverageHeartrate
+		} else if perKmHR != nil {
+			hr = perKmHR[i]
+		}
 		splits[i] = splitResponse{
 			Km:                  s.Split,
 			Distance:            s.Distance,
@@ -159,7 +180,7 @@ func (h *CompareHandler) GetActivityDetail(w http.ResponseWriter, r *http.Reques
 			MovingTime:          s.MovingTime,
 			AverageSpeed:        s.AverageSpeed,
 			ElevationDifference: s.ElevationDifference,
-			AverageHeartrate:    perKmHR[i],
+			AverageHeartrate:    hr,
 		}
 	}
 
