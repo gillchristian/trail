@@ -54,10 +54,17 @@ func main() {
 		FrontendURL: frontendURL,
 	}
 
+	backfillHandler := &handlers.BackfillHandler{
+		Store:         tokenStore,
+		Strava:        stravaClient,
+		ActivityStore: activityStore,
+	}
+
 	activitiesHandler := &handlers.ActivitiesHandler{
 		Store:         tokenStore,
 		Strava:        stravaClient,
 		ActivityStore: activityStore,
+		Backfill:      backfillHandler,
 	}
 
 	compareHandler := &handlers.CompareHandler{
@@ -80,8 +87,10 @@ func main() {
 	r.Get("/auth/status", authHandler.Status)
 	r.Post("/auth/logout", authHandler.Logout)
 	r.Get("/api/activities", activitiesHandler.GetActivities)
+	r.Get("/api/activities/search", activitiesHandler.SearchActivities)
 	r.Get("/api/activities/{id}/detail", compareHandler.GetActivityDetail)
 	r.Get("/api/resolve-link", compareHandler.ResolveShortLink)
+	r.Get("/api/backfill/status", backfillHandler.GetBackfillStatus)
 
 	fmt.Printf("Server running on http://localhost:%s\n", port)
 	log.Fatal(http.ListenAndServe(":"+port, r))

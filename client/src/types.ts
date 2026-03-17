@@ -41,3 +41,25 @@ export interface ActivityDetailResponse {
   activity: ActivitySummary;
   splits: ActivitySplit[];
 }
+
+export interface SearchResult {
+  id: number;
+  name: string;
+  distance: number;
+  moving_time: number;
+  start_date_local: string;
+  sport_type: string;
+}
+
+export interface SearchResponse {
+  activities: SearchResult[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export interface BackfillStatus {
+  running: boolean;
+  complete: boolean;
+  total_stored: number;
+}

@@ -15,6 +15,7 @@ type ActivitiesHandler struct {
 	Store         *store.TokenStore
 	Strava        *strava.Client
 	ActivityStore *store.ActivityStore
+	Backfill      *BackfillHandler
 }
 
 func (h *ActivitiesHandler) GetActivities(w http.ResponseWriter, r *http.Request) {
@@ -96,6 +97,11 @@ func (h *ActivitiesHandler) GetActivities(w http.ResponseWriter, r *http.Request
 		}
 	}
 
+	// Auto-trigger backfill if not yet complete
+	if h.Backfill != nil {
+		h.Backfill.TryStartBackfill(tokens)
+	}
+
 	// Query cached activities for the requested day range
 	since := time.Now().AddDate(0, 0, -days)
 	runs, err := h.ActivityStore.GetRunActivities(tokens.AthleteID, since)
@@ -117,4 +123,63 @@ func (h *ActivitiesHandler) GetActivities(w http.ResponseWriter, r *http.Request
 		runs = []json.RawMessage{}
 	}
 	json.NewEncoder(w).Encode(runs)
+}
+
+func (h *ActivitiesHandler) SearchActivities(w http.ResponseWriter, r *http.Request) {
+	sessionToken := getSessionToken(r)
+	if sessionToken == "" {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Not authenticated"})
+		return
+	}
+
+	tokens, err := h.Store.GetTokensBySession(sessionToken)
+	if err != nil || tokens == nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Not authenticated"})
+		return
+	}
+
+	q := r.URL.Query()
+	params := store.SearchParams{
+		AthleteID: tokens.AthleteID,
+		NameQuery: q.Get("q"),
+		Limit:     50,
+	}
+
+	if v, err := strconv.ParseFloat(q.Get("min_distance"), 64); err == nil {
+		params.MinDistance = v
+	}
+	if v, err := strconv.ParseFloat(q.Get("max_distance"), 64); err == nil {
+		params.MaxDistance = v
+	}
+	if v, err := strconv.Atoi(q.Get("limit")); err == nil && v > 0 {
+		params.Limit = v
+	}
+	if v, err := strconv.Atoi(q.Get("offset")); err == nil && v >= 0 {
+		params.Offset = v
+	}
+
+	results, total, err := h.ActivityStore.SearchActivities(params)
+	if err != nil {
+		log.Printf("Search error: %v", err)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Search failed"})
+		return
+	}
+
+	if results == nil {
+		results = []store.ActivitySearchResult{}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]any{
+		"activities": results,
+		"total":      total,
+		"limit":      params.Limit,
+		"offset":     params.Offset,
+	})
 }

@@ -206,6 +206,38 @@ func (c *Client) FetchActivityStreams(accessToken string, activityID int64) (*Ac
 	return streams, nil
 }
 
+// FetchActivitiesPage fetches a single page of activities with configurable pagination.
+func (c *Client) FetchActivitiesPage(accessToken string, page, perPage int) ([]json.RawMessage, error) {
+	params := url.Values{
+		"page":     {strconv.Itoa(page)},
+		"per_page": {strconv.Itoa(perPage)},
+	}
+
+	req, err := http.NewRequest("GET", stravaAPI+"/athlete/activities?"+params.Encode(), nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("strava API request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("strava API error: %d %s", resp.StatusCode, body)
+	}
+
+	var activities []json.RawMessage
+	if err := json.NewDecoder(resp.Body).Decode(&activities); err != nil {
+		return nil, fmt.Errorf("activities decode failed: %w", err)
+	}
+
+	return activities, nil
+}
+
 func (c *Client) FetchActivities(accessToken string, after, before int64) ([]json.RawMessage, error) {
 	params := url.Values{
 		"after":    {strconv.FormatInt(after, 10)},

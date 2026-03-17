@@ -69,6 +69,31 @@ var migrations = []Migration{
 		ID:  "005_create_activities_index",
 		SQL: `CREATE INDEX IF NOT EXISTS idx_activities_athlete_date ON activities (athlete_id, start_date)`,
 	},
+	{
+		ID:  "006_add_distance_column",
+		SQL: `ALTER TABLE activities ADD COLUMN distance REAL NOT NULL DEFAULT 0`,
+	},
+	{
+		ID:  "007_add_name_column",
+		SQL: `ALTER TABLE activities ADD COLUMN name TEXT NOT NULL DEFAULT ''`,
+	},
+	{
+		ID:  "008_backfill_distance_name",
+		SQL: `UPDATE activities SET distance = COALESCE(json_extract(raw_json, '$.distance'), 0), name = COALESCE(json_extract(raw_json, '$.name'), '') WHERE distance = 0 OR name = ''`,
+	},
+	{
+		ID:  "009_index_athlete_distance",
+		SQL: `CREATE INDEX IF NOT EXISTS idx_activities_athlete_distance ON activities (athlete_id, distance)`,
+	},
+	{
+		ID: "010_create_backfill_status",
+		SQL: `CREATE TABLE IF NOT EXISTS backfill_status (
+			athlete_id INTEGER PRIMARY KEY,
+			complete INTEGER NOT NULL DEFAULT 0,
+			total_stored INTEGER NOT NULL DEFAULT 0,
+			updated_at INTEGER NOT NULL
+		)`,
+	},
 }
 
 func RunMigrations(db *sql.DB) error {
