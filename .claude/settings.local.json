@@ -29,7 +29,9 @@
       "WebFetch(domain:communityhub.strava.com)",
       "WebFetch(domain:stackoverflow.com)",
       "WebFetch(domain:groups.google.com)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(node -e \":*)",
+      "Bash(npm:*)"
     ]
   }
 }
