@@ -25,7 +25,6 @@ export function ActivitySearchPanel({ selectedA, selectedB, onSelectA, onSelectB
 
   const handlePresetClick = useCallback((preset: typeof DISTANCE_PRESETS[number]) => {
     if (activePreset === preset.label) {
-      // Deselect
       setActivePreset(null);
       setSliderMin(0);
       setSliderMax(SLIDER_MAX_KM);
@@ -74,7 +73,7 @@ export function ActivitySearchPanel({ selectedA, selectedB, onSelectA, onSelectB
   const isSelected = (id: number) => selectedA?.id === id || selectedB?.id === id;
 
   return (
-    <div className="space-y-4">
+    <div className="flex min-h-0 flex-1 flex-col space-y-4">
       {/* Sync indicator */}
       {syncing && (
         <p className="text-xs text-gray-400">
@@ -146,8 +145,8 @@ export function ActivitySearchPanel({ selectedA, selectedB, onSelectA, onSelectB
         </div>
       </div>
 
-      {/* Results */}
-      <div className="max-h-80 space-y-1 overflow-y-auto">
+      {/* Results — fills remaining height */}
+      <div className="min-h-0 flex-1 space-y-1 overflow-y-auto">
         {results.map((activity) => (
           <div
             key={activity.id}
@@ -201,16 +200,16 @@ export function ActivitySearchPanel({ selectedA, selectedB, onSelectA, onSelectB
               : 'No activities yet'}
           </p>
         )}
-      </div>
 
-      {hasMore && !loading && (
-        <button
-          onClick={loadMore}
-          className="w-full rounded-md border border-gray-200 py-1.5 text-xs text-gray-500 hover:bg-gray-50 transition-colors"
-        >
-          Load more ({total - results.length} remaining)
-        </button>
-      )}
+        {hasMore && !loading && (
+          <button
+            onClick={loadMore}
+            className="w-full rounded-md border border-gray-200 py-1.5 text-xs text-gray-500 hover:bg-gray-50 transition-colors"
+          >
+            Load more ({total - results.length} remaining)
+          </button>
+        )}
+      </div>
     </div>
   );
 }
