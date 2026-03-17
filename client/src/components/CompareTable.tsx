@@ -1,5 +1,11 @@
-import type { ComparisonData } from '../hooks/useCompareData';
+import type { ActivityDetailResponse } from '../types';
 import { formatPace, formatHeartRate, formatDuration } from '../lib/format';
+
+interface ActivityEntry {
+  detail: ActivityDetailResponse;
+  label: string;
+  color: string;
+}
 
 function formatPaceDiff(speedA: number, speedB: number): string {
   if (speedA <= 0 || speedB <= 0) return '--';
@@ -31,27 +37,38 @@ function formatTimeDiff(cumA: number, cumB: number): string {
   return `${sign}${s}s`;
 }
 
-export function CompareTable({ data }: { data: ComparisonData }) {
-  const maxKm = Math.max(data.a.splits.length, data.b.splits.length);
+export function CompareTable({ entries }: { entries: ActivityEntry[] }) {
+  const n = entries.length;
+  if (n === 0) return null;
 
-  let cumTimeA = 0;
-  let cumTimeB = 0;
+  const showDiff = n === 2;
+  const maxKm = Math.max(...entries.map(e => e.detail.splits.length));
+  const colsPerMetric = n + (showDiff ? 1 : 0);
 
-  const rows: { km: string; splitA: typeof data.a.splits[0] | null; splitB: typeof data.b.splits[0] | null; cumA: number; cumB: number }[] = [];
+  const cumTimes = entries.map(() => 0);
+
+  const rows: {
+    km: string;
+    splits: (typeof entries[0]['detail']['splits'][0] | null)[];
+    cumTimes: number[];
+  }[] = [];
+
   for (let i = 0; i < maxKm; i++) {
-    const splitA = data.a.splits[i] ?? null;
-    const splitB = data.b.splits[i] ?? null;
+    const splits = entries.map(e => e.detail.splits[i] ?? null);
+    splits.forEach((split, j) => {
+      if (split) cumTimes[j] += split.elapsed_time;
+    });
 
-    if (splitA) cumTimeA += splitA.elapsed_time;
-    if (splitB) cumTimeB += splitB.elapsed_time;
+    let kmLabel = String(i + 1);
+    for (let j = 0; j < entries.length; j++) {
+      const split = splits[j];
+      if (split && i === entries[j].detail.splits.length - 1 && split.distance < 900) {
+        kmLabel = (split.distance / 1000).toFixed(1);
+        break;
+      }
+    }
 
-    const isLastA = splitA && i === data.a.splits.length - 1 && splitA.distance < 900;
-    const isLastB = splitB && i === data.b.splits.length - 1 && splitB.distance < 900;
-    const kmLabel = (isLastA || isLastB)
-      ? ((splitA?.distance ?? splitB?.distance ?? 0) / 1000).toFixed(1)
-      : String(i + 1);
-
-    rows.push({ km: kmLabel, splitA, splitB, cumA: cumTimeA, cumB: cumTimeB });
+    rows.push({ km: kmLabel, splits, cumTimes: [...cumTimes] });
   }
 
   return (
@@ -60,57 +77,78 @@ export function CompareTable({ data }: { data: ComparisonData }) {
         <thead>
           <tr className="border-b border-gray-200 text-gray-500">
             <th rowSpan={2} className="py-2 pr-2 text-left font-medium">km</th>
-            <th colSpan={3} className="border-l border-gray-200 px-2 py-1 text-center font-medium">Pace</th>
-            <th colSpan={3} className="border-l border-gray-200 px-2 py-1 text-center font-medium">HR</th>
-            <th colSpan={3} className="border-l border-gray-200 px-2 py-1 text-center font-medium">Time</th>
+            <th colSpan={colsPerMetric} className="border-l border-gray-200 px-2 py-1 text-center font-medium">Pace</th>
+            <th colSpan={colsPerMetric} className="border-l border-gray-200 px-2 py-1 text-center font-medium">HR</th>
+            <th colSpan={colsPerMetric} className="border-l border-gray-200 px-2 py-1 text-center font-medium">Time</th>
           </tr>
-          <tr className="border-b border-gray-200 text-gray-400 text-xs">
-            <th className="border-l border-gray-200 px-2 py-1 text-right font-medium">A</th>
-            <th className="px-2 py-1 text-right font-medium">B</th>
-            <th className="px-2 py-1 text-right font-medium">Diff</th>
-            <th className="border-l border-gray-200 px-2 py-1 text-right font-medium">A</th>
-            <th className="px-2 py-1 text-right font-medium">B</th>
-            <th className="px-2 py-1 text-right font-medium">Diff</th>
-            <th className="border-l border-gray-200 px-2 py-1 text-right font-medium">A</th>
-            <th className="px-2 py-1 text-right font-medium">B</th>
-            <th className="px-2 py-1 text-right font-medium">Diff</th>
+          <tr className="border-b border-gray-200 text-xs text-gray-400">
+            {/* Pace sub-headers */}
+            {entries.map((e, j) => (
+              <th key={`pace-${j}`} className={`px-2 py-1 text-right font-medium ${j === 0 ? 'border-l border-gray-200' : ''}`}>
+                {e.label}
+              </th>
+            ))}
+            {showDiff && <th className="px-2 py-1 text-right font-medium">Diff</th>}
+            {/* HR sub-headers */}
+            {entries.map((e, j) => (
+              <th key={`hr-${j}`} className={`px-2 py-1 text-right font-medium ${j === 0 ? 'border-l border-gray-200' : ''}`}>
+                {e.label}
+              </th>
+            ))}
+            {showDiff && <th className="px-2 py-1 text-right font-medium">Diff</th>}
+            {/* Time sub-headers */}
+            {entries.map((e, j) => (
+              <th key={`time-${j}`} className={`px-2 py-1 text-right font-medium ${j === 0 ? 'border-l border-gray-200' : ''}`}>
+                {e.label}
+              </th>
+            ))}
+            {showDiff && <th className="px-2 py-1 text-right font-medium">Diff</th>}
           </tr>
         </thead>
         <tbody className="tabular-nums">
           {rows.map((row) => (
             <tr key={row.km} className="border-b border-gray-100 hover:bg-gray-50">
               <td className="py-2 pr-2 text-gray-500">{row.km}</td>
-              <td className="border-l border-gray-200 px-2 py-2 text-right">
-                {row.splitA ? formatPace(row.splitA.average_speed) : '--'}
-              </td>
-              <td className="px-2 py-2 text-right">
-                {row.splitB ? formatPace(row.splitB.average_speed) : '--'}
-              </td>
-              <td className="px-2 py-2 text-right text-gray-400">
-                {row.splitA && row.splitB
-                  ? formatPaceDiff(row.splitA.average_speed, row.splitB.average_speed)
-                  : '--'}
-              </td>
-              <td className="border-l border-gray-200 px-2 py-2 text-right">
-                {formatHeartRate(row.splitA?.average_heartrate ?? undefined)}
-              </td>
-              <td className="px-2 py-2 text-right">
-                {formatHeartRate(row.splitB?.average_heartrate ?? undefined)}
-              </td>
-              <td className="px-2 py-2 text-right text-gray-400">
-                {formatHrDiff(row.splitA?.average_heartrate ?? null, row.splitB?.average_heartrate ?? null)}
-              </td>
-              <td className="border-l border-gray-200 px-2 py-2 text-right">
-                {row.splitA ? formatDuration(row.cumA) : '--'}
-              </td>
-              <td className="px-2 py-2 text-right">
-                {row.splitB ? formatDuration(row.cumB) : '--'}
-              </td>
-              <td className="px-2 py-2 text-right text-gray-400">
-                {row.splitA && row.splitB
-                  ? formatTimeDiff(row.cumA, row.cumB)
-                  : '--'}
-              </td>
+
+              {/* Pace columns */}
+              {row.splits.map((split, j) => (
+                <td key={`pace-${j}`} className={`px-2 py-2 text-right ${j === 0 ? 'border-l border-gray-200' : ''}`}>
+                  {split ? formatPace(split.average_speed) : '--'}
+                </td>
+              ))}
+              {showDiff && (
+                <td className="px-2 py-2 text-right text-gray-400">
+                  {row.splits[0] && row.splits[1]
+                    ? formatPaceDiff(row.splits[0].average_speed, row.splits[1].average_speed)
+                    : '--'}
+                </td>
+              )}
+
+              {/* HR columns */}
+              {row.splits.map((split, j) => (
+                <td key={`hr-${j}`} className={`px-2 py-2 text-right ${j === 0 ? 'border-l border-gray-200' : ''}`}>
+                  {formatHeartRate(split?.average_heartrate ?? undefined)}
+                </td>
+              ))}
+              {showDiff && (
+                <td className="px-2 py-2 text-right text-gray-400">
+                  {formatHrDiff(row.splits[0]?.average_heartrate ?? null, row.splits[1]?.average_heartrate ?? null)}
+                </td>
+              )}
+
+              {/* Time columns */}
+              {row.splits.map((split, j) => (
+                <td key={`time-${j}`} className={`px-2 py-2 text-right ${j === 0 ? 'border-l border-gray-200' : ''}`}>
+                  {split ? formatDuration(row.cumTimes[j]) : '--'}
+                </td>
+              ))}
+              {showDiff && (
+                <td className="px-2 py-2 text-right text-gray-400">
+                  {row.splits[0] && row.splits[1]
+                    ? formatTimeDiff(row.cumTimes[0], row.cumTimes[1])
+                    : '--'}
+                </td>
+              )}
             </tr>
           ))}
         </tbody>

@@ -5,17 +5,21 @@ import { DISTANCE_PRESETS } from '../lib/distances';
 import { formatDistance, formatDuration, formatDate } from '../lib/format';
 import type { SearchResult } from '../types';
 
+const ACTIVITY_COLORS = [
+  '#f97316', '#3b82f6', '#10b981', '#8b5cf6', '#ef4444',
+  '#06b6d4', '#f59e0b', '#ec4899', '#6366f1', '#14b8a6',
+];
+
 interface Props {
-  selectedA: SearchResult | null;
-  selectedB: SearchResult | null;
-  onSelectA: (activity: SearchResult) => void;
-  onSelectB: (activity: SearchResult) => void;
+  selectedIds: string[];
+  onToggle: (activity: SearchResult) => void;
+  maxSelections: number;
 }
 
 const SLIDER_MAX_KM = 100;
 const SLIDER_STEP_KM = 1;
 
-export function ActivitySearchPanel({ selectedA, selectedB, onSelectA, onSelectB }: Props) {
+export function ActivitySearchPanel({ selectedIds, onToggle, maxSelections }: Props) {
   const { results, total, loading, filters, setFilters, loadMore, hasMore } = useActivitySearch();
   const { syncing, totalStored } = useBackfill();
   const [activePreset, setActivePreset] = useState<string | null>(null);
@@ -70,10 +74,11 @@ export function ActivitySearchPanel({ selectedA, selectedB, onSelectA, onSelectB
     setFilters({ ...filters, query: value || undefined });
   }, [filters, setFilters]);
 
-  const isSelected = (id: number) => selectedA?.id === id || selectedB?.id === id;
+  const getSelectionIndex = (id: number) => selectedIds.indexOf(String(id));
+  const atLimit = selectedIds.length >= maxSelections;
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col space-y-4">
+    <div className="flex min-h-0 flex-1 flex-col space-y-3">
       {/* Sync indicator */}
       {syncing && (
         <p className="text-xs text-gray-400">
@@ -91,12 +96,12 @@ export function ActivitySearchPanel({ selectedA, selectedB, onSelectA, onSelectB
       />
 
       {/* Preset distance pills */}
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-1.5">
         {DISTANCE_PRESETS.map((preset) => (
           <button
             key={preset.label}
             onClick={() => handlePresetClick(preset)}
-            className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+            className={`rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors ${
               activePreset === preset.label
                 ? 'bg-orange-500 text-white'
                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -147,47 +152,41 @@ export function ActivitySearchPanel({ selectedA, selectedB, onSelectA, onSelectB
 
       {/* Results — fills remaining height */}
       <div className="min-h-0 flex-1 space-y-1 overflow-y-auto">
-        {results.map((activity) => (
-          <div
-            key={activity.id}
-            className={`flex items-center justify-between rounded-md border px-3 py-2 ${
-              isSelected(activity.id)
-                ? 'border-orange-300 bg-orange-50'
-                : 'border-gray-200 hover:bg-gray-50'
-            }`}
-          >
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium text-gray-900">{activity.name}</p>
-              <p className="text-xs text-gray-500">
-                {formatDate(activity.start_date_local)} &middot; {formatDistance(activity.distance)} km &middot; {formatDuration(activity.moving_time)}
-              </p>
+        {results.map((activity) => {
+          const idx = getSelectionIndex(activity.id);
+          const selected = idx >= 0;
+          const disabled = !selected && atLimit;
+
+          return (
+            <div
+              key={activity.id}
+              onClick={() => !disabled && onToggle(activity)}
+              className={`flex items-center rounded-md border px-3 py-2 transition-colors ${
+                selected
+                  ? 'border-l-4 bg-gray-50'
+                  : disabled
+                    ? 'cursor-not-allowed border-gray-200 opacity-50'
+                    : 'cursor-pointer border-gray-200 hover:bg-gray-50'
+              }`}
+              style={selected ? { borderLeftColor: ACTIVITY_COLORS[idx % ACTIVITY_COLORS.length] } : undefined}
+            >
+              {selected && (
+                <span
+                  className="mr-2 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white"
+                  style={{ backgroundColor: ACTIVITY_COLORS[idx % ACTIVITY_COLORS.length] }}
+                >
+                  {String.fromCharCode(65 + idx)}
+                </span>
+              )}
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium text-gray-900">{activity.name}</p>
+                <p className="text-xs text-gray-500">
+                  {formatDate(activity.start_date_local)} &middot; {formatDistance(activity.distance)} km &middot; {formatDuration(activity.moving_time)}
+                </p>
+              </div>
             </div>
-            <div className="ml-2 flex gap-1">
-              <button
-                onClick={() => onSelectA(activity)}
-                disabled={selectedA?.id === activity.id}
-                className={`rounded px-2 py-0.5 text-xs font-medium transition-colors ${
-                  selectedA?.id === activity.id
-                    ? 'bg-orange-500 text-white'
-                    : 'bg-gray-100 text-gray-600 hover:bg-orange-100 hover:text-orange-700'
-                }`}
-              >
-                A
-              </button>
-              <button
-                onClick={() => onSelectB(activity)}
-                disabled={selectedB?.id === activity.id}
-                className={`rounded px-2 py-0.5 text-xs font-medium transition-colors ${
-                  selectedB?.id === activity.id
-                    ? 'bg-orange-500 text-white'
-                    : 'bg-gray-100 text-gray-600 hover:bg-orange-100 hover:text-orange-700'
-                }`}
-              >
-                B
-              </button>
-            </div>
-          </div>
-        ))}
+          );
+        })}
 
         {loading && (
           <p className="py-2 text-center text-xs text-gray-400">Loading...</p>

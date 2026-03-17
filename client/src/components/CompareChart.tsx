@@ -1,14 +1,20 @@
 import { useState } from 'react';
 import { ResponsiveContainer, LineChart, XAxis, YAxis, Tooltip, Line, Legend } from 'recharts';
-import type { CompareChartPoint } from '../hooks/useCompareChartData';
+import type { MultiCompareChartPoint } from '../hooks/useMultiCompareChartData';
 
 type Metric = 'pace' | 'hr' | 'time';
 
-const METRICS: { key: Metric; label: string; color: string; keyA: keyof CompareChartPoint; keyB: keyof CompareChartPoint; rawA: keyof CompareChartPoint; rawB: keyof CompareChartPoint }[] = [
-  { key: 'pace', label: 'Pace', color: '#3b82f6', keyA: 'paceA', keyB: 'paceB', rawA: 'rawPaceA', rawB: 'rawPaceB' },
-  { key: 'hr', label: 'Heart Rate', color: '#ef4444', keyA: 'hrA', keyB: 'hrB', rawA: 'rawHrA', rawB: 'rawHrB' },
-  { key: 'time', label: 'Time', color: '#10b981', keyA: 'timeA', keyB: 'timeB', rawA: 'rawTimeA', rawB: 'rawTimeB' },
+const METRICS: { key: Metric; label: string }[] = [
+  { key: 'pace', label: 'Pace' },
+  { key: 'hr', label: 'Heart Rate' },
+  { key: 'time', label: 'Time' },
 ];
+
+const RAW_KEY_PREFIX: Record<Metric, string> = {
+  pace: 'rawPace',
+  hr: 'rawHr',
+  time: 'rawTime',
+};
 
 function formatYAxis(value: number, metric: Metric): string {
   if (metric === 'pace') {
@@ -26,34 +32,39 @@ function formatYAxis(value: number, metric: Metric): string {
   return String(value);
 }
 
-function CustomTooltip({ active, payload, label, nameA, nameB, metric }: {
+interface ActivityInfo {
+  name: string;
+  color: string;
+}
+
+function CustomTooltip({ active, payload, label, activities, metric }: {
   active?: boolean;
-  payload?: { dataKey: string; color: string; payload: CompareChartPoint }[];
+  payload?: { payload: MultiCompareChartPoint }[];
   label?: string;
-  nameA: string;
-  nameB: string;
+  activities: ActivityInfo[];
   metric: Metric;
 }) {
   if (!active || !payload?.length) return null;
 
   const data = payload[0].payload;
-  const m = METRICS.find((m) => m.key === metric)!;
+  const prefix = RAW_KEY_PREFIX[metric];
 
   return (
     <div className="rounded-md border border-gray-200 bg-white px-3 py-2 text-sm shadow-md">
       <p className="mb-1 font-medium text-gray-700">km {label}</p>
-      <p style={{ color: m.color }}>{nameA}: {data[m.rawA] as string}</p>
-      <p style={{ color: m.color }} className="opacity-60">{nameB}: {data[m.rawB] as string}</p>
+      {activities.map((a, i) => (
+        <p key={i} style={{ color: a.color }}>
+          {a.name}: {String(data[`${prefix}_${i}`])}
+        </p>
+      ))}
     </div>
   );
 }
 
-export function CompareChart({ data, nameA, nameB }: { data: CompareChartPoint[]; nameA: string; nameB: string }) {
+export function CompareChart({ data, activities }: { data: MultiCompareChartPoint[]; activities: ActivityInfo[] }) {
   const [metric, setMetric] = useState<Metric>('pace');
 
   if (data.length === 0) return null;
-
-  const m = METRICS.find((m) => m.key === metric)!;
 
   return (
     <div className="mb-8 rounded-lg bg-white shadow-sm">
@@ -75,52 +86,44 @@ export function CompareChart({ data, nameA, nameB }: { data: CompareChartPoint[]
         </nav>
       </div>
       <div className="p-4">
-      <ResponsiveContainer width="100%" height={300}>
-        <LineChart data={data}>
-          <XAxis dataKey="km" tick={{ fontSize: 12 }} />
-          <YAxis
-            tick={{ fontSize: 12 }}
-            tickFormatter={(v) => formatYAxis(v, metric)}
-            reversed={metric === 'pace'}
-            domain={['auto', 'auto']}
-          />
-          <Tooltip content={<CustomTooltip nameA={nameA} nameB={nameB} metric={metric} />} />
-          <Legend
-            content={() => (
-              <div className="flex justify-center gap-6 pt-2 text-sm">
-                <span className="flex items-center gap-1.5">
-                  <svg width="16" height="2"><line x1="0" y1="1" x2="16" y2="1" stroke={m.color} strokeWidth="2" /></svg>
-                  <span style={{ color: m.color }}>{nameA}</span>
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <svg width="16" height="2"><line x1="0" y1="1" x2="16" y2="1" stroke={m.color} strokeWidth="2" strokeDasharray="3 3" opacity="0.6" /></svg>
-                  <span style={{ color: m.color, opacity: 0.6 }}>{nameB}</span>
-                </span>
-              </div>
-            )}
-          />
-          <Line
-            type="monotone"
-            dataKey={m.keyA as string}
-            name={nameA}
-            stroke={m.color}
-            strokeWidth={2}
-            dot={{ r: 2 }}
-            connectNulls
-          />
-          <Line
-            type="monotone"
-            dataKey={m.keyB as string}
-            name={nameB}
-            stroke={m.color}
-            strokeWidth={2}
-            strokeDasharray="5 5"
-            dot={{ r: 2 }}
-            connectNulls
-            opacity={0.6}
-          />
-        </LineChart>
-      </ResponsiveContainer>
+        <ResponsiveContainer width="100%" height={300}>
+          <LineChart data={data}>
+            <XAxis dataKey="km" tick={{ fontSize: 12 }} />
+            <YAxis
+              tick={{ fontSize: 12 }}
+              tickFormatter={(v) => formatYAxis(v, metric)}
+              reversed={metric === 'pace'}
+              domain={['auto', 'auto']}
+            />
+            <Tooltip content={<CustomTooltip activities={activities} metric={metric} />} />
+            <Legend
+              content={() => (
+                <div className="flex flex-wrap justify-center gap-4 pt-2 text-sm">
+                  {activities.map((a, i) => (
+                    <span key={i} className="flex items-center gap-1.5">
+                      <svg width="16" height="2">
+                        <line x1="0" y1="1" x2="16" y2="1" stroke={a.color} strokeWidth="2" />
+                      </svg>
+                      <span style={{ color: a.color }}>{a.name}</span>
+                    </span>
+                  ))}
+                </div>
+              )}
+            />
+            {activities.map((a, i) => (
+              <Line
+                key={i}
+                type="monotone"
+                dataKey={`${metric}_${i}`}
+                name={a.name}
+                stroke={a.color}
+                strokeWidth={2}
+                dot={{ r: 2 }}
+                connectNulls
+              />
+            ))}
+          </LineChart>
+        </ResponsiveContainer>
       </div>
     </div>
   );
