@@ -4,13 +4,16 @@ import { CompareTable } from './CompareTable';
 import { useActivityDetailCache } from '../hooks/useActivityDetailCache';
 import { useMultiCompareChartData } from '../hooks/useMultiCompareChartData';
 import { ACTIVITY_COLORS } from '../lib/colors';
+import { formatDistance, formatDuration, formatDate } from '../lib/format';
+import type { ActivityDetailResponse } from '../types';
 
 interface Props {
   ids: string[];
   shareButton?: ReactNode;
+  showActivityInfo?: boolean;
 }
 
-export function CompareView({ ids, shareButton }: Props) {
+export function CompareView({ ids, shareButton, showActivityInfo }: Props) {
   const { data, loading, errors, fetchActivity } = useActivityDetailCache();
 
   useEffect(() => {
@@ -43,7 +46,7 @@ export function CompareView({ ids, shareButton }: Props) {
   const anyLoading = ids.some(id => loading[id]);
   const failedIds = ids.filter(id => errors[id]);
 
-  return (
+  const mainContent = (
     <>
       {shareButton && activityEntries.length > 0 && (
         <div className="mb-4 flex justify-end">
@@ -77,6 +80,46 @@ export function CompareView({ ids, shareButton }: Props) {
         <p className="mt-4 text-center text-sm text-gray-400">Loading more activities...</p>
       )}
     </>
+  );
+
+  if (showActivityInfo && activityEntries.length > 0) {
+    return (
+      <div className="flex gap-8">
+        <div className="min-w-0 flex-1">{mainContent}</div>
+        <ActivityInfoPanel entries={activityEntries} />
+      </div>
+    );
+  }
+
+  return mainContent;
+}
+
+function ActivityInfoPanel({ entries }: {
+  entries: { detail: ActivityDetailResponse; label: string; color: string }[];
+}) {
+  return (
+    <div className="w-56 shrink-0">
+      <div className="sticky top-8 space-y-3">
+        {entries.map((entry) => (
+          <div key={entry.detail.activity.id} className="rounded-md border border-gray-200 bg-white p-3">
+            <div className="mb-1 flex items-center gap-2">
+              <span
+                className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white"
+                style={{ backgroundColor: entry.color }}
+              >
+                {entry.label}
+              </span>
+              <p className="truncate text-sm font-medium text-gray-900">
+                {entry.detail.activity.name}
+              </p>
+            </div>
+            <p className="pl-7 text-xs text-gray-500">
+              {formatDate(entry.detail.activity.start_date_local)} &middot; {formatDistance(entry.detail.activity.distance)} km &middot; {formatDuration(entry.detail.activity.moving_time)}
+            </p>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 
