@@ -1,26 +1,27 @@
-import { useEffect, useMemo, type ReactNode } from 'react';
+import { useMemo, type ReactNode } from 'react';
 import { CompareChart } from './CompareChart';
 import { CompareTable } from './CompareTable';
-import { useActivityDetailCache } from '../hooks/useActivityDetailCache';
 import { useMultiCompareChartData } from '../hooks/useMultiCompareChartData';
 import { ACTIVITY_COLORS } from '../lib/colors';
 import { formatDistance, formatDuration, formatDate } from '../lib/format';
 import type { ActivityDetailResponse } from '../types';
 
+export interface ActivityDetailCache {
+  data: Record<string, ActivityDetailResponse>;
+  loading: Record<string, boolean>;
+  errors: Record<string, string>;
+  fetchActivity: (id: string) => void;
+}
+
 interface Props {
   ids: string[];
+  cache: ActivityDetailCache;
   shareButton?: ReactNode;
   showActivityInfo?: boolean;
 }
 
-export function CompareView({ ids, shareButton, showActivityInfo }: Props) {
-  const { data, loading, errors, fetchActivity } = useActivityDetailCache();
-
-  useEffect(() => {
-    for (const id of ids) {
-      fetchActivity(id);
-    }
-  }, [ids, fetchActivity]);
+export function CompareView({ ids, cache, shareButton, showActivityInfo }: Props) {
+  const { data, loading, errors } = cache;
 
   const activityEntries = useMemo(() => {
     return ids
@@ -37,10 +38,24 @@ export function CompareView({ ids, shareButton, showActivityInfo }: Props) {
   }, [ids, data]);
 
   const chartData = useMultiCompareChartData(activityEntries.map(e => e.detail));
-  const chartActivities = activityEntries.map(e => ({
-    name: e.detail.activity.name,
-    color: e.color,
-  }));
+
+  const hasMultipleAthletes = useMemo(() => {
+    const athleteIds = new Set(
+      activityEntries
+        .map(e => e.detail.activity.athlete_id)
+        .filter(Boolean)
+    );
+    return athleteIds.size > 1;
+  }, [activityEntries]);
+
+  const chartActivities = activityEntries.map(e => {
+    const activity = e.detail.activity;
+    let name = activity.name;
+    if (hasMultipleAthletes && activity.athlete_name) {
+      name = `${name} (${activity.athlete_name})`;
+    }
+    return { name, color: e.color };
+  });
 
   const hasSelected = ids.length > 0;
   const anyLoading = ids.some(id => loading[id]);
@@ -86,7 +101,7 @@ export function CompareView({ ids, shareButton, showActivityInfo }: Props) {
     return (
       <div className="flex gap-8">
         <div className="min-w-0 flex-1">{mainContent}</div>
-        <ActivityInfoPanel entries={activityEntries} />
+        <ActivityInfoPanel entries={activityEntries} hasMultipleAthletes={hasMultipleAthletes} />
       </div>
     );
   }
@@ -94,8 +109,9 @@ export function CompareView({ ids, shareButton, showActivityInfo }: Props) {
   return mainContent;
 }
 
-function ActivityInfoPanel({ entries }: {
+function ActivityInfoPanel({ entries, hasMultipleAthletes }: {
   entries: { detail: ActivityDetailResponse; label: string; color: string }[];
+  hasMultipleAthletes: boolean;
 }) {
   return (
     <div className="w-56 shrink-0">
@@ -109,9 +125,16 @@ function ActivityInfoPanel({ entries }: {
               >
                 {entry.label}
               </span>
-              <p className="truncate text-sm font-medium text-gray-900">
-                {entry.detail.activity.name}
-              </p>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium text-gray-900">
+                  {entry.detail.activity.name}
+                </p>
+                {hasMultipleAthletes && entry.detail.activity.athlete_name && (
+                  <p className="truncate text-xs text-gray-400">
+                    {entry.detail.activity.athlete_name}
+                  </p>
+                )}
+              </div>
             </div>
             <p className="pl-7 text-xs text-gray-500">
               {formatDate(entry.detail.activity.start_date_local)} &middot; {formatDistance(entry.detail.activity.distance)} km &middot; {formatDuration(entry.detail.activity.moving_time)}

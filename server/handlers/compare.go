@@ -17,6 +17,7 @@ type CompareHandler struct {
 	Store         *store.TokenStore
 	Strava        *strava.Client
 	ActivityCache *store.ActivityCacheStore
+	AthleteStore  *store.AthleteStore
 }
 
 type activityResponse struct {
@@ -26,6 +27,8 @@ type activityResponse struct {
 	MovingTime     int     `json:"moving_time"`
 	StartDateLocal string  `json:"start_date_local"`
 	Type           string  `json:"type"`
+	AthleteID      int64   `json:"athlete_id,omitempty"`
+	AthleteName    string  `json:"athlete_name,omitempty"`
 }
 
 type splitResponse struct {
@@ -136,6 +139,17 @@ func (h *CompareHandler) fetchAndCacheActivity(accessToken string, activityID in
 		}
 	}
 
+	athleteID := detail.Athlete.ID
+	var athleteName string
+	if athleteID != 0 && h.AthleteStore != nil {
+		name, err := h.AthleteStore.GetName(athleteID)
+		if err != nil {
+			log.Printf("Athlete name lookup error for %d: %v", athleteID, err)
+		} else {
+			athleteName = name
+		}
+	}
+
 	resp := detailResponse{
 		Activity: activityResponse{
 			ID:             detail.ID,
@@ -144,6 +158,8 @@ func (h *CompareHandler) fetchAndCacheActivity(accessToken string, activityID in
 			MovingTime:     detail.MovingTime,
 			StartDateLocal: detail.StartDateLocal,
 			Type:           detail.Type,
+			AthleteID:      athleteID,
+			AthleteName:    athleteName,
 		},
 		Splits: splits,
 	}
@@ -185,7 +201,7 @@ func (h *CompareHandler) GetActivityDetail(w http.ResponseWriter, r *http.Reques
 	if entry != nil {
 		w.Header().Set("X-Data-Source", "cache")
 		w.Header().Set("Content-Type", "application/json")
-		w.Write(entry.Data)
+		w.Write(h.enrichWithAthleteName(entry.Data))
 
 		// Check if cache is stale and we can revalidate in the background
 		if sessionToken := getSessionToken(r); sessionToken != "" {
@@ -271,6 +287,33 @@ func (h *CompareHandler) isStale(entry *store.CacheEntry) bool {
 	}
 
 	return false
+}
+
+func (h *CompareHandler) enrichWithAthleteName(data []byte) []byte {
+	if h.AthleteStore == nil {
+		return data
+	}
+
+	var parsed detailResponse
+	if err := json.Unmarshal(data, &parsed); err != nil {
+		return data
+	}
+
+	if parsed.Activity.AthleteID == 0 || parsed.Activity.AthleteName != "" {
+		return data
+	}
+
+	name, err := h.AthleteStore.GetName(parsed.Activity.AthleteID)
+	if err != nil || name == "" {
+		return data
+	}
+
+	parsed.Activity.AthleteName = name
+	enriched, err := json.Marshal(parsed)
+	if err != nil {
+		return data
+	}
+	return enriched
 }
 
 func (h *CompareHandler) resolveAccessToken(sessionToken string) (string, error) {

@@ -1,6 +1,7 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { CompareView } from '../components/CompareView';
+import { useActivityDetailCache } from '../hooks/useActivityDetailCache';
 import { decodeCompareIds } from '../lib/compareUrl';
 import { getSessionToken } from '../lib/api';
 
@@ -8,6 +9,15 @@ export function CompareSharePage() {
   const { encoded } = useParams<{ encoded: string }>();
   const ids = useMemo(() => decodeCompareIds(encoded ?? ''), [encoded]);
   const isAuthenticated = !!getSessionToken();
+
+  const cache = useActivityDetailCache();
+  const { fetchActivity } = cache;
+
+  useEffect(() => {
+    for (const id of ids) {
+      fetchActivity(id);
+    }
+  }, [ids, fetchActivity]);
 
   if (ids.length === 0) {
     return (
@@ -29,7 +39,7 @@ export function CompareSharePage() {
             </Link>
           </div>
         )}
-        <CompareView ids={ids} showActivityInfo />
+        <CompareView ids={ids} cache={cache} showActivityInfo />
       </div>
       <footer className="py-6 text-center text-sm text-gray-400">
         <p>

@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 
 	"cadence-server/store"
 )
@@ -25,12 +26,19 @@ type tokenResponse struct {
 	AccessToken  string `json:"access_token"`
 	RefreshToken string `json:"refresh_token"`
 	ExpiresAt    int64  `json:"expires_at"`
-	Athlete      struct {
-		ID int64 `json:"id"`
+	Athlete struct {
+		ID        int64  `json:"id"`
+		Firstname string `json:"firstname"`
+		Lastname  string `json:"lastname"`
 	} `json:"athlete"`
 }
 
-func (c *Client) ExchangeCodeForTokens(code string) (*store.Tokens, error) {
+type TokenExchangeResult struct {
+	Tokens      store.Tokens
+	AthleteName string
+}
+
+func (c *Client) ExchangeCodeForTokens(code string) (*TokenExchangeResult, error) {
 	resp, err := http.PostForm(stravaOAuth+"/token", url.Values{
 		"client_id":     {c.ClientID},
 		"client_secret": {c.ClientSecret},
@@ -52,11 +60,16 @@ func (c *Client) ExchangeCodeForTokens(code string) (*store.Tokens, error) {
 		return nil, fmt.Errorf("token exchange decode failed: %w", err)
 	}
 
-	return &store.Tokens{
-		AccessToken:  data.AccessToken,
-		RefreshToken: data.RefreshToken,
-		ExpiresAt:    data.ExpiresAt,
-		AthleteID:    data.Athlete.ID,
+	name := strings.TrimSpace(data.Athlete.Firstname + " " + data.Athlete.Lastname)
+
+	return &TokenExchangeResult{
+		Tokens: store.Tokens{
+			AccessToken:  data.AccessToken,
+			RefreshToken: data.RefreshToken,
+			ExpiresAt:    data.ExpiresAt,
+			AthleteID:    data.Athlete.ID,
+		},
+		AthleteName: name,
 	}, nil
 }
 
@@ -124,6 +137,9 @@ type ActivityDetail struct {
 	Type           string  `json:"type"`
 	HasHeartrate   bool    `json:"has_heartrate"`
 	SplitsMetric   []Split `json:"splits_metric"`
+	Athlete        struct {
+		ID int64 `json:"id"`
+	} `json:"athlete"`
 }
 
 func (c *Client) FetchActivityDetail(accessToken string, activityID int64) (*ActivityDetail, error) {

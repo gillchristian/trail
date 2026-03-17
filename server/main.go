@@ -7,8 +7,8 @@ import (
 	"os"
 
 	"cadence-server/handlers"
-	"cadence-server/strava"
 	"cadence-server/store"
+	"cadence-server/strava"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/cors"
@@ -40,6 +40,7 @@ func main() {
 	tokenStore := store.NewTokenStore(db)
 	activityCache := store.NewActivityCacheStore(db)
 	activityStore := store.NewActivityStore(db)
+	athleteStore := store.NewAthleteStore(db)
 
 	stravaClient := &strava.Client{
 		ClientID:     clientID,
@@ -47,11 +48,12 @@ func main() {
 	}
 
 	authHandler := &handlers.AuthHandler{
-		Store:       tokenStore,
-		Strava:      stravaClient,
-		ClientID:    clientID,
-		APIBaseURL:  apiBaseURL,
-		FrontendURL: frontendURL,
+		Store:        tokenStore,
+		AthleteStore: athleteStore,
+		Strava:       stravaClient,
+		ClientID:     clientID,
+		APIBaseURL:   apiBaseURL,
+		FrontendURL:  frontendURL,
 	}
 
 	backfillHandler := &handlers.BackfillHandler{
@@ -71,6 +73,7 @@ func main() {
 		Store:         tokenStore,
 		Strava:        stravaClient,
 		ActivityCache: activityCache,
+		AthleteStore:  athleteStore,
 	}
 
 	r := chi.NewRouter()

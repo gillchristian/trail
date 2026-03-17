@@ -35,6 +35,8 @@ export interface ActivitySummary {
   moving_time: number;
   start_date_local: string;
   type: string;
+  athlete_id?: number;
+  athlete_name?: string;
 }
 
 export interface ActivityDetailResponse {

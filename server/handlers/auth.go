@@ -13,11 +13,12 @@ import (
 )
 
 type AuthHandler struct {
-	Store       *store.TokenStore
-	Strava      *strava.Client
-	ClientID    string
-	APIBaseURL  string
-	FrontendURL string
+	Store        *store.TokenStore
+	AthleteStore *store.AthleteStore
+	Strava       *strava.Client
+	ClientID     string
+	APIBaseURL   string
+	FrontendURL  string
 }
 
 func getSessionToken(r *http.Request) string {
@@ -45,7 +46,7 @@ func (h *AuthHandler) Callback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tokens, err := h.Strava.ExchangeCodeForTokens(code)
+	result, err := h.Strava.ExchangeCodeForTokens(code)
 	if err != nil {
 		log.Printf("OAuth callback error: %v", err)
 		http.Error(w, "Authentication failed", http.StatusInternalServerError)
@@ -59,10 +60,16 @@ func (h *AuthHandler) Callback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.Store.SetTokens(*tokens, sessionToken); err != nil {
+	if err := h.Store.SetTokens(result.Tokens, sessionToken); err != nil {
 		log.Printf("Token store error: %v", err)
 		http.Error(w, "Authentication failed", http.StatusInternalServerError)
 		return
+	}
+
+	if result.AthleteName != "" {
+		if err := h.AthleteStore.Upsert(result.Tokens.AthleteID, result.AthleteName); err != nil {
+			log.Printf("Athlete name store error: %v", err)
+		}
 	}
 
 	http.Redirect(w, r, h.FrontendURL+"/?token="+url.QueryEscape(sessionToken), http.StatusFound)

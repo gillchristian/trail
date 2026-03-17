@@ -1,12 +1,13 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { ActivitySearchPanel } from '../components/ActivitySearchPanel';
 import { CompareView } from '../components/CompareView';
+import { useActivityDetailCache } from '../hooks/useActivityDetailCache';
 import { parseActivityId, isStravaShortLink } from '../lib/parseActivityId';
 import { encodeCompareIds } from '../lib/compareUrl';
 import { ACTIVITY_COLORS } from '../lib/colors';
 import { apiFetch } from '../lib/api';
-import type { SearchResult } from '../types';
+import type { SearchResult, ActivityDetailResponse } from '../types';
 
 const MAX_ACTIVITIES = 10;
 
@@ -17,6 +18,15 @@ export function ComparePage() {
     () => idsParam ? [...new Set(idsParam.split(',').filter(Boolean))] : [],
     [idsParam],
   );
+
+  const cache = useActivityDetailCache();
+  const { fetchActivity } = cache;
+
+  useEffect(() => {
+    for (const id of selectedIds) {
+      fetchActivity(id);
+    }
+  }, [selectedIds, fetchActivity]);
 
   const [inputValue, setInputValue] = useState('');
   const [resolving, setResolving] = useState(false);
@@ -94,6 +104,15 @@ export function ComparePage() {
     </button>
   );
 
+  const hasMultipleAthletes = useMemo(() => {
+    const athleteIds = new Set(
+      selectedIds
+        .map(id => cache.data[id]?.activity.athlete_id)
+        .filter(Boolean)
+    );
+    return athleteIds.size > 1;
+  }, [selectedIds, cache.data]);
+
   return (
     <div className="flex h-screen bg-gray-50">
       {/* Search sidebar */}
@@ -128,6 +147,8 @@ export function ComparePage() {
       {/* Selection column */}
       <SelectionColumn
         selectedIds={selectedIds}
+        cacheData={cache.data}
+        hasMultipleAthletes={hasMultipleAthletes}
         onRemove={removeActivity}
         onClear={() => setIds([])}
       />
@@ -135,15 +156,17 @@ export function ComparePage() {
       {/* Main content */}
       <main className="flex-1 overflow-auto p-8">
         <div className="mx-auto max-w-5xl">
-          <CompareView ids={selectedIds} shareButton={shareButton} />
+          <CompareView ids={selectedIds} cache={cache} shareButton={shareButton} />
         </div>
       </main>
     </div>
   );
 }
 
-function SelectionColumn({ selectedIds, onRemove, onClear }: {
+function SelectionColumn({ selectedIds, cacheData, hasMultipleAthletes, onRemove, onClear }: {
   selectedIds: string[];
+  cacheData: Record<string, ActivityDetailResponse>;
+  hasMultipleAthletes: boolean;
   onRemove: (id: string) => void;
   onClear: () => void;
 }) {
@@ -163,29 +186,42 @@ function SelectionColumn({ selectedIds, onRemove, onClear }: {
             </button>
           </div>
           <div className="flex-1 overflow-y-auto p-2">
-            {selectedIds.map((id, i) => (
-              <div
-                key={id}
-                className="group flex items-center gap-2 rounded px-2 py-1.5 hover:bg-gray-50"
-              >
-                <span
-                  className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white"
-                  style={{ backgroundColor: ACTIVITY_COLORS[i % ACTIVITY_COLORS.length] }}
+            {selectedIds.map((id, i) => {
+              const detail = cacheData[id];
+              const name = detail?.activity.name;
+              const athleteName = hasMultipleAthletes ? detail?.activity.athlete_name : undefined;
+
+              return (
+                <div
+                  key={id}
+                  className="group flex items-center gap-2 rounded px-2 py-1.5 hover:bg-gray-50"
                 >
-                  {String.fromCharCode(65 + i)}
-                </span>
-                <span className="min-w-0 flex-1 truncate text-xs text-gray-700">
-                  {id}
-                </span>
-                <button
-                  onClick={() => onRemove(id)}
-                  className="shrink-0 text-gray-300 opacity-0 group-hover:opacity-100 hover:text-red-500 transition-all"
-                  aria-label="Remove"
-                >
-                  &times;
-                </button>
-              </div>
-            ))}
+                  <span
+                    className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white"
+                    style={{ backgroundColor: ACTIVITY_COLORS[i % ACTIVITY_COLORS.length] }}
+                  >
+                    {String.fromCharCode(65 + i)}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <span className="block truncate text-xs text-gray-700">
+                      {name ?? id}
+                    </span>
+                    {athleteName && (
+                      <span className="block truncate text-[10px] text-gray-400">
+                        {athleteName}
+                      </span>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => onRemove(id)}
+                    className="shrink-0 text-gray-300 opacity-0 group-hover:opacity-100 hover:text-red-500 transition-all"
+                    aria-label="Remove"
+                  >
+                    &times;
+                  </button>
+                </div>
+              );
+            })}
           </div>
         </>
       ) : (

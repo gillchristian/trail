@@ -95,6 +95,13 @@ var migrations = []Migration{
 		)`,
 	},
 	{
+		ID: "012_create_athletes_table",
+		SQL: `CREATE TABLE IF NOT EXISTS athletes (
+			athlete_id INTEGER PRIMARY KEY,
+			name TEXT NOT NULL DEFAULT ''
+		)`,
+	},
+	{
 		ID: "011_create_activities_fts",
 		SQL: `CREATE VIRTUAL TABLE IF NOT EXISTS activities_fts USING fts5(
 			name,
