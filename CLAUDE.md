@@ -10,8 +10,8 @@ npm run build        # TypeScript check + Vite build (client only)
 npm run lint         # ESLint across the client
 
 # Backend (Go)
-cd server && go run .          # Run backend dev server (localhost:3001)
-cd server && go build -o cadence-server .  # Build binary
+cd server && go run -tags fts5 .          # Run backend dev server (localhost:3001)
+cd server && go build -tags fts5 -o cadence-server .  # Build binary
 ```
 
 ## Architecture

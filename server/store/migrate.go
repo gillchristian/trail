@@ -94,6 +94,23 @@ var migrations = []Migration{
 			updated_at INTEGER NOT NULL
 		)`,
 	},
+	{
+		ID: "011_create_activities_fts",
+		SQL: `CREATE VIRTUAL TABLE IF NOT EXISTS activities_fts USING fts5(
+			name,
+			content='activities',
+			content_rowid='rowid',
+			tokenize='trigram'
+		);
+		INSERT INTO activities_fts(rowid, name) SELECT rowid, name FROM activities;
+		CREATE TRIGGER IF NOT EXISTS activities_fts_insert AFTER INSERT ON activities BEGIN
+			INSERT INTO activities_fts(rowid, name) VALUES (new.rowid, new.name);
+		END;
+		CREATE TRIGGER IF NOT EXISTS activities_fts_update AFTER UPDATE OF name ON activities BEGIN
+			INSERT INTO activities_fts(activities_fts, rowid, name) VALUES('delete', old.rowid, old.name);
+			INSERT INTO activities_fts(rowid, name) VALUES (new.rowid, new.name);
+		END`,
+	},
 }
 
 func RunMigrations(db *sql.DB) error {

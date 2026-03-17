@@ -3,7 +3,7 @@ WORKDIR /app
 COPY server/go.mod server/go.sum ./
 RUN go mod download
 COPY server/ .
-RUN go build -o cadence-server .
+RUN go build -tags fts5 -o cadence-server .
 
 FROM alpine:3.21
 RUN apk add --no-cache ca-certificates

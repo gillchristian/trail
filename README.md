@@ -16,7 +16,7 @@ Add your `STRAVA_CLIENT_ID` and `STRAVA_CLIENT_SECRET` to `server/.env`.
 ## Dev
 
 ```
-cd server && go run .   # Backend: http://localhost:3001
+cd server && go run -tags fts5 .   # Backend: http://localhost:3001
 npm run dev             # Frontend: http://localhost:5173
 ```
 

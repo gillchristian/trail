@@ -136,43 +136,47 @@ func (s *ActivityStore) SearchActivities(params SearchParams) ([]ActivitySearchR
 	}
 
 	where := []string{
-		"athlete_id = ?",
-		"(type IN ('Run', 'TrailRun', 'VirtualRun') OR sport_type IN ('Run', 'TrailRun', 'VirtualRun'))",
+		"activities.athlete_id = ?",
+		"(activities.type IN ('Run', 'TrailRun', 'VirtualRun') OR activities.sport_type IN ('Run', 'TrailRun', 'VirtualRun'))",
 	}
 	args := []any{params.AthleteID}
+	join := ""
 
 	if params.MinDistance > 0 {
-		where = append(where, "distance >= ?")
+		where = append(where, "activities.distance >= ?")
 		args = append(args, params.MinDistance)
 	}
 	if params.MaxDistance > 0 {
-		where = append(where, "distance <= ?")
+		where = append(where, "activities.distance <= ?")
 		args = append(args, params.MaxDistance)
 	}
 	if params.NameQuery != "" {
-		where = append(where, "name LIKE ? COLLATE NOCASE")
-		args = append(args, "%"+params.NameQuery+"%")
+		join = "JOIN activities_fts ON activities.rowid = activities_fts.rowid"
+		where = append(where, "activities_fts MATCH ?")
+		// Escape double quotes in query for FTS5 trigram
+		escaped := strings.ReplaceAll(params.NameQuery, `"`, `""`)
+		args = append(args, `"`+escaped+`"`)
 	}
 
 	whereClause := strings.Join(where, " AND ")
 
 	// Count total matches
 	var total int
-	countSQL := fmt.Sprintf("SELECT COUNT(*) FROM activities WHERE %s", whereClause)
+	countSQL := fmt.Sprintf("SELECT COUNT(*) FROM activities %s WHERE %s", join, whereClause)
 	if err := s.db.QueryRow(countSQL, args...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
 
 	// Fetch page
 	querySQL := fmt.Sprintf(`
-		SELECT activity_id, name, distance,
-			COALESCE(json_extract(raw_json, '$.moving_time'), 0),
-			COALESCE(json_extract(raw_json, '$.start_date_local'), ''),
-			sport_type
-		FROM activities
+		SELECT activities.activity_id, activities.name, activities.distance,
+			COALESCE(json_extract(activities.raw_json, '$.moving_time'), 0),
+			COALESCE(json_extract(activities.raw_json, '$.start_date_local'), ''),
+			activities.sport_type
+		FROM activities %s
 		WHERE %s
-		ORDER BY start_date DESC
-		LIMIT ? OFFSET ?`, whereClause)
+		ORDER BY activities.start_date DESC
+		LIMIT ? OFFSET ?`, join, whereClause)
 
 	queryArgs := append(args, params.Limit, params.Offset)
 	rows, err := s.db.Query(querySQL, queryArgs...)
