@@ -107,8 +107,10 @@ export function ShareOverlay({ range, rangeParam, totalKm, onClose }: ShareOverl
               <div
                 ref={captureRef}
                 className="px-8 py-6"
-                style={{ display: 'block', width: '100%', boxSizing: 'border-box' }}
                 style={{
+                  display: 'block',
+                  width: '100%',
+                  boxSizing: 'border-box',
                   fontFamily: font,
                   textAlign: align,
                   color,
