@@ -5,6 +5,7 @@ import { useAuth } from './hooks/useAuth';
 import { DashboardPage } from './pages/DashboardPage';
 import { ComparePage } from './pages/ComparePage';
 import { CompareSharePage } from './pages/CompareSharePage';
+import { LogPage } from './pages/LogPage';
 import { encodeCompareIds } from './lib/compareUrl';
 
 function CompareRedirect() {
@@ -45,6 +46,8 @@ function App() {
       <Route path="/compare" element={<ComparePage />} />
       <Route path="/compare/v/:encoded" element={<CompareSharePage />} />
       <Route path="/compare/:idA/:idB" element={<CompareRedirect />} />
+      <Route path="/log" element={<Navigate to="/log/ytd" replace />} />
+      <Route path="/log/:range" element={<LogPage />} />
     </Routes>
   );
 }

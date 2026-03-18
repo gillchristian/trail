@@ -55,69 +55,103 @@ func (h *ActivitiesHandler) GetActivities(w http.ResponseWriter, r *http.Request
 		}
 	}
 
-	// Parse ?days=N (default 30, clamp 1-365)
-	days := 30
-	if d, err := strconv.Atoi(r.URL.Query().Get("days")); err == nil && d > 0 && d <= 365 {
-		days = d
+	// Check for date range params: ?from=YYYY-MM-DD&to=YYYY-MM-DD
+	fromStr := r.URL.Query().Get("from")
+	toStr := r.URL.Query().Get("to")
+	var useRange bool
+	var rangeFrom, rangeTo time.Time
+
+	if fromStr != "" && toStr != "" {
+		from, err1 := time.Parse("2006-01-02", fromStr)
+		to, err2 := time.Parse("2006-01-02", toStr)
+		if err1 == nil && err2 == nil && !to.Before(from) {
+			rangeFrom = from
+			rangeTo = to.Add(24*time.Hour - time.Second) // end of day
+			useRange = true
+		}
 	}
 
-	// Incremental sync: only fetch new activities from Strava
-	latestDate, err := h.ActivityStore.LatestStartDate(tokens.AthleteID)
-	if err != nil {
-		log.Printf("Activities latest date error: %v", err)
-	}
+	if !useRange {
+		// Parse ?days=N (default 30, clamp 1-365)
+		days := 30
+		if d, err := strconv.Atoi(r.URL.Query().Get("days")); err == nil && d > 0 && d <= 365 {
+			days = d
+		}
 
-	var after int64
-	if latestDate == "" {
-		// First sync: seed with 30 days
-		after = time.Now().AddDate(0, 0, -30).Unix()
-	} else {
-		// Delta sync: from latest activity minus 1h overlap buffer
-		t, err := time.Parse(time.RFC3339, latestDate)
+		// Incremental sync: only fetch new activities from Strava
+		latestDate, err := h.ActivityStore.LatestStartDate(tokens.AthleteID)
 		if err != nil {
+			log.Printf("Activities latest date error: %v", err)
+		}
+
+		var after int64
+		if latestDate == "" {
+			// First sync: seed with 30 days
 			after = time.Now().AddDate(0, 0, -30).Unix()
 		} else {
-			// Always re-fetch at least the last 24h to catch metadata changes
-		afterLatest := t.Add(-1 * time.Hour).Unix()
-		oneDayAgo := time.Now().Add(-24 * time.Hour).Unix()
-		after = min(afterLatest, oneDayAgo)
+			// Delta sync: from latest activity minus 1h overlap buffer
+			t, err := time.Parse(time.RFC3339, latestDate)
+			if err != nil {
+				after = time.Now().AddDate(0, 0, -30).Unix()
+			} else {
+				// Always re-fetch at least the last 24h to catch metadata changes
+				afterLatest := t.Add(-1 * time.Hour).Unix()
+				oneDayAgo := time.Now().Add(-24 * time.Hour).Unix()
+				after = min(afterLatest, oneDayAgo)
+			}
 		}
-	}
 
-	now := time.Now().Unix()
-	stravaActivities, err := h.Strava.FetchActivities(accessToken, after, now)
-	if err != nil {
-		log.Printf("Activities fetch error: %v", err)
-		// Non-fatal if we have cached data — continue to serve from SQLite
-	}
-
-	if len(stravaActivities) > 0 {
-		if err := h.ActivityStore.UpsertActivities(tokens.AthleteID, stravaActivities); err != nil {
-			log.Printf("Activities upsert error: %v", err)
+		now := time.Now().Unix()
+		stravaActivities, err := h.Strava.FetchActivities(accessToken, after, now)
+		if err != nil {
+			log.Printf("Activities fetch error: %v", err)
 		}
+
+		if len(stravaActivities) > 0 {
+			if err := h.ActivityStore.UpsertActivities(tokens.AthleteID, stravaActivities); err != nil {
+				log.Printf("Activities upsert error: %v", err)
+			}
+		}
+
+		// Auto-trigger backfill if not yet complete
+		if h.Backfill != nil {
+			h.Backfill.TryStartBackfill(tokens)
+		}
+
+		since := time.Now().AddDate(0, 0, -days)
+		runs, err := h.ActivityStore.GetRunActivities(tokens.AthleteID, since)
+		if err != nil {
+			log.Printf("Activities query error: %v", err)
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(map[string]string{"error": "Failed to fetch activities"})
+			return
+		}
+
+		if len(stravaActivities) > 0 {
+			w.Header().Set("X-Data-Source", "strava")
+		} else {
+			w.Header().Set("X-Data-Source", "cache")
+		}
+		w.Header().Set("Content-Type", "application/json")
+		if runs == nil {
+			runs = []json.RawMessage{}
+		}
+		json.NewEncoder(w).Encode(runs)
+		return
 	}
 
-	// Auto-trigger backfill if not yet complete
-	if h.Backfill != nil {
-		h.Backfill.TryStartBackfill(tokens)
-	}
-
-	// Query cached activities for the requested day range
-	since := time.Now().AddDate(0, 0, -days)
-	runs, err := h.ActivityStore.GetRunActivities(tokens.AthleteID, since)
+	// Date range query — serve from cache only (backfilled data)
+	runs, err := h.ActivityStore.GetRunActivitiesRange(tokens.AthleteID, rangeFrom, rangeTo)
 	if err != nil {
-		log.Printf("Activities query error: %v", err)
+		log.Printf("Activities range query error: %v", err)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(map[string]string{"error": "Failed to fetch activities"})
 		return
 	}
 
-	if len(stravaActivities) > 0 {
-		w.Header().Set("X-Data-Source", "strava")
-	} else {
-		w.Header().Set("X-Data-Source", "cache")
-	}
+	w.Header().Set("X-Data-Source", "cache")
 	w.Header().Set("Content-Type", "application/json")
 	if runs == nil {
 		runs = []json.RawMessage{}

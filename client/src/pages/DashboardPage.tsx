@@ -21,6 +21,12 @@ export function DashboardPage({ logout }: { logout: () => void }) {
         </div>
         <div className="flex items-center gap-2">
           <Link
+            to="/log/ytd"
+            className="rounded-md px-3 py-1.5 text-sm text-orange-600 hover:bg-orange-50 transition-colors"
+          >
+            Running Log
+          </Link>
+          <Link
             to="/compare"
             className="rounded-md px-3 py-1.5 text-sm text-orange-600 hover:bg-orange-50 transition-colors"
           >

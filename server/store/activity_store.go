@@ -106,6 +106,35 @@ func (s *ActivityStore) GetRunActivities(athleteID int64, since time.Time) ([]js
 	return results, rows.Err()
 }
 
+// GetRunActivitiesRange returns running activities for this athlete within the given date range.
+func (s *ActivityStore) GetRunActivitiesRange(athleteID int64, from, to time.Time) ([]json.RawMessage, error) {
+	fromStr := from.UTC().Format(time.RFC3339)
+	toStr := to.UTC().Format(time.RFC3339)
+	rows, err := s.db.Query(`
+		SELECT raw_json FROM activities
+		WHERE athlete_id = ?
+		  AND start_date >= ?
+		  AND start_date <= ?
+		  AND (type IN ('Run', 'TrailRun', 'VirtualRun') OR sport_type IN ('Run', 'TrailRun', 'VirtualRun'))
+		ORDER BY start_date DESC`,
+		athleteID, fromStr, toStr,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var results []json.RawMessage
+	for rows.Next() {
+		var raw string
+		if err := rows.Scan(&raw); err != nil {
+			return nil, err
+		}
+		results = append(results, json.RawMessage(raw))
+	}
+	return results, rows.Err()
+}
+
 // SearchParams defines filters for searching activities.
 type SearchParams struct {
 	AthleteID  int64
