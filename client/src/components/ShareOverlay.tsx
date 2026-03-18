@@ -15,6 +15,19 @@ const FONTS = [
 
 type Alignment = 'left' | 'center' | 'right';
 
+function luminance(hex: string): number {
+  const r = parseInt(hex.slice(1, 3), 16) / 255;
+  const g = parseInt(hex.slice(3, 5), 16) / 255;
+  const b = parseInt(hex.slice(5, 7), 16) / 255;
+  const toLinear = (c: number) => (c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4));
+  return 0.2126 * toLinear(r) + 0.7152 * toLinear(g) + 0.0722 * toLinear(b);
+}
+
+function checkerboardColors(textColor: string): [string, string] {
+  const isLight = luminance(textColor) > 0.4;
+  return isLight ? ['#d1d5db', '#f3f4f6'] : ['#374151', '#4b5563'];
+}
+
 interface ShareOverlayProps {
   range: DateRange;
   rangeParam: string;
@@ -31,7 +44,7 @@ export function ShareOverlay({ range, rangeParam, totalKm, onClose }: ShareOverl
   const [downloading, setDownloading] = useState(false);
 
   const rangeText = formatRangeDisplay(range.from, range.to);
-  const kmText = `${Math.round(totalKm).toLocaleString()}km`;
+  const kmText = `${Math.round(totalKm).toLocaleString('de-DE')}km`;
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
@@ -84,23 +97,23 @@ export function ShareOverlay({ range, rangeParam, totalKm, onClose }: ShareOverl
           {/* Preview */}
           <div className="flex-1">
             <div
-              className="relative flex items-center justify-center rounded-lg border border-gray-200 p-8"
+              className="relative rounded-lg border border-gray-200 p-8"
               style={{
                 backgroundImage:
-                  'repeating-conic-gradient(#e5e7eb 0% 25%, #f9fafb 0% 50%)',
+                  `repeating-conic-gradient(${checkerboardColors(color)[0]} 0% 25%, ${checkerboardColors(color)[1]} 0% 50%)`,
                 backgroundSize: '16px 16px',
               }}
             >
               <div
                 ref={captureRef}
-                className="px-6 py-4"
+                className="w-full px-6 py-4"
                 style={{
                   fontFamily: font,
                   textAlign: align,
                   color,
                 }}
               >
-                <div className="text-sm opacity-80" style={{ fontFamily: font }}>
+                <div className="text-sm font-bold opacity-80" style={{ fontFamily: font }}>
                   {displayRange}
                 </div>
                 <div className="text-4xl font-bold" style={{ fontFamily: font }}>
