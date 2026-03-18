@@ -25,7 +25,7 @@ function luminance(hex: string): number {
 
 function checkerboardColors(textColor: string): [string, string] {
   const isLight = luminance(textColor) > 0.4;
-  return isLight ? ['#d1d5db', '#f3f4f6'] : ['#374151', '#4b5563'];
+  return isLight ? ['#374151', '#4b5563'] : ['#d1d5db', '#f3f4f6'];
 }
 
 interface ShareOverlayProps {
@@ -95,9 +95,9 @@ export function ShareOverlay({ range, rangeParam, totalKm, onClose }: ShareOverl
 
         <div className="flex gap-6">
           {/* Preview */}
-          <div className="flex-1">
+          <div className="flex-1 min-w-0">
             <div
-              className="relative rounded-lg border border-gray-200 p-8"
+              className="rounded-lg border border-gray-200 overflow-hidden"
               style={{
                 backgroundImage:
                   `repeating-conic-gradient(${checkerboardColors(color)[0]} 0% 25%, ${checkerboardColors(color)[1]} 0% 50%)`,
@@ -106,7 +106,8 @@ export function ShareOverlay({ range, rangeParam, totalKm, onClose }: ShareOverl
             >
               <div
                 ref={captureRef}
-                className="w-full px-6 py-4"
+                className="px-8 py-6"
+                style={{ display: 'block', width: '100%', boxSizing: 'border-box' }}
                 style={{
                   fontFamily: font,
                   textAlign: align,
