@@ -1,11 +1,13 @@
 module Main exposing (main)
 
-{-| TASK-005.
+{-| TASK-006 + TASK-007.
 
 `Browser.application` shell with hash routing, IndexedDB-backed
 persistence, race index, race-detail with 1:1 elevation profile +
-aid-station CRUD (add by distance-from-start or distance-from-
-previous, edit, delete). Markers render on the profile chart.
+aid-station CRUD, plus the per-km planning experience: target
+total time, GAP-distributed pace per km, table view (km / section
+toggle), per-km card view with mini-profile + notes + manual time
+override.
 
 The whole UI still lives in this module. We'll split per-page when
 a page passes ~250 lines on its own.
@@ -21,27 +23,37 @@ import File.Select as Select
 import Gpx exposing (Track)
 import Html exposing (Html, a, button, div, h1, h2, h3, input, label, p, span, text, textarea)
 import Html.Attributes as A exposing (class, classList)
-import Html.Events as E exposing (onClick, onInput, preventDefaultOn)
+import Html.Events as E exposing (onBlur, onClick, onInput, preventDefaultOn)
 import Html.Lazy
 import Json.Decode as D
 import Json.Encode as Encode
+import Planning exposing (Km, KmResult, KmSource(..))
 import Profile exposing (Marker, ScaleMode(..))
 import Route exposing (Route)
 import Storage
+import Svg
+import Svg.Attributes as SA
 import Task
 import Types
     exposing
         ( AidStation
+        , KmTime(..)
+        , Plan
         , Race
         , RaceId
         , Service
         , allServices
+        , defaultPlan
+        , emptyKmPlan
         , encodeRace
+        , kmPlanFor
         , raceIdFromString
         , raceIdToString
         , serviceIcon
         , serviceLabel
         , sortAidStations
+        , withKmPlan
+        , withTargetSeconds
         )
 import Url exposing (Url)
 
@@ -109,6 +121,11 @@ type AidEditor
     | AidOpen AidForm
 
 
+type TableMode
+    = ByKm
+    | BySection
+
+
 type alias Model =
     { key : Nav.Key
     , route : Route
@@ -116,12 +133,17 @@ type alias Model =
     , viewportWidth : Float
     , races : RacesState
     , parsedTracks : Dict String Track
+    , kmsCache : Dict String (List Km)
     , scaleMode : ScaleMode
     , upload : UploadState
     , dragOver : Bool
     , storageError : Maybe String
     , pendingDelete : Maybe RaceId
     , aidEditor : AidEditor
+    , planTableMode : TableMode
+    , targetTimeText : String
+    , kmTimeText : String
+    , kmNotesText : String
     }
 
 
@@ -133,12 +155,17 @@ init flags url key =
       , viewportWidth = flags.width
       , races = LoadingRaces
       , parsedTracks = Dict.empty
+      , kmsCache = Dict.empty
       , scaleMode = FitWidth
       , upload = NotUploading
       , dragOver = False
       , storageError = Nothing
       , pendingDelete = Nothing
       , aidEditor = AidClosed
+      , planTableMode = ByKm
+      , targetTimeText = ""
+      , kmTimeText = ""
+      , kmNotesText = ""
       }
     , Storage.loadAll
     )
@@ -182,6 +209,15 @@ type Msg
     | AidToggleService Service
     | AidSubmit
     | AidDelete String
+      -- plan
+    | SetPlanTableMode TableMode
+    | SetTargetTimeText String
+    | CommitTargetTime
+    | SetKmTimeText String
+    | CommitKmTimeForKm Int
+    | SetKmNotesText String
+    | CommitKmNotesForKm Int
+    | ResetKmToAuto Int
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -194,7 +230,19 @@ update msg model =
             ( model, Nav.load href )
 
         UrlChanged url ->
-            ( { model | route = Route.fromUrl url, pendingDelete = Nothing, aidEditor = AidClosed }, Cmd.none )
+            let
+                newRoute =
+                    Route.fromUrl url
+
+                hydrated =
+                    hydratePlanInputs
+                        { model
+                            | route = newRoute
+                            , pendingDelete = Nothing
+                            , aidEditor = AidClosed
+                        }
+            in
+            ( hydrated, Cmd.none )
 
         WindowResized w _ ->
             ( { model | viewportWidth = toFloat w }, Cmd.none )
@@ -241,13 +289,21 @@ update msg model =
                     let
                         sorted =
                             sortRaces races
+
+                        tracks =
+                            buildTrackCache sorted Dict.empty
+
+                        kms =
+                            buildKmsCache sorted tracks Dict.empty
+
+                        modelWithRaces =
+                            { model
+                                | races = LoadedRaces sorted
+                                , parsedTracks = tracks
+                                , kmsCache = kms
+                            }
                     in
-                    ( { model
-                        | races = LoadedRaces sorted
-                        , parsedTracks = buildTrackCache sorted Dict.empty
-                      }
-                    , Cmd.none
-                    )
+                    ( hydratePlanInputs modelWithRaces, Cmd.none )
 
                 Err err ->
                     ( { model
@@ -267,23 +323,37 @@ update msg model =
                         merged =
                             race :: List.filter (\r -> r.id /= race.id) existing
 
+                        nextRaces =
+                            sortRaces merged
+
+                        nextTracks =
+                            cacheTrack race model.parsedTracks
+
+                        nextKms =
+                            cacheKms race nextTracks model.kmsCache
+
                         navCmd =
                             case model.route of
                                 Route.RaceDetail rid ->
                                     if raceIdToString rid == raceIdToString race.id then
-                                        -- already on detail page, no nav needed
                                         Cmd.none
 
                                     else
                                         Cmd.none
 
+                                Route.PlanTable _ ->
+                                    Cmd.none
+
+                                Route.PlanKm _ _ ->
+                                    Cmd.none
+
                                 _ ->
-                                    -- coming from upload — navigate to the new race
                                     Nav.pushUrl model.key (Route.toString (Route.RaceDetail race.id))
                     in
                     ( { model
-                        | races = LoadedRaces (sortRaces merged)
-                        , parsedTracks = cacheTrack race model.parsedTracks
+                        | races = LoadedRaces nextRaces
+                        , parsedTracks = nextTracks
+                        , kmsCache = nextKms
                         , upload = NotUploading
                         , aidEditor = AidClosed
                       }
@@ -309,6 +379,7 @@ update msg model =
             ( { model
                 | races = LoadedRaces kept
                 , parsedTracks = Dict.remove idStr model.parsedTracks
+                , kmsCache = Dict.remove idStr model.kmsCache
                 , pendingDelete = Nothing
               }
             , if currentRouteIs (Route.RaceDetail rid) model.route then
@@ -409,6 +480,170 @@ update msg model =
                 Nothing ->
                     ( model, Cmd.none )
 
+        SetPlanTableMode m ->
+            ( { model | planTableMode = m }, Cmd.none )
+
+        SetTargetTimeText s ->
+            ( { model | targetTimeText = s }, Cmd.none )
+
+        CommitTargetTime ->
+            case currentRace model of
+                Just race ->
+                    let
+                        newTarget =
+                            parseHhmm model.targetTimeText
+
+                        formatted =
+                            case newTarget of
+                                Just s ->
+                                    formatHhmm s
+
+                                Nothing ->
+                                    if String.isEmpty (String.trim model.targetTimeText) then
+                                        ""
+
+                                    else
+                                        model.targetTimeText
+
+                        updatedRace =
+                            { race | plan = withTargetSeconds newTarget race.plan }
+                    in
+                    ( { model | targetTimeText = formatted }
+                    , Storage.saveRace (encodeRace updatedRace)
+                    )
+
+                Nothing ->
+                    ( model, Cmd.none )
+
+        SetKmTimeText s ->
+            ( { model | kmTimeText = s }, Cmd.none )
+
+        CommitKmTimeForKm kmIndex ->
+            case currentRace model of
+                Just race ->
+                    let
+                        kp =
+                            kmPlanFor kmIndex race.plan
+
+                        trimmed =
+                            String.trim model.kmTimeText
+
+                        newTime =
+                            if String.isEmpty trimmed then
+                                Auto
+
+                            else
+                                case parseMmss trimmed of
+                                    Just secs ->
+                                        Manual secs
+
+                                    Nothing ->
+                                        kp.time
+
+                        formatted =
+                            case newTime of
+                                Manual s ->
+                                    formatMmss s
+
+                                Auto ->
+                                    ""
+
+                        updatedKp =
+                            { kp | time = newTime }
+
+                        updatedRace =
+                            { race | plan = withKmPlan kmIndex updatedKp race.plan }
+                    in
+                    ( { model | kmTimeText = formatted }
+                    , Storage.saveRace (encodeRace updatedRace)
+                    )
+
+                Nothing ->
+                    ( model, Cmd.none )
+
+        SetKmNotesText s ->
+            ( { model | kmNotesText = s }, Cmd.none )
+
+        CommitKmNotesForKm kmIndex ->
+            case currentRace model of
+                Just race ->
+                    let
+                        kp =
+                            kmPlanFor kmIndex race.plan
+
+                        updatedKp =
+                            { kp | notes = model.kmNotesText }
+
+                        updatedRace =
+                            { race | plan = withKmPlan kmIndex updatedKp race.plan }
+                    in
+                    ( model, Storage.saveRace (encodeRace updatedRace) )
+
+                Nothing ->
+                    ( model, Cmd.none )
+
+        ResetKmToAuto kmIndex ->
+            case currentRace model of
+                Just race ->
+                    let
+                        kp =
+                            kmPlanFor kmIndex race.plan
+
+                        updatedKp =
+                            { kp | time = Auto }
+
+                        updatedRace =
+                            { race | plan = withKmPlan kmIndex updatedKp race.plan }
+                    in
+                    ( { model | kmTimeText = "" }
+                    , Storage.saveRace (encodeRace updatedRace)
+                    )
+
+                Nothing ->
+                    ( model, Cmd.none )
+
+
+hydratePlanInputs : Model -> Model
+hydratePlanInputs model =
+    case currentRace model of
+        Nothing ->
+            { model | targetTimeText = "", kmTimeText = "", kmNotesText = "" }
+
+        Just race ->
+            let
+                targetText =
+                    case race.plan.targetSeconds of
+                        Just s ->
+                            formatHhmm s
+
+                        Nothing ->
+                            ""
+
+                ( kmTime, kmNotes ) =
+                    case model.route of
+                        Route.PlanKm _ idx ->
+                            let
+                                kp =
+                                    kmPlanFor idx race.plan
+                            in
+                            ( case kp.time of
+                                Manual s ->
+                                    formatMmss s
+
+                                Auto ->
+                                    ""
+                            , kp.notes
+                            )
+
+                        _ ->
+                            ( "", "" )
+            in
+            { model
+                | targetTimeText = targetText
+                , kmTimeText = kmTime
+                , kmNotesText = kmNotes
+            }
+
 
 currentRaces : Model -> List Race
 currentRaces model =
@@ -471,6 +706,30 @@ cacheTrack race cache =
                     cache
 
 
+cacheKms : Race -> Dict String Track -> Dict String (List Km) -> Dict String (List Km)
+cacheKms race tracks cache =
+    let
+        key =
+            raceIdToString race.id
+    in
+    case Dict.get key cache of
+        Just _ ->
+            cache
+
+        Nothing ->
+            case Dict.get key tracks of
+                Just track ->
+                    Dict.insert key (Planning.computeKms track) cache
+
+                Nothing ->
+                    cache
+
+
+buildKmsCache : List Race -> Dict String Track -> Dict String (List Km) -> Dict String (List Km)
+buildKmsCache races tracks existing =
+    List.foldl (\r acc -> cacheKms r tracks acc) existing races
+
+
 buildDraftRace : Int -> Track -> String -> Race
 buildDraftRace now track gpxText =
     { id = raceIdFromString ""
@@ -487,6 +746,7 @@ buildDraftRace now track gpxText =
     , createdAt = now
     , aidStations = []
     , aidStationSeq = 0
+    , plan = defaultPlan
     }
 
 
@@ -676,6 +936,12 @@ title route =
         Route.RaceDetail _ ->
             "Trail — race"
 
+        Route.PlanTable _ ->
+            "Trail — plan"
+
+        Route.PlanKm _ _ ->
+            "Trail — plan km"
+
         Route.NotFound ->
             "Trail — not found"
 
@@ -697,6 +963,12 @@ viewHeader route =
 
                         Route.RaceDetail _ ->
                             "Race detail."
+
+                        Route.PlanTable _ ->
+                            "Plan · table view."
+
+                        Route.PlanKm _ _ ->
+                            "Plan · per km."
 
                         Route.NotFound ->
                             "Lost?"
@@ -727,6 +999,22 @@ viewContent model =
             case findRace rid races of
                 Just race ->
                     viewRaceDetail model race
+
+                Nothing ->
+                    viewRaceNotFound
+
+        ( Route.PlanTable rid, LoadedRaces races ) ->
+            case findRace rid races of
+                Just race ->
+                    viewPlanTable model race
+
+                Nothing ->
+                    viewRaceNotFound
+
+        ( Route.PlanKm rid kmIndex, LoadedRaces races ) ->
+            case findRace rid races of
+                Just race ->
+                    viewPlanKm model race kmIndex
 
                 Nothing ->
                     viewRaceNotFound
@@ -976,9 +1264,16 @@ viewRaceDetail model race =
                 div [ class "rounded-2xl bg-slate-900 border border-slate-800 p-10 text-center text-slate-500" ]
                     [ text "Parsing GPX…" ]
         , viewAidStationsSection model race
-        , div [ class "rounded-2xl bg-slate-900 border border-slate-800 p-5 text-sm text-slate-400" ]
-            [ p [ class "font-medium text-slate-300 mb-2" ] [ text "Coming soon" ]
-            , p [] [ text "Per-km planning, table view, and Coros-ready GPX export are next in the queue." ]
+        , div [ class "rounded-2xl bg-slate-900 border border-slate-800 p-5 flex items-center justify-between gap-4 flex-wrap" ]
+            [ div []
+                [ p [ class "font-medium text-slate-100" ] [ text "Plan this race" ]
+                , p [ class "text-sm text-slate-400 mt-1" ] [ text "Set a target time. We'll distribute pace by km using the terrain. Override any km manually." ]
+                ]
+            , a
+                [ Route.href (Route.PlanTable race.id)
+                , class "px-4 py-2 bg-rose-600 text-white rounded-md hover:bg-rose-500 text-sm font-medium"
+                ]
+                [ text "Open the plan →" ]
             ]
         ]
 
@@ -1313,6 +1608,857 @@ serviceChip current s =
 
 
 -- ============================================================
+-- PLAN VIEWS
+-- ============================================================
+
+
+viewPlanTable : Model -> Race -> Html Msg
+viewPlanTable model race =
+    let
+        kms =
+            Dict.get (raceIdToString race.id) model.kmsCache
+                |> Maybe.withDefault []
+
+        aidRest =
+            Planning.aidRestTotal race.aidStations
+
+        results =
+            Planning.distribute
+                { target = race.plan.targetSeconds
+                , kms = kms
+                , plan = race.plan
+                , aidRestSeconds = aidRest
+                }
+
+        currentSum =
+            Dict.foldl (\_ r acc -> acc + r.seconds) 0 results + aidRest
+    in
+    div [ class "max-w-screen-2xl mx-auto mt-8 space-y-6 px-6" ]
+        [ viewPlanCrumb race
+        , viewPlanHeader race
+        , viewPlanTargetPanel race aidRest currentSum model.targetTimeText
+        , viewPlanTabs race model.planTableMode
+        , case model.planTableMode of
+            ByKm ->
+                viewKmTable race kms results
+
+            BySection ->
+                viewSectionTable race kms results
+        ]
+
+
+viewPlanCrumb : Race -> Html Msg
+viewPlanCrumb race =
+    div [ class "text-sm text-slate-400 flex items-center gap-2" ]
+        [ a [ Route.href Route.Index, class "hover:text-slate-100" ] [ text "Races" ]
+        , span [ class "text-slate-700" ] [ text "/" ]
+        , a [ Route.href (Route.RaceDetail race.id), class "hover:text-slate-100" ] [ text race.name ]
+        , span [ class "text-slate-700" ] [ text "/" ]
+        , span [ class "text-slate-200" ] [ text "Plan" ]
+        ]
+
+
+viewPlanHeader : Race -> Html Msg
+viewPlanHeader race =
+    div [ class "flex items-end justify-between gap-4 flex-wrap" ]
+        [ div []
+            [ h1 [ class "text-3xl font-bold tracking-tight text-slate-100" ] [ text "Plan" ]
+            , p [ class "mt-2 text-sm text-slate-500" ]
+                [ text
+                    (formatFloat 1 (race.distance / 1000)
+                        ++ " km · "
+                        ++ formatInt race.gain
+                        ++ " m+ · "
+                        ++ String.fromInt (List.length race.aidStations)
+                        ++ (if List.length race.aidStations == 1 then
+                                " aid station"
+
+                            else
+                                " aid stations"
+                           )
+                    )
+                ]
+            ]
+        ]
+
+
+viewPlanTargetPanel : Race -> Int -> Int -> String -> Html Msg
+viewPlanTargetPanel race aidRest currentSum targetText =
+    let
+        target =
+            race.plan.targetSeconds
+
+        diff =
+            case target of
+                Just t ->
+                    currentSum - t
+
+                Nothing ->
+                    0
+    in
+    div [ class "rounded-2xl bg-slate-900 border border-slate-800 p-5 grid grid-cols-1 sm:grid-cols-4 gap-4 items-center" ]
+        [ div []
+            [ p [ class "text-xs text-slate-500 uppercase tracking-wider mb-2" ] [ text "Target time" ]
+            , input
+                [ A.type_ "text"
+                , A.value targetText
+                , A.placeholder "h:mm"
+                , onInput SetTargetTimeText
+                , onBlur CommitTargetTime
+                , A.attribute "inputmode" "numeric"
+                , class "w-full bg-slate-950 border border-slate-800 rounded-md px-3 py-2 text-2xl font-semibold text-slate-100 tabular-nums focus:outline-none focus:border-rose-500/60"
+                ]
+                []
+            , p [ class "text-xs text-slate-500 mt-1" ] [ text "Tap Tab or click away to commit." ]
+            ]
+        , planStat "Current sum"
+            (if currentSum == 0 then
+                "—"
+
+             else
+                formatHhmm currentSum
+            )
+            (case target of
+                Just _ ->
+                    if diff == 0 then
+                        Just ( "On target", "text-emerald-400" )
+
+                    else if diff > 0 then
+                        Just ( "+" ++ formatMmss diff ++ " over", "text-rose-400" )
+
+                    else
+                        Just ( formatMmss (abs diff) ++ " under", "text-amber-400" )
+
+                Nothing ->
+                    Nothing
+            )
+        , planStat "Aid rest"
+            (formatHhmm aidRest)
+            (Just
+                ( String.fromInt (List.length race.aidStations)
+                    ++ " stops"
+                , "text-slate-500"
+                )
+            )
+        , planStat "Avg pace"
+            (case ( target, race.distance > 0 ) of
+                ( Just t, True ) ->
+                    paceMinPerKm (t - aidRest) race.distance
+
+                _ ->
+                    "—"
+            )
+            (Just ( "/ km · moving", "text-slate-500" ))
+        ]
+
+
+planStat : String -> String -> Maybe ( String, String ) -> Html msg
+planStat label value note =
+    div []
+        [ p [ class "text-xs text-slate-500 uppercase tracking-wider mb-1" ] [ text label ]
+        , p [ class "text-2xl font-semibold text-slate-100 tabular-nums" ] [ text value ]
+        , case note of
+            Just ( t, colorClass ) ->
+                p [ class ("text-xs " ++ colorClass) ] [ text t ]
+
+            Nothing ->
+                text ""
+        ]
+
+
+viewPlanTabs : Race -> TableMode -> Html Msg
+viewPlanTabs _ mode =
+    div [ class "flex items-center justify-between" ]
+        [ div [ class "flex items-center gap-1 bg-slate-900 border border-slate-800 rounded-lg p-1" ]
+            [ tabButton "By km" (mode == ByKm) (SetPlanTableMode ByKm)
+            , tabButton "By section" (mode == BySection) (SetPlanTableMode BySection)
+            ]
+        , p [ class "text-xs text-slate-500" ]
+            [ text "Tap a row to edit a km in detail." ]
+        ]
+
+
+tabButton : String -> Bool -> Msg -> Html Msg
+tabButton labelText active msg =
+    button
+        [ onClick msg
+        , classList
+            [ ( "px-3 py-1.5 text-sm rounded transition-colors", True )
+            , ( "bg-rose-600 text-white font-medium shadow-sm", active )
+            , ( "text-slate-400 hover:text-slate-100", not active )
+            ]
+        ]
+        [ text labelText ]
+
+
+viewKmTable : Race -> List Km -> Dict Int KmResult -> Html Msg
+viewKmTable race kms results =
+    let
+        aidByKm =
+            race.aidStations
+                |> List.map (\a -> ( Planning.kmAtDistance a.distance, a ))
+                |> List.foldl (\( idx, a ) acc -> Dict.update idx (Just << (\v -> a :: Maybe.withDefault [] v)) acc) Dict.empty
+
+        cumulativeRows =
+            kmsWithCumulative race aidByKm results kms
+    in
+    div [ class "rounded-2xl bg-slate-900 border border-slate-800 overflow-x-auto" ]
+        [ Html.table [ class "w-full text-sm" ]
+            [ Html.thead [ class "text-xs uppercase tracking-wider text-slate-500" ]
+                [ Html.tr []
+                    [ Html.th [ class "px-4 py-3 text-left" ] [ text "Km" ]
+                    , Html.th [ class "px-4 py-3 text-left" ] [ text "Span" ]
+                    , Html.th [ class "px-4 py-3 text-right" ] [ text "Δ ele" ]
+                    , Html.th [ class "px-4 py-3 text-right" ] [ text "Pace" ]
+                    , Html.th [ class "px-4 py-3 text-right" ] [ text "Time" ]
+                    , Html.th [ class "px-4 py-3 text-right" ] [ text "Cum" ]
+                    , Html.th [ class "px-4 py-3 text-left" ] [ text "Notes / stops" ]
+                    ]
+                ]
+            , Html.tbody [] cumulativeRows
+            ]
+        ]
+
+
+kmsWithCumulative :
+    Race
+    -> Dict Int (List AidStation)
+    -> Dict Int KmResult
+    -> List Km
+    -> List (Html Msg)
+kmsWithCumulative race aidByKm results kms =
+    let
+        go km ( running, acc ) =
+            let
+                result =
+                    Dict.get km.index results
+                        |> Maybe.withDefault { seconds = 0, source = AutoComputed }
+
+                stops =
+                    Dict.get km.index aidByKm |> Maybe.withDefault []
+
+                stopRest =
+                    List.foldl (\a sum -> sum + a.restSeconds) 0 stops
+
+                newRunning =
+                    running + result.seconds + stopRest
+
+                notes =
+                    (kmPlanFor km.index race.plan).notes
+            in
+            ( newRunning, viewKmRow race km result stops notes newRunning :: acc )
+
+        ( _, rows ) =
+            List.foldl go ( 0, [] ) kms
+    in
+    List.reverse rows
+
+
+viewKmRow : Race -> Km -> KmResult -> List AidStation -> String -> Int -> Html Msg
+viewKmRow race km result stops notes cumulative =
+    let
+        deltaEle =
+            km.eleEnd - km.eleStart
+
+        pace =
+            paceMinPerKm result.seconds km.distance
+
+        timeCell =
+            div [ class "flex items-baseline justify-end gap-1 tabular-nums" ]
+                [ span [ class "text-slate-100 font-medium" ] [ text (formatMmss result.seconds) ]
+                , span
+                    [ classList
+                        [ ( "text-[10px] uppercase tracking-wider", True )
+                        , ( "text-amber-300", result.source == UserManual )
+                        , ( "text-slate-600", result.source == AutoComputed )
+                        ]
+                    ]
+                    [ text
+                        (if result.source == UserManual then
+                            "M"
+
+                         else
+                            "A"
+                        )
+                    ]
+                ]
+    in
+    Html.tr [ class "border-t border-slate-800 hover:bg-slate-950/60 transition-colors" ]
+        [ Html.td [ class "px-4 py-3 align-top tabular-nums text-slate-300" ]
+            [ a
+                [ Route.href (Route.PlanKm race.id km.index)
+                , class "hover:text-rose-300"
+                ]
+                [ text (String.fromInt (km.index + 1)) ]
+            ]
+        , Html.td [ class "px-4 py-3 align-top text-slate-400 tabular-nums whitespace-nowrap" ]
+            [ text
+                (formatFloat 2 (km.distStart / 1000)
+                    ++ " → "
+                    ++ formatFloat 2 (km.distEnd / 1000)
+                    ++ " km"
+                )
+            ]
+        , Html.td [ class "px-4 py-3 align-top text-right tabular-nums" ]
+            [ span
+                [ classList
+                    [ ( "font-medium", True )
+                    , ( "text-rose-300", deltaEle > 0 )
+                    , ( "text-emerald-300", deltaEle < 0 )
+                    , ( "text-slate-400", deltaEle == 0 )
+                    ]
+                ]
+                [ text
+                    ((if deltaEle > 0 then
+                        "+"
+
+                      else
+                        ""
+                     )
+                        ++ formatInt deltaEle
+                        ++ " m"
+                    )
+                ]
+            ]
+        , Html.td [ class "px-4 py-3 align-top text-right text-slate-300 tabular-nums" ] [ text pace ]
+        , Html.td [ class "px-4 py-3 align-top text-right" ] [ timeCell ]
+        , Html.td [ class "px-4 py-3 align-top text-right text-slate-300 tabular-nums" ]
+            [ text (formatHmsLong cumulative) ]
+        , Html.td [ class "px-4 py-3 align-top text-slate-400 text-xs" ]
+            [ if List.isEmpty stops && String.isEmpty notes then
+                span [ class "text-slate-700" ] [ text "—" ]
+
+              else
+                div [ class "space-y-1" ]
+                    (List.map
+                        (\a ->
+                            div [ class "text-amber-300" ]
+                                [ text ("★ " ++ a.name ++ " · +" ++ formatRest a.restSeconds) ]
+                        )
+                        stops
+                        ++ (if String.isEmpty notes then
+                                []
+
+                            else
+                                [ p [ class "text-slate-400 line-clamp-2" ] [ text notes ] ]
+                           )
+                    )
+            ]
+        ]
+
+
+viewSectionTable : Race -> List Km -> Dict Int KmResult -> Html Msg
+viewSectionTable race kms results =
+    let
+        sections =
+            Planning.sectionsForRace
+                { totalDistance = race.distance
+                , aidStations = race.aidStations
+                , kms = kms
+                }
+
+        rows =
+            sectionsWithCumulative race results sections
+    in
+    div [ class "rounded-2xl bg-slate-900 border border-slate-800 overflow-x-auto" ]
+        [ Html.table [ class "w-full text-sm" ]
+            [ Html.thead [ class "text-xs uppercase tracking-wider text-slate-500" ]
+                [ Html.tr []
+                    [ Html.th [ class "px-4 py-3 text-left" ] [ text "Section" ]
+                    , Html.th [ class "px-4 py-3 text-right" ] [ text "Distance" ]
+                    , Html.th [ class "px-4 py-3 text-right" ] [ text "Gain" ]
+                    , Html.th [ class "px-4 py-3 text-right" ] [ text "Loss" ]
+                    , Html.th [ class "px-4 py-3 text-right" ] [ text "Pace" ]
+                    , Html.th [ class "px-4 py-3 text-right" ] [ text "Section time" ]
+                    , Html.th [ class "px-4 py-3 text-right" ] [ text "Cum" ]
+                    ]
+                ]
+            , Html.tbody [] rows
+            ]
+        ]
+
+
+sectionsWithCumulative : Race -> Dict Int KmResult -> List Planning.Section -> List (Html msg)
+sectionsWithCumulative _ results sections =
+    let
+        go section ( running, acc ) =
+            let
+                sectionSeconds =
+                    section.kmIndices
+                        |> List.filterMap (\idx -> Dict.get idx results)
+                        |> List.foldl (\r sum -> sum + r.seconds) 0
+
+                aidRest =
+                    section.followedByAid
+                        |> Maybe.map .restSeconds
+                        |> Maybe.withDefault 0
+
+                runningAfterSection =
+                    running + sectionSeconds
+
+                runningAfterRest =
+                    runningAfterSection + aidRest
+
+                pace =
+                    paceMinPerKm sectionSeconds section.distance
+
+                sectionRow =
+                    Html.tr [ class "border-t border-slate-800" ]
+                        [ Html.td [ class "px-4 py-3 text-slate-200" ] [ text section.label ]
+                        , Html.td [ class "px-4 py-3 text-right text-slate-300 tabular-nums" ] [ text (formatFloat 2 (section.distance / 1000) ++ " km") ]
+                        , Html.td [ class "px-4 py-3 text-right text-rose-300 tabular-nums" ] [ text (formatInt section.gain ++ " m+") ]
+                        , Html.td [ class "px-4 py-3 text-right text-emerald-300 tabular-nums" ] [ text (formatInt section.loss ++ " m−") ]
+                        , Html.td [ class "px-4 py-3 text-right text-slate-300 tabular-nums" ] [ text pace ]
+                        , Html.td [ class "px-4 py-3 text-right text-slate-100 font-medium tabular-nums" ] [ text (formatHmsLong sectionSeconds) ]
+                        , Html.td [ class "px-4 py-3 text-right text-slate-300 tabular-nums" ] [ text (formatHmsLong runningAfterSection) ]
+                        ]
+
+                aidRow =
+                    case section.followedByAid of
+                        Just aid ->
+                            Html.tr [ class "border-t border-slate-800 bg-slate-950/40" ]
+                                [ Html.td [ class "px-4 py-2 text-xs text-amber-300" ]
+                                    [ text ("★ " ++ aid.name) ]
+                                , Html.td [ class "px-4 py-2 text-right text-xs text-slate-500 tabular-nums" ] [ text "—" ]
+                                , Html.td [ class "px-4 py-2 text-right text-xs text-slate-500 tabular-nums" ] [ text "—" ]
+                                , Html.td [ class "px-4 py-2 text-right text-xs text-slate-500 tabular-nums" ] [ text "—" ]
+                                , Html.td [ class "px-4 py-2 text-right text-xs text-slate-500 tabular-nums" ] [ text "—" ]
+                                , Html.td [ class "px-4 py-2 text-right text-xs text-amber-300 tabular-nums" ] [ text ("+" ++ formatHmsLong aid.restSeconds) ]
+                                , Html.td [ class "px-4 py-2 text-right text-xs text-slate-400 tabular-nums" ] [ text (formatHmsLong runningAfterRest) ]
+                                ]
+
+                        Nothing ->
+                            text ""
+            in
+            ( runningAfterRest, aidRow :: sectionRow :: acc )
+
+        ( _, rowsRev ) =
+            List.foldl go ( 0, [] ) sections
+    in
+    List.reverse rowsRev
+
+
+
+-- PER-KM CARD VIEW
+
+
+viewPlanKm : Model -> Race -> Int -> Html Msg
+viewPlanKm model race kmIndex =
+    let
+        kms =
+            Dict.get (raceIdToString race.id) model.kmsCache
+                |> Maybe.withDefault []
+
+        thisKm =
+            kms
+                |> List.filter (\k -> k.index == kmIndex)
+                |> List.head
+
+        aidRest =
+            Planning.aidRestTotal race.aidStations
+
+        results =
+            Planning.distribute
+                { target = race.plan.targetSeconds
+                , kms = kms
+                , plan = race.plan
+                , aidRestSeconds = aidRest
+                }
+
+        prevIndex =
+            if kmIndex <= 0 then
+                Nothing
+
+            else
+                Just (kmIndex - 1)
+
+        nextIndex =
+            if kmIndex + 1 >= List.length kms then
+                Nothing
+
+            else
+                Just (kmIndex + 1)
+    in
+    div [ class "max-w-screen-2xl mx-auto mt-8 px-6 space-y-6" ]
+        [ viewPlanCrumb race
+        , div [ class "flex items-end justify-between gap-4 flex-wrap" ]
+            [ h1 [ class "text-3xl font-bold tracking-tight text-slate-100" ]
+                [ text ("Km " ++ String.fromInt (kmIndex + 1) ++ " of " ++ String.fromInt (List.length kms)) ]
+            , a [ Route.href (Route.PlanTable race.id), class "text-sm text-slate-400 hover:text-slate-100" ]
+                [ text "Back to table" ]
+            ]
+        , case thisKm of
+            Nothing ->
+                div [ class "rounded-2xl bg-slate-900 border border-slate-800 p-10 text-center text-slate-500" ]
+                    [ text "This km doesn't exist in this race." ]
+
+            Just km ->
+                viewKmCardAndForm model race km results aidRest prevIndex nextIndex
+        ]
+
+
+viewKmCardAndForm : Model -> Race -> Km -> Dict Int KmResult -> Int -> Maybe Int -> Maybe Int -> Html Msg
+viewKmCardAndForm model race km results _ prevIndex nextIndex =
+    let
+        result =
+            Dict.get km.index results |> Maybe.withDefault { seconds = 0, source = AutoComputed }
+
+        kp =
+            kmPlanFor km.index race.plan
+
+        stopsInKm =
+            race.aidStations
+                |> List.filter (\a -> a.distance >= km.distStart && a.distance <= km.distEnd)
+
+        navLink labelText maybeIdx =
+            case maybeIdx of
+                Just idx ->
+                    a
+                        [ Route.href (Route.PlanKm race.id idx)
+                        , class "px-3 py-2 text-sm border border-slate-700 rounded-md hover:bg-slate-800 text-slate-200"
+                        ]
+                        [ text labelText ]
+
+                Nothing ->
+                    span
+                        [ class "px-3 py-2 text-sm border border-slate-800 rounded-md text-slate-600 cursor-not-allowed" ]
+                        [ text labelText ]
+    in
+    div [ class "grid grid-cols-1 lg:grid-cols-2 gap-6 items-start" ]
+        [ div [ class "space-y-4" ]
+            [ viewKmCard km stopsInKm
+            , div [ class "flex gap-2 justify-between" ]
+                [ navLink "← Prev km" prevIndex
+                , navLink "Next km →" nextIndex
+                ]
+            ]
+        , viewKmForm model race km result kp stopsInKm
+        ]
+
+
+viewKmCard : Km -> List AidStation -> Html Msg
+viewKmCard km stopsInKm =
+    let
+        cardWidth =
+            360.0
+
+        cardHeight =
+            260.0
+
+        padding =
+            16.0
+
+        chartLeft =
+            padding
+
+        chartTop =
+            padding
+
+        chartWidth =
+            cardWidth - padding * 2
+
+        chartHeight =
+            cardHeight - padding * 2 - 28
+        -- room for the label band at the bottom
+
+        eleRange =
+            max 10 (km.maxEle - km.minEle)
+
+        -- 1:1 scale within the card. m/px is the same on both axes.
+        mPerPx =
+            max (km.distance / chartWidth) (eleRange / chartHeight)
+
+        -- Recompute chart geometry now that we know the actual ratio.
+        actualChartHeight =
+            eleRange / mPerPx
+
+        elevBaseline =
+            chartTop + actualChartHeight
+
+        toX d =
+            chartLeft + d / mPerPx
+
+        toY ele =
+            chartTop + (km.maxEle - ele) / mPerPx
+
+        coords =
+            List.map2 (\d p -> ( toX d, toY p.ele )) km.cumDist km.points
+
+        pathD =
+            buildAreaPathLocal coords elevBaseline
+
+        strokeD =
+            buildStrokePathLocal coords
+
+        stopMarkers =
+            List.map (viewKmCardStop chartTop elevBaseline km.distStart toX) stopsInKm
+    in
+    div [ class "relative bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden", A.style "width" (String.fromFloat cardWidth ++ "px") ]
+        [ div [ class "px-5 pt-4 pb-3 border-b border-slate-800" ]
+            [ p [ class "text-xs uppercase tracking-wider text-slate-500" ]
+                [ text
+                    ("Km "
+                        ++ String.fromInt (km.index + 1)
+                        ++ " · 1:1 scale (1 px = "
+                        ++ formatFloat 1 mPerPx
+                        ++ " m)"
+                    )
+                ]
+            , div [ class "mt-1 flex items-baseline justify-between" ]
+                [ p [ class "text-2xl font-semibold text-slate-100 tabular-nums" ]
+                    [ text
+                        (formatFloat 2 (km.distStart / 1000)
+                            ++ " → "
+                            ++ formatFloat 2 (km.distEnd / 1000)
+                            ++ " km"
+                        )
+                    ]
+                , p [ class "text-sm text-slate-400 tabular-nums" ]
+                    [ text
+                        ((if km.eleEnd - km.eleStart >= 0 then
+                            "+"
+
+                          else
+                            ""
+                         )
+                            ++ formatInt (km.eleEnd - km.eleStart)
+                            ++ " m"
+                        )
+                    ]
+                ]
+            ]
+        , Svg.svg
+            [ SA.width (String.fromFloat cardWidth)
+            , SA.height (String.fromFloat (chartTop + actualChartHeight + 24))
+            , SA.viewBox ("0 0 " ++ String.fromFloat cardWidth ++ " " ++ String.fromFloat (chartTop + actualChartHeight + 24))
+            ]
+            [ Svg.defs []
+                [ Svg.linearGradient
+                    [ SA.id ("km-fill-" ++ String.fromInt km.index)
+                    , SA.x1 "0"
+                    , SA.y1 "0"
+                    , SA.x2 "0"
+                    , SA.y2 "1"
+                    ]
+                    [ Svg.stop [ SA.offset "0%", SA.stopColor "#E52E3A", SA.stopOpacity "0.65" ] []
+                    , Svg.stop [ SA.offset "100%", SA.stopColor "#E52E3A", SA.stopOpacity "0.1" ] []
+                    ]
+                ]
+            , Svg.path
+                [ SA.d pathD
+                , SA.fill ("url(#km-fill-" ++ String.fromInt km.index ++ ")")
+                , SA.stroke "none"
+                ]
+                []
+            , Svg.path
+                [ SA.d strokeD
+                , SA.fill "none"
+                , SA.stroke "#ff5f6a"
+                , SA.strokeWidth "1.5"
+                , SA.strokeLinejoin "round"
+                ]
+                []
+            , Svg.g [] stopMarkers
+            ]
+        , div [ class "px-5 pb-4 -mt-1 flex items-baseline justify-between text-xs text-slate-500 tabular-nums" ]
+            [ span [] [ text (formatInt km.eleStart ++ " m") ]
+            , span [] [ text (formatInt km.maxEle ++ " m max") ]
+            , span [] [ text (formatInt km.eleEnd ++ " m") ]
+            ]
+        ]
+
+
+viewKmCardStop : Float -> Float -> Float -> (Float -> Float) -> AidStation -> Svg.Svg Msg
+viewKmCardStop yTop yBottom kmStart toX aid =
+    let
+        relative =
+            aid.distance - kmStart
+
+        x =
+            toX relative
+    in
+    Svg.g []
+        [ Svg.line
+            [ SA.x1 (String.fromFloat x)
+            , SA.x2 (String.fromFloat x)
+            , SA.y1 (String.fromFloat yTop)
+            , SA.y2 (String.fromFloat yBottom)
+            , SA.stroke "#fbbf24"
+            , SA.strokeWidth "1"
+            , SA.strokeDasharray "2 2"
+            ]
+            []
+        , Svg.circle
+            [ SA.cx (String.fromFloat x)
+            , SA.cy (String.fromFloat yTop)
+            , SA.r "5"
+            , SA.fill "#fbbf24"
+            ]
+            []
+        ]
+
+
+buildAreaPathLocal : List ( Float, Float ) -> Float -> String
+buildAreaPathLocal coords baseline =
+    case coords of
+        [] ->
+            ""
+
+        ( x0, y0 ) :: _ ->
+            let
+                middle =
+                    coords
+                        |> List.drop 1
+                        |> List.map (\( x, y ) -> "L " ++ fmtCoord x ++ " " ++ fmtCoord y)
+                        |> String.join " "
+
+                xLast =
+                    coords
+                        |> List.reverse
+                        |> List.head
+                        |> Maybe.map Tuple.first
+                        |> Maybe.withDefault x0
+            in
+            String.join " "
+                [ "M " ++ fmtCoord x0 ++ " " ++ fmtCoord baseline
+                , "L " ++ fmtCoord x0 ++ " " ++ fmtCoord y0
+                , middle
+                , "L " ++ fmtCoord xLast ++ " " ++ fmtCoord baseline
+                , "Z"
+                ]
+
+
+buildStrokePathLocal : List ( Float, Float ) -> String
+buildStrokePathLocal coords =
+    case coords of
+        [] ->
+            ""
+
+        ( x0, y0 ) :: rest ->
+            ("M " ++ fmtCoord x0 ++ " " ++ fmtCoord y0)
+                :: List.map (\( x, y ) -> "L " ++ fmtCoord x ++ " " ++ fmtCoord y) rest
+                |> String.join " "
+
+
+fmtCoord : Float -> String
+fmtCoord f =
+    let
+        rounded =
+            toFloat (round (f * 100)) / 100
+    in
+    String.fromFloat rounded
+
+
+viewKmForm :
+    Model
+    -> Race
+    -> Km
+    -> KmResult
+    -> Types.KmPlan
+    -> List AidStation
+    -> Html Msg
+viewKmForm model _ km result kp stopsInKm =
+    let
+        sourceBadge =
+            case result.source of
+                UserManual ->
+                    span [ class "px-2 py-0.5 text-[10px] uppercase tracking-wider bg-amber-400/20 text-amber-300 rounded" ]
+                        [ text "Manual" ]
+
+                AutoComputed ->
+                    span [ class "px-2 py-0.5 text-[10px] uppercase tracking-wider bg-slate-800 text-slate-400 rounded" ]
+                        [ text "Auto" ]
+
+        pace =
+            paceMinPerKm result.seconds km.distance
+    in
+    div [ class "space-y-5 rounded-2xl bg-slate-900 border border-slate-800 p-5" ]
+        [ div [ class "flex items-baseline justify-between gap-2" ]
+            [ h3 [ class "text-base font-semibold text-slate-100" ] [ text "Plan this km" ]
+            , sourceBadge
+            ]
+        , div [ class "grid grid-cols-3 gap-3 tabular-nums" ]
+            [ smallStat "Distance" (formatFloat 2 (km.distance / 1000)) "km"
+            , smallStat "Δ ele" (formatInt (km.eleEnd - km.eleStart)) "m"
+            , smallStat "Slope" (formatFloat 1 (km.slope * 100)) "%"
+            ]
+        , div [ class "grid grid-cols-2 gap-3" ]
+            [ field "Target time"
+                [ input
+                    [ A.type_ "text"
+                    , A.value model.kmTimeText
+                    , A.placeholder
+                        (if result.seconds > 0 then
+                            formatMmss result.seconds ++ " (auto)"
+
+                         else
+                            "m:ss"
+                        )
+                    , onInput SetKmTimeText
+                    , onBlur (CommitKmTimeForKm km.index)
+                    , class "w-full bg-slate-950 border border-slate-800 rounded-md px-3 py-2 text-lg font-medium text-slate-100 tabular-nums focus:outline-none focus:border-rose-500/60"
+                    ]
+                    []
+                ]
+            , div [ class "space-y-1" ]
+                [ span [ class "text-xs text-slate-500 uppercase tracking-wider" ] [ text "Pace" ]
+                , div [ class "px-3 py-2 bg-slate-950 border border-slate-800 rounded-md text-lg font-medium text-slate-100 tabular-nums" ]
+                    [ text (pace ++ "/km") ]
+                ]
+            ]
+        , case kp.time of
+            Manual _ ->
+                button
+                    [ onClick (ResetKmToAuto km.index)
+                    , class "text-xs text-slate-400 hover:text-slate-100 underline"
+                    ]
+                    [ text "Reset to auto (GAP)" ]
+
+            Auto ->
+                p [ class "text-xs text-slate-500" ]
+                    [ text "Auto-distributed from your target total time using the slope of this km." ]
+        , field "Notes"
+            [ textarea
+                [ A.value model.kmNotesText
+                , A.placeholder "Anything to remember about this km — surface, exposure, mental cues…"
+                , A.rows 3
+                , onInput SetKmNotesText
+                , onBlur (CommitKmNotesForKm km.index)
+                , class "w-full bg-slate-950 border border-slate-800 rounded-md px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-rose-500/60"
+                ]
+                []
+            ]
+        , if List.isEmpty stopsInKm then
+            text ""
+
+          else
+            div [ class "space-y-2" ]
+                [ p [ class "text-xs text-slate-500 uppercase tracking-wider" ] [ text "Aid stations in this km" ]
+                , div [ class "space-y-1" ]
+                    (List.map
+                        (\a ->
+                            div [ class "text-sm text-amber-300" ]
+                                [ text ("★ " ++ a.name ++ " · " ++ formatFloat 2 (a.distance / 1000) ++ " km · " ++ formatRest a.restSeconds) ]
+                        )
+                        stopsInKm
+                    )
+                ]
+        ]
+
+
+smallStat : String -> String -> String -> Html msg
+smallStat labelText value unit =
+    div [ class "rounded-lg bg-slate-950/60 px-3 py-2" ]
+        [ p [ class "text-[10px] uppercase tracking-wider text-slate-500" ] [ text labelText ]
+        , p [ class "flex items-baseline gap-1" ]
+            [ span [ class "text-base font-semibold text-slate-100" ] [ text value ]
+            , span [ class "text-[10px] text-slate-500" ] [ text unit ]
+            ]
+        ]
+
+
+
+-- ============================================================
 -- DELETE CONFIRM + ERROR TOAST
 -- ============================================================
 
@@ -1430,3 +2576,133 @@ formatRest seconds =
 
         else
             String.fromInt minutes ++ ":" ++ String.padLeft 2 '0' (String.fromInt remainder) ++ " rest"
+
+
+
+-- TIME PARSING / FORMATTING
+
+
+{-| Parse "H:MM" or "HH:MM" (hours and minutes) into total seconds.
+Also accepts "H:MM:SS". Empty / unparseable input → Nothing.
+-}
+parseHhmm : String -> Maybe Int
+parseHhmm raw =
+    let
+        trimmed =
+            String.trim raw
+    in
+    if String.isEmpty trimmed then
+        Nothing
+
+    else
+        case String.split ":" trimmed |> List.map String.trim of
+            [ h, m ] ->
+                Maybe.map2 (\hh mm -> hh * 3600 + mm * 60) (String.toInt h) (String.toInt m)
+
+            [ h, m, s ] ->
+                Maybe.map3 (\hh mm ss -> hh * 3600 + mm * 60 + ss)
+                    (String.toInt h)
+                    (String.toInt m)
+                    (String.toInt s)
+
+            [ only ] ->
+                -- bare number = minutes
+                String.toInt only |> Maybe.map (\v -> v * 60)
+
+            _ ->
+                Nothing
+
+
+{-| Format seconds as "H:MM" (or "HH:MM" if ≥ 10 h).
+-}
+formatHhmm : Int -> String
+formatHhmm totalSeconds =
+    let
+        hours =
+            totalSeconds // 3600
+
+        minutes =
+            modBy 60 (totalSeconds // 60)
+    in
+    String.fromInt hours
+        ++ ":"
+        ++ String.padLeft 2 '0' (String.fromInt minutes)
+
+
+formatHmsLong : Int -> String
+formatHmsLong totalSeconds =
+    let
+        hours =
+            totalSeconds // 3600
+
+        minutes =
+            modBy 60 (totalSeconds // 60)
+
+        seconds =
+            modBy 60 totalSeconds
+    in
+    if hours == 0 then
+        String.fromInt minutes ++ ":" ++ String.padLeft 2 '0' (String.fromInt seconds)
+
+    else
+        String.fromInt hours
+            ++ ":"
+            ++ String.padLeft 2 '0' (String.fromInt minutes)
+            ++ ":"
+            ++ String.padLeft 2 '0' (String.fromInt seconds)
+
+
+{-| Parse "M:SS" → seconds. Also accepts bare "M" (minutes).
+-}
+parseMmss : String -> Maybe Int
+parseMmss raw =
+    let
+        trimmed =
+            String.trim raw
+    in
+    if String.isEmpty trimmed then
+        Nothing
+
+    else
+        case String.split ":" trimmed |> List.map String.trim of
+            [ m, s ] ->
+                Maybe.map2 (\mm ss -> mm * 60 + ss) (String.toInt m) (String.toInt s)
+
+            [ only ] ->
+                String.toInt only |> Maybe.map (\v -> v * 60)
+
+            _ ->
+                Nothing
+
+
+{-| Format seconds as "M:SS" (no hours).
+-}
+formatMmss : Int -> String
+formatMmss totalSeconds =
+    let
+        m =
+            totalSeconds // 60
+
+        s =
+            modBy 60 totalSeconds
+    in
+    String.fromInt m ++ ":" ++ String.padLeft 2 '0' (String.fromInt s)
+
+
+paceMinPerKm : Int -> Float -> String
+paceMinPerKm secs meters =
+    if meters <= 0 || secs <= 0 then
+        "—"
+
+    else
+        let
+            secPerKm =
+                toFloat secs * 1000 / meters
+
+            m =
+                floor (secPerKm / 60)
+
+            s =
+                round (secPerKm - toFloat (m * 60))
+        in
+        String.fromInt m ++ ":" ++ String.padLeft 2 '0' (String.fromInt s)

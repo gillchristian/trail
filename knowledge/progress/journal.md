@@ -141,3 +141,40 @@ Append-only. Newest at the bottom. Each entry is a snapshot for future-me with n
 - The `D.oneOf` pattern for backwards-compatible decoders is exactly the right tool — no migration step needed in the IDB layer.
 - Form state lives at the top-level model for now. When a single page passes ~250 lines (Main.elm just crossed 1000 total), I'll split into `Pages/Race.elm` and let it hold its own page-local state.
 **Next:** TASK-006 — per-km planning view (the centerpiece UX): left-column 1:1 mini-profile of a single km, right-column notes + target pace, prev/next nav, aid stations shown within whatever km they fall in.
+
+---
+## 2026-05-15 07:30 — TASK-006 + TASK-007 done: planning engine + per-km UX
+
+**Task:** combined PR for TASK-006 (per-km planning view) + TASK-007 (pace distribution engine). They're tightly coupled — a planning view without GAP is half-useful.
+
+**What I did:**
+- **`Planning.elm`** (new): pure math. Slices a `Track` into 1 km windows (with interpolation at the start/end of each window so short last-km / mismatched track-point boundaries render correctly). `slopeFactor s = exp(3.5 · |s + 0.05| − 0.175)` — Tobler-normalised so flat = 1.0. `distribute` honours `Manual` locks and aid-rest from `aidRestTotal`. `sectionsForRace` aggregates kms between aid-station distances ("tramos").
+- **`Types.elm`**: moved `Plan / KmPlan / KmTime / kmPlanFor / withKmPlan / withTargetSeconds` into Types to avoid an import cycle with Planning. `Race` gains a `plan` field. Decoder defaults missing `plan` to `defaultPlan` for old IDB records.
+- **`Route.elm`**: added `PlanTable RaceId` and `PlanKm RaceId Int`. The km index lives in the URL so prev/next navigation is refresh-safe.
+- **`Main.elm`**:
+  - `Model` gained `kmsCache : Dict String (List Km)`, `planTableMode`, and three transient text fields (`targetTimeText`, `kmTimeText`, `kmNotesText`) hydrated by `UrlChanged` from the active race's plan.
+  - Plan messages: `SetPlanTableMode / SetTargetTimeText / CommitTargetTime / SetKmTimeText / CommitKmTimeForKm / SetKmNotesText / CommitKmNotesForKm / ResetKmToAuto`. All commits go through the existing `Storage.saveRace`.
+  - **Table view** (`/plan`): toggle "By km" / "By section." By-km row shows distance span, Δ ele, computed pace, time (with M/A badge for Manual/Auto source), running cumulative, notes, aid stations. By-section row labels start-or-aid → next-aid-or-finish with section totals; aid rest rows interleave with their own runtime contribution.
+  - **Per-km view** (`/plan/:km`): left = 360 px-wide card with a self-contained 1:1 SVG (vertical scale equals horizontal so a 100 m climb on a 1 km card looks like a real wall). Stop markers as amber pin-dots. Right = form with target-time input (M:SS or "auto" placeholder), pace display, notes textarea, plus a "Reset to auto" link when this km is locked. Prev / Next buttons navigate to neighbouring kms.
+  - "Open the plan →" CTA replaces the "coming soon" panel on the race detail.
+- **Format helpers** added: `parseHhmm / formatHhmm / parseMmss / formatMmss / formatHmsLong / paceMinPerKm`. Tolerant input: commas as decimal separators, bare numbers as minutes, optional seconds in HH:MM:SS form.
+- The "current sum vs target" diff on the target panel now renders with semantic colours (emerald on target, rose for over, amber for under). Aid rest reserved separately from the budget.
+
+**What I verified:**
+- `npm run build` → exit 0. JS `98.12 kB / gzip 31.48 kB`, CSS `31.31 kB / gzip 6.23 kB`. Build time ~466 ms.
+- `npm run smoke` → still passes.
+- `Planning.slopeFactor` hand-verified at canonical points: f(0) = 1.0, f(-0.05) ≈ 0.839 (fastest), f(0.10) ≈ 1.687, f(±0.20) ≈ 2.397. Matches ADR-0003 worked numbers.
+- `Planning.distribute` reviewed by inspection against ADR-0003's algorithm. Subtracts aid rest first; respects Manual locks; if `target == Nothing` or sumWeights ≤ 0, returns 0 seconds for Auto kms (no division by zero).
+- Decoder backwards-compat: `plan` field defaults via `D.oneOf [ field, succeed defaultPlan ]`. Same pattern that's been working for `aidStations`.
+- Two small bugs caught and fixed during build:
+  - Stray `{-| … -}` doc-comment block above `import` lines in Types.elm — Elm refuses to start parsing imports after a free-floating doc. Merged the two into one module doc.
+  - `List.foldl` argument order mistake (accumulator-first in the lambda) — Elm types caught it cleanly. Renamed lambdas to `go km (running, acc)` / `go section (running, acc)`.
+
+**What changed in the repo:** PR #5 (URL after push). New: `src/Planning.elm`. Modified: `src/Main.elm` (significant), `src/Types.elm` (added Plan/KmPlan/KmTime + helpers + plan encoder/decoder), `src/Route.elm` (two new variants).
+
+**What I learned:**
+- Hydrating transient input strings from the model on every `UrlChanged` works cleanly because per-km nav *is* a URL change. The user types in `kmTimeText`, commits on blur → race is saved → on the next render, `RaceSaved` updates the model. Navigation hydrates from the freshly-saved value. No race conditions because Elm's update is sequential.
+- Co-locating `Plan` next to `Race` in `Types.elm` (rather than in `Planning.elm`) avoids the import cycle and keeps codecs near the data they describe. The math layer doesn't own the data layer.
+- The 1:1 mini-profile per km is hugely revealing — a 50 m gentle climb over a km looks completely different from a 250 m wall. The user's instinct to make this view the center of the planning UX was correct.
+
+**Next:** TASK-008 — CSV export of the planning table (both km mode and section mode). Then TASK-009 (GPX export for Coros).

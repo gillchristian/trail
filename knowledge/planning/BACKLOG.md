@@ -8,8 +8,8 @@ Ordered. Top item is next. Promote into `CURRENT.md` when started.
 - [x] TASK-002 — IndexedDB storage layer + race index page (upload GPX → race appears, persists across reload) — (M) ✓ PR #2
 - [x] TASK-004 — True-1:1 profile view (port crest's Main.elm rendering into the Race page) — (M) — ✓ PR #3
 - [x] TASK-005 — Aid-station CRUD: add by distance-from-start or distance-from-previous, edit, delete, persist — (M) — ✓ PR #4
-- [ ] TASK-006 — Per-km planning view (left card with 1:1 mini-profile, right inputs: notes + pace, prev/next nav) — (L)
-- [ ] TASK-007 — Pace distribution engine (Tobler, ADR-0003) + total-target UI, locked vs auto kms — (M)
+- [x] TASK-006 — Per-km planning view (left card with 1:1 mini-profile, right inputs: notes + pace, prev/next nav) — (L) — ✓ PR #5 (combined with TASK-007)
+- [x] TASK-007 — Pace distribution engine (Tobler, ADR-0003) + total-target UI, locked vs auto kms — (M) — ✓ PR #5
 - [ ] TASK-008 — Planning table view (km / section toggle) + CSV export in both modes — (M)
 - [ ] TASK-009 — GPX export with aid-station waypoints (ADR-0002), downloadable from the race page — (S)
 - [ ] TASK-010 — `.trail` project file export/import (round-trip: GPX + plan + aid stations) — (M)

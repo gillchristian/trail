@@ -1,34 +1,44 @@
 module Types exposing
     ( AidStation
+    , KmPlan
+    , KmTime(..)
+    , Plan
     , Race
     , RaceId
     , Service(..)
     , allServices
     , decodeRace
     , decodeRaces
+    , defaultPlan
+    , emptyKmPlan
     , encodeRace
+    , kmPlanFor
+    , planFromValue
+    , planToValue
     , raceIdFromString
     , raceIdToString
     , serviceIcon
     , serviceLabel
     , serviceToString
     , sortAidStations
+    , withKmPlan
+    , withTargetSeconds
     )
 
-{-| Shared types. A `Race` carries everything we need to render the
-index card, jump into the detail page, and (later) export Coros-ready
-GPX without going back to the original file: we keep the raw GPX text
-on the record.
+{-| Types module — primary records carried across the app.
+
+The data types and JSON codecs live here. The math (slope factors,
+GAP distribution, km windowing) lives in `Planning.elm` and imports
+from here.
 
 `RaceId` is wrapped so the compiler stops us from passing a name or
-a URL where a race id is expected.
-
-`AidStation` is embedded on `Race`. Ids are issued by a per-race
-sequence counter — stable across re-imports, no collisions, no
-external uuid library needed.
+a URL where a race id is expected. `AidStation` is embedded on
+`Race`; ids are issued by a per-race sequence counter — stable
+across re-imports, no uuid library needed.
 
 -}
 
+import Dict exposing (Dict)
 import Json.Decode as D exposing (Decoder)
 import Json.Encode as E exposing (Value)
 
@@ -185,7 +195,58 @@ type alias Race =
     , createdAt : Int
     , aidStations : List AidStation
     , aidStationSeq : Int
+    , plan : Plan
     }
+
+
+
+-- PLAN
+
+
+type alias Plan =
+    { targetSeconds : Maybe Int
+    , kmPlans : Dict Int KmPlan
+    }
+
+
+type alias KmPlan =
+    { time : KmTime
+    , notes : String
+    }
+
+
+type KmTime
+    = Auto
+    | Manual Int -- seconds
+
+
+defaultPlan : Plan
+defaultPlan =
+    { targetSeconds = Nothing, kmPlans = Dict.empty }
+
+
+emptyKmPlan : KmPlan
+emptyKmPlan =
+    { time = Auto, notes = "" }
+
+
+kmPlanFor : Int -> Plan -> KmPlan
+kmPlanFor index plan =
+    Dict.get index plan.kmPlans |> Maybe.withDefault emptyKmPlan
+
+
+withKmPlan : Int -> KmPlan -> Plan -> Plan
+withKmPlan index kp plan =
+    if kp.time == Auto && String.isEmpty kp.notes then
+        { plan | kmPlans = Dict.remove index plan.kmPlans }
+
+    else
+        { plan | kmPlans = Dict.insert index kp plan.kmPlans }
+
+
+withTargetSeconds : Maybe Int -> Plan -> Plan
+withTargetSeconds t plan =
+    { plan | targetSeconds = t }
 
 
 
@@ -209,7 +270,81 @@ encodeRace r =
         , ( "createdAt", E.int r.createdAt )
         , ( "aidStations", E.list encodeAidStation r.aidStations )
         , ( "aidStationSeq", E.int r.aidStationSeq )
+        , ( "plan", planToValue r.plan )
         ]
+
+
+planToValue : Plan -> Value
+planToValue plan =
+    E.object
+        [ ( "targetSeconds"
+          , case plan.targetSeconds of
+                Just t ->
+                    E.int t
+
+                Nothing ->
+                    E.null
+          )
+        , ( "kmPlans"
+          , plan.kmPlans
+                |> Dict.toList
+                |> E.list
+                    (\( idx, kp ) ->
+                        E.object
+                            [ ( "index", E.int idx )
+                            , ( "time", encodeKmTime kp.time )
+                            , ( "notes", E.string kp.notes )
+                            ]
+                    )
+          )
+        ]
+
+
+encodeKmTime : KmTime -> Value
+encodeKmTime t =
+    case t of
+        Auto ->
+            E.object [ ( "kind", E.string "auto" ) ]
+
+        Manual s ->
+            E.object [ ( "kind", E.string "manual" ), ( "seconds", E.int s ) ]
+
+
+planFromValue : Decoder Plan
+planFromValue =
+    D.map2 Plan
+        (D.field "targetSeconds" (D.nullable D.int))
+        (D.field "kmPlans" (D.list kmPlanEntryDecoder)
+            |> D.map Dict.fromList
+        )
+
+
+kmPlanEntryDecoder : Decoder ( Int, KmPlan )
+kmPlanEntryDecoder =
+    D.map3
+        (\index time notes ->
+            ( index, { time = time, notes = notes } )
+        )
+        (D.field "index" D.int)
+        (D.field "time" kmTimeDecoder)
+        (D.field "notes" D.string)
+
+
+kmTimeDecoder : Decoder KmTime
+kmTimeDecoder =
+    D.field "kind" D.string
+        |> D.andThen
+            (\kind ->
+                case kind of
+                    "auto" ->
+                        D.succeed Auto
+
+                    "manual" ->
+                        D.field "seconds" D.int |> D.map Manual
+
+                    other ->
+                        D.fail ("Unknown km-time kind: " ++ other)
+            )
 
 
 encodeAidStation : AidStation -> Value
@@ -246,7 +381,7 @@ decodeRace =
     coreDecoder
         |> D.andThen
             (\partial ->
-                D.map6 partial
+                D.map7 partial
                     (D.field "gain" D.float)
                     (D.field "loss" D.float)
                     (D.field "gpxText" D.string)
@@ -261,6 +396,11 @@ decodeRace =
                         , D.succeed 0
                         ]
                     )
+                    (D.oneOf
+                        [ D.field "plan" planFromValue
+                        , D.succeed defaultPlan
+                        ]
+                    )
             )
 
 
@@ -273,9 +413,9 @@ coreBuilder :
     -> String
     -> Maybe String
     -> Float
-    -> (Float -> Float -> String -> Int -> List AidStation -> Int -> Race)
+    -> (Float -> Float -> String -> Int -> List AidStation -> Int -> Plan -> Race)
 coreBuilder id name date location url notes cover dist =
-    \gain loss gpx ts aids seq ->
+    \gain loss gpx ts aids seq plan ->
         { id = id
         , name = name
         , date = date
@@ -290,6 +430,7 @@ coreBuilder id name date location url notes cover dist =
         , createdAt = ts
         , aidStations = aids
         , aidStationSeq = seq
+        , plan = plan
         }
 
 
