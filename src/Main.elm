@@ -1,30 +1,36 @@
 module Main exposing (main)
 
-{-| TASK-002.
+{-| TASK-004.
 
 `Browser.application` shell with hash routing, IndexedDB-backed
-persistence, race index + race detail (stub), upload flow that
-parses a GPX, creates a `Race`, persists, then navigates to detail.
+persistence, race index, race-detail (now with the **true-scale**
+elevation profile lifted from crest). Tracks are parsed lazily from
+the raw GPX on RacesLoaded / RaceSaved and cached in the model so
+navigating between races doesn't re-parse.
 
-The whole UI lives here for now. We'll split out per-page modules
-when a single page grows beyond ~250 lines.
+The whole UI still lives in this module. We'll split per-page when
+a page passes ~250 lines on its own.
 
 -}
 
 import Browser
+import Browser.Events
 import Browser.Navigation as Nav
+import Dict exposing (Dict)
 import File exposing (File)
 import File.Select as Select
 import Gpx exposing (Track)
-import Html exposing (Html, a, button, div, h1, h2, input, p, span, text)
+import Html exposing (Html, a, button, div, h1, h2, p, span, text)
 import Html.Attributes as A exposing (class, classList)
 import Html.Events as E exposing (onClick, preventDefaultOn)
+import Html.Lazy
 import Json.Decode as D
 import Json.Encode as Encode
+import Profile exposing (ScaleMode(..))
 import Route exposing (Route)
 import Storage
 import Task
-import Types exposing (Race, RaceId, encodeRace, raceIdFromString, raceIdToString, unwrapRaceId)
+import Types exposing (Race, RaceId, encodeRace, raceIdFromString, raceIdToString)
 import Url exposing (Url)
 
 
@@ -65,16 +71,19 @@ type RacesState
 
 type UploadState
     = NotUploading
-    | Parsing String -- filename
-    | UploadFailed String String -- filename, error
-    | Persisting String -- filename, waiting for IDB ack
+    | Parsing String
+    | UploadFailed String String
+    | Persisting String
 
 
 type alias Model =
     { key : Nav.Key
     , route : Route
     , now : Int
+    , viewportWidth : Float
     , races : RacesState
+    , parsedTracks : Dict String Track -- keyed by raceIdToString
+    , scaleMode : ScaleMode
     , upload : UploadState
     , dragOver : Bool
     , storageError : Maybe String
@@ -87,7 +96,10 @@ init flags url key =
     ( { key = key
       , route = Route.fromUrl url
       , now = flags.now
+      , viewportWidth = flags.width
       , races = LoadingRaces
+      , parsedTracks = Dict.empty
+      , scaleMode = FitWidth
       , upload = NotUploading
       , dragOver = False
       , storageError = Nothing
@@ -106,6 +118,8 @@ init flags url key =
 type Msg
     = LinkClicked Browser.UrlRequest
     | UrlChanged Url
+    | WindowResized Int Int
+    | SetScaleMode ScaleMode
       -- upload
     | DragEnter
     | DragLeave
@@ -135,6 +149,12 @@ update msg model =
 
         UrlChanged url ->
             ( { model | route = Route.fromUrl url, pendingDelete = Nothing }, Cmd.none )
+
+        WindowResized w _ ->
+            ( { model | viewportWidth = toFloat w }, Cmd.none )
+
+        SetScaleMode m ->
+            ( { model | scaleMode = m }, Cmd.none )
 
         DragEnter ->
             ( { model | dragOver = True }, Cmd.none )
@@ -172,7 +192,16 @@ update msg model =
         RacesLoaded value ->
             case D.decodeValue Types.decodeRaces value of
                 Ok races ->
-                    ( { model | races = LoadedRaces (sortRaces races) }, Cmd.none )
+                    let
+                        sorted =
+                            sortRaces races
+                    in
+                    ( { model
+                        | races = LoadedRaces sorted
+                        , parsedTracks = buildTrackCache sorted Dict.empty
+                      }
+                    , Cmd.none
+                    )
 
                 Err err ->
                     ( { model
@@ -187,17 +216,16 @@ update msg model =
                 Ok race ->
                     let
                         existing =
-                            case model.races of
-                                LoadedRaces rs ->
-                                    rs
-
-                                LoadingRaces ->
-                                    []
+                            currentRaces model
 
                         merged =
                             race :: List.filter (\r -> r.id /= race.id) existing
                     in
-                    ( { model | races = LoadedRaces (sortRaces merged), upload = NotUploading }
+                    ( { model
+                        | races = LoadedRaces (sortRaces merged)
+                        , parsedTracks = cacheTrack race model.parsedTracks
+                        , upload = NotUploading
+                      }
                     , Nav.pushUrl model.key (Route.toString (Route.RaceDetail race.id))
                     )
 
@@ -215,14 +243,13 @@ update msg model =
                     raceIdFromString idStr
 
                 kept =
-                    case model.races of
-                        LoadedRaces rs ->
-                            List.filter (\r -> r.id /= rid) rs
-
-                        LoadingRaces ->
-                            []
+                    List.filter (\r -> r.id /= rid) (currentRaces model)
             in
-            ( { model | races = LoadedRaces kept, pendingDelete = Nothing }
+            ( { model
+                | races = LoadedRaces kept
+                , parsedTracks = Dict.remove idStr model.parsedTracks
+                , pendingDelete = Nothing
+              }
             , if currentRouteIs (Route.RaceDetail rid) model.route then
                 Nav.pushUrl model.key (Route.toString Route.Index)
 
@@ -248,6 +275,16 @@ update msg model =
             ( { model | pendingDelete = Nothing }, Cmd.none )
 
 
+currentRaces : Model -> List Race
+currentRaces model =
+    case model.races of
+        LoadedRaces rs ->
+            rs
+
+        LoadingRaces ->
+            []
+
+
 currentRouteIs : Route -> Route -> Bool
 currentRouteIs target current =
     case ( target, current ) of
@@ -263,9 +300,33 @@ sortRaces =
     List.sortBy (\r -> -r.createdAt)
 
 
+buildTrackCache : List Race -> Dict String Track -> Dict String Track
+buildTrackCache races existing =
+    List.foldl cacheTrack existing races
+
+
+cacheTrack : Race -> Dict String Track -> Dict String Track
+cacheTrack race cache =
+    let
+        key =
+            raceIdToString race.id
+    in
+    case Dict.get key cache of
+        Just _ ->
+            cache
+
+        Nothing ->
+            case Gpx.parseGPX race.gpxText of
+                Ok track ->
+                    Dict.insert key track cache
+
+                Err _ ->
+                    cache
+
+
 buildDraftRace : Int -> Track -> String -> Race
 buildDraftRace now track gpxText =
-    { id = raceIdFromString "" -- JS assigns the id on save
+    { id = raceIdFromString ""
     , name = track.name
     , date = Nothing
     , location = ""
@@ -298,6 +359,7 @@ subscriptions _ =
         , Storage.gotRace RaceSaved
         , Storage.gotRaceDeleted RaceDeleted
         , Storage.gotError StorageError
+        , Browser.Events.onResize WindowResized
         ]
 
 
@@ -313,7 +375,7 @@ view model =
     , body =
         [ div [ class "min-h-screen flex flex-col" ]
             [ viewHeader model.route
-            , div [ class "flex-1 px-6 pb-10" ] [ viewContent model ]
+            , div [ class "flex-1 pb-10" ] [ viewContent model ]
             , viewFooter
             , viewDeleteModal model
             , viewErrorToast model
@@ -376,12 +438,12 @@ viewContent model =
             viewLoading
 
         ( Route.Index, LoadedRaces races ) ->
-            viewIndex model races
+            div [ class "px-6" ] [ viewIndex model races ]
 
         ( Route.RaceDetail rid, LoadedRaces races ) ->
             case findRace rid races of
                 Just race ->
-                    viewRaceDetail race
+                    viewRaceDetail model race
 
                 Nothing ->
                     viewRaceNotFound
@@ -403,7 +465,7 @@ viewLoading =
 
 viewNotFound : Html msg
 viewNotFound =
-    div [ class "max-w-screen-md mx-auto mt-20 text-center space-y-4" ]
+    div [ class "max-w-screen-md mx-auto mt-20 text-center space-y-4 px-6" ]
         [ p [ class "text-rose-400 text-lg" ] [ text "404 — that page doesn't exist." ]
         , a [ Route.href Route.Index, class "inline-block px-4 py-2 border border-slate-700 rounded-md hover:bg-slate-800 text-slate-200" ]
             [ text "Back to races" ]
@@ -412,7 +474,7 @@ viewNotFound =
 
 viewRaceNotFound : Html msg
 viewRaceNotFound =
-    div [ class "max-w-screen-md mx-auto mt-20 text-center space-y-4" ]
+    div [ class "max-w-screen-md mx-auto mt-20 text-center space-y-4 px-6" ]
         [ p [ class "text-rose-400 text-lg" ] [ text "This race isn't in your library anymore." ]
         , a [ Route.href Route.Index, class "inline-block px-4 py-2 border border-slate-700 rounded-md hover:bg-slate-800 text-slate-200" ]
             [ text "Back to races" ]
@@ -574,54 +636,87 @@ miniStat value unit =
 
 
 -- ============================================================
--- RACE DETAIL (stub — full views land in TASK-003+)
+-- RACE DETAIL
 -- ============================================================
 
 
-viewRaceDetail : Race -> Html Msg
-viewRaceDetail race =
-    div [ class "max-w-screen-md mx-auto mt-10 space-y-8" ]
+viewRaceDetail : Model -> Race -> Html Msg
+viewRaceDetail model race =
+    let
+        containerWidth =
+            min (max 320 (model.viewportWidth - 48)) (1536 - 48)
+
+        cachedTrack =
+            Dict.get (raceIdToString race.id) model.parsedTracks
+    in
+    div [ class "max-w-screen-2xl mx-auto mt-8 space-y-8 px-6" ]
         [ a [ Route.href Route.Index, class "inline-flex items-center gap-2 text-sm text-slate-400 hover:text-slate-100" ]
             [ text "← Back to races" ]
-        , div []
-            [ h1 [ class "text-3xl font-bold tracking-tight text-slate-100" ] [ text race.name ]
-            , p [ class "mt-2 text-sm text-slate-500" ]
-                [ text
-                    (case ( race.date, race.location ) of
-                        ( Just d, "" ) ->
-                            d
+        , div [ class "flex items-end justify-between gap-4 flex-wrap" ]
+            [ div [ class "min-w-0" ]
+                [ h1 [ class "text-3xl font-bold tracking-tight text-slate-100" ] [ text race.name ]
+                , p [ class "mt-2 text-sm text-slate-500" ]
+                    [ text
+                        (case ( race.date, race.location ) of
+                            ( Just d, "" ) ->
+                                d
 
-                        ( Nothing, loc ) ->
-                            if String.isEmpty loc then
-                                "Race detail"
+                            ( Nothing, loc ) ->
+                                if String.isEmpty loc then
+                                    "Race detail"
 
-                            else
-                                loc
+                                else
+                                    loc
 
-                        ( Just d, loc ) ->
-                            loc ++ " · " ++ d
-                    )
+                            ( Just d, loc ) ->
+                                loc ++ " · " ++ d
+                        )
+                    ]
+                ]
+            , div [ class "grid grid-cols-3 gap-3 sm:gap-4" ]
+                [ bigStat "Distance" (formatKm race.distance) "km"
+                , bigStat "Gain" (formatInt race.gain) "m"
+                , bigStat "Loss" (formatInt race.loss) "m"
                 ]
             ]
-        , div [ class "grid grid-cols-1 sm:grid-cols-3 gap-4" ]
-            [ bigStat "Distance" (formatKm race.distance) "km"
-            , bigStat "Elevation gain" (formatInt race.gain) "m"
-            , bigStat "Elevation loss" (formatInt race.loss) "m"
-            ]
+        , case cachedTrack of
+            Just track ->
+                viewProfileSection model track containerWidth
+
+            Nothing ->
+                div [ class "rounded-2xl bg-slate-900 border border-slate-800 p-10 text-center text-slate-500" ]
+                    [ text "Parsing GPX…" ]
         , div [ class "rounded-2xl bg-slate-900 border border-slate-800 p-5 text-sm text-slate-400" ]
             [ p [ class "font-medium text-slate-300 mb-2" ] [ text "Coming soon" ]
-            , p [] [ text "Profile view, aid stations, per-km planning, and Coros-ready export will land in the next PRs." ]
+            , p [] [ text "Aid stations, per-km planning, table view, and Coros-ready GPX export are next in the queue." ]
             ]
+        ]
+
+
+viewProfileSection : Model -> Track -> Float -> Html Msg
+viewProfileSection model track containerWidth =
+    div [ class "space-y-3" ]
+        [ div [ class "flex items-baseline gap-3" ]
+            [ h2 [ class "text-xl font-semibold text-slate-100" ] [ text "Elevation profile" ]
+            , span [ class "text-xs text-slate-500" ] [ text "true 1:1 scale · no vertical exaggeration" ]
+            ]
+        , Profile.viewToolbar
+            { mode = model.scaleMode
+            , track = track
+            , containerWidth = containerWidth
+            , onSetMode = SetScaleMode
+            }
+        , Html.Lazy.lazy3 Profile.view track model.scaleMode containerWidth
         ]
 
 
 bigStat : String -> String -> String -> Html msg
 bigStat label value unit =
-    div [ class "rounded-2xl bg-slate-900 border border-slate-800 p-5" ]
-        [ p [ class "text-xs uppercase tracking-wider text-slate-500 mb-2" ] [ text label ]
-        , p [ class "flex items-baseline gap-1" ]
-            [ span [ class "text-3xl font-semibold text-slate-100" ] [ text value ]
-            , span [ class "text-sm text-slate-500" ] [ text unit ]
+    div [ class "rounded-xl bg-slate-900 border border-slate-800 px-4 py-3 text-center min-w-[6rem]" ]
+        [ p [ class "text-[10px] uppercase tracking-wider text-slate-500" ] [ text label ]
+        , p [ class "mt-0.5 flex items-baseline justify-center gap-1" ]
+            [ span [ class "text-2xl font-semibold text-slate-100" ] [ text value ]
+            , span [ class "text-xs text-slate-500" ] [ text unit ]
             ]
         ]
 
