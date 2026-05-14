@@ -1,0 +1,13 @@
+@import "tailwindcss";
+
+@theme {
+  --color-bg: #0b0b21;
+  --color-bg-elevated: #14142b;
+  --color-accent: #E52E3A;
+  --color-accent-soft: #ff5f6a;
+  --font-display: "Inter", system-ui, sans-serif;
+}
+
+html, body, #app {
+  height: 100%;
+}
