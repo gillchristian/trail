@@ -13,7 +13,7 @@ Ordered. Top item is next. Promote into `CURRENT.md` when started.
 - [x] TASK-008 — Planning table view (km / section toggle) + CSV export in both modes — (M) — table done in PR #5; CSV export ✓ PR #6
 - [x] TASK-009 — GPX export with aid-station waypoints (ADR-0002), downloadable from the race page — (S) — ✓ PR #6
 - [x] TASK-010 — `.trail` project file export/import (round-trip: GPX + plan + aid stations) — (M) — ✓ PR #6
-- [ ] TASK-011 — Gamified visual pass: UTMB-DNA badges, layered/ghost-wave elevation, race-card aesthetic, glow accents, micro-animations — (L)
+- [x] TASK-011 — Gamified visual pass: UTMB-DNA badges, layered/ghost-wave elevation, race-card aesthetic, glow accents, micro-animations — (L) — ✓ PR #8
 - [x] TASK-012 — Offline-first: PWA manifest + service worker for app shell + IDB confirmed durable — (M) — ✓ PR #7
 - [ ] TASK-013 — Real-world map overview view via Leaflet/OSM JS port — (M)
 - [ ] TASK-003 — Race metadata editing (name inline + date/location/url/notes + cover image upload) — (S) — **deprioritized; can land alongside the visual polish task**
