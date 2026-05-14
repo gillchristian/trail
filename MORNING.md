@@ -1,0 +1,84 @@
+# Trail — morning triage
+
+End-of-night summary. Read this first.
+
+## What shipped
+
+Full backlog done. 10 PRs, all squash-merged into `master`, all authored as `gillchristian` (no Claude credit, per your rule). Build is clean (`npm run build` ✓), smoke test is clean (`npm run smoke` ✓).
+
+| # | PR | What |
+|---|---|---|
+| 1 | [#1](https://github.com/gillchristian/trail/pull/1) | Scaffold (Elm 0.19 + Tailwind v4 + Vite, `Gpx.elm` lifted from crest) |
+| 2 | [#2](https://github.com/gillchristian/trail/pull/2) | IndexedDB races + hash router + race index/detail |
+| 3 | [#3](https://github.com/gillchristian/trail/pull/3) | True 1:1 elevation profile (`Profile.elm`) |
+| 4 | [#4](https://github.com/gillchristian/trail/pull/4) | Aid station CRUD + profile markers |
+| 5 | [#5](https://github.com/gillchristian/trail/pull/5) | Planning engine + per-km card + table view (Tobler GAP) |
+| 6 | [#6](https://github.com/gillchristian/trail/pull/6) | CSV / GPX / `.trail` exports + `.trail` import |
+| 7 | [#7](https://github.com/gillchristian/trail/pull/7) | Offline-first PWA shell |
+| 8 | [#8](https://github.com/gillchristian/trail/pull/8) | Gamified visual pass (ghost-wave profile, UTMB-style badges, race-card aesthetic, motion) |
+| 9 | [#9](https://github.com/gillchristian/trail/pull/9) | Race metadata editing + cover image |
+| 10 | [#10](https://github.com/gillchristian/trail/pull/10) | Real-world map (Leaflet + OSM, tile cache for offline) |
+
+Stack ended up exactly as ADR-0001 proposed: Elm + Tailwind + Vite + a few tiny JS ports (IDB, downloads, image picker, custom Leaflet element).
+
+## Try it
+
+```sh
+npm install   # if you haven't recently
+npm run dev
+# open http://localhost:5173
+```
+
+Then drop `samples/20k_oh_meu_deus.gpx` onto the index page (or click *Choose a file*). You should land on a race detail with the 1:1 profile drawn in.
+
+## Morning verification checklist
+
+Concrete things to click through to confirm I didn't break anything I couldn't browser-test from here. Should take 10 minutes.
+
+### Core workflow
+- [ ] **Upload** `samples/20k_oh_meu_deus.gpx`. Stats look right? Race detail loads?
+- [ ] **Reload** the page (Cmd-R). The race is still there?
+- [ ] **Add an aid station** (e.g. "Cafetería", 6 km from start, 5 min rest, water + food). Save → marker appears on the profile?
+- [ ] **Open the plan**. Set target time `3:00`. Per-km times distribute? Sum matches?
+- [ ] **Per-km nav** (click a row, then prev/next at the bottom of the card). Mini-profile renders 1:1?
+- [ ] **Manual override**: enter `5:30` on a km, blur the field. M badge appears? Other kms re-distribute?
+- [ ] **Edit details** on the race (name, date, location, cover image). Save → re-render the index card with the cover?
+- [ ] **Map view**: navigate to `View on map →`. OSM tiles render? Track + numbered markers?
+- [ ] **Exports**:
+  - GPX for Coros → opens a download. Inspect the `<wpt>` block; verify it has lat/lon/ele/name/desc/sym/type for each aid station.
+  - .trail file → re-import it. New race shows up with everything intact (aids, plan, notes, cover).
+  - CSV (km mode + sections mode) → open in a spreadsheet; verify columns + Hh:Mm:Ss formatting.
+- [ ] **Delete a race** (hover its card; click ✕; confirm). Reload — gone.
+
+### Offline
+- [ ] DevTools → Application → Service Workers → confirm `trail` is registered.
+- [ ] DevTools → Network → check "Offline". Reload. Page still renders. Map view shows cached tiles (panned-over areas) but new pans go blank — expected.
+
+### Performance
+- [ ] Drop `samples/utmb_2025.gpx`. ~26k track points. Initial parse may take a second or two (one-time, on load). After that, scale-mode switches should be instant. Profile and map should render without freezing.
+
+### Coros field test (the real gate)
+- [ ] Export the 20k race as GPX. Upload to the COROS app. Enable Waypoint Alerts on the route. Start a Pace Strategy. Confirm the aid stations show up in the segmentation.
+- [ ] If they *don't*: that's the real validation gate for [ADR-0002](knowledge/decisions/0002-coros-aid-station-format.md). Open a `BLOCKER` in [`knowledge/progress/blockers.md`](knowledge/progress/blockers.md) with whatever the watch shows; we'll iterate on the `<sym>` / `<type>` / extension shape.
+
+## Where things live
+
+- [`knowledge/`](knowledge/) — the system. Read [`README.md`](knowledge/README.md) for the loop.
+- [`knowledge/decisions/`](knowledge/decisions/) — three ADRs (stack, Coros format assumption, Tobler pace).
+- [`knowledge/progress/journal.md`](knowledge/progress/journal.md) — the full overnight log (timestamps + what changed + what I learned at each step).
+- [`knowledge/planning/DONE.md`](knowledge/planning/DONE.md) — completed-task index with merge shas.
+- `src/` is the Elm + JS code. `samples/` is the input fixtures + Coros docs HTML. `scripts/smoke-storage.mjs` is the JS-side IDB roundtrip test (`npm run smoke`).
+
+## Known caveats / parking-lot items
+
+(Backlog parking lot at the bottom of [`knowledge/planning/BACKLOG.md`](knowledge/planning/BACKLOG.md) is the canonical list. Highlights:)
+
+- **No browser-driven E2E test** in CI. `npm run smoke` covers the JS-side storage layer only. jsdom 29 doesn't load on Node 20.15 (transitive ESM/CJS bug); fix is `nvm use 22` if we want headless Elm tests later.
+- **Tobler descents** may feel slow on aggressive technical descenders. ADR-0003 calls out the "descent aggressiveness slider" follow-up if it's wrong in practice.
+- **Coros GPX format** is an *assumption* (ADR-0002). Real-watch validation pending.
+- **Per-km card "ghost-wave" rendering** is only on the main race-detail profile, not on the per-km mini cards. Adding it there is easy; skipped to keep the card visually quiet.
+- **Map performance** with UTMB-size 26k-point polyline: Leaflet handles it but rendering may stutter on slow phones. If it matters, we can decimate the polyline with the Douglas-Peucker we already have.
+
+## If you want me to keep going
+
+Bring up specific feedback (anything from "this looks ugly" to "this aid station export didn't work") and I'll iterate. The PR-per-task discipline + the journal mean every change is reviewable in isolation.
