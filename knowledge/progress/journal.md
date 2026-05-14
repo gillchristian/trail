@@ -96,3 +96,25 @@ Append-only. Newest at the bottom. Each entry is a snapshot for future-me with n
 - jsdom 29 → Node 22+ in practice. If E2E test coverage matters later, either bump Node or pin to jsdom 24.
 - Per the rhythm I set: TASK-001's bookkeeping landed as the first commit of TASK-002's branch. From TASK-003 onward, each task branch ends with its own bookkeeping commit *before* the PR is opened.
 **Next:** Implement TASK-003 (race detail page: cover image upload, edit metadata, naive overview path).
+
+---
+## 2026-05-15 04:00 — TASK-004 done: true 1:1 elevation profile in race detail
+
+**Task:** TASK-004 — port crest's profile rendering into the race detail page
+**What I did:**
+- Wrote `Profile.elm` lifting crest's elevation chart logic (Douglas-Peucker simplification at half-pixel tolerance, FitWidth + TrueScale modes, niceStep grid, distance ticks). Retuned palette: rose 0.65→0.10 vertical-gradient fill + rose-400 stroke, slate-800 dashed gridlines, slate-400 axis labels. Added a small "1 px = X m (both axes · 1:1)" legend.
+- Race-detail page now renders the chart. Toolbar above with FitWidth / TrueScale buttons + the 1 / 2 / 5 / 10 / 20 / 50 / 100 m/px presets (when in TrueScale mode).
+- Added an in-memory **parsed-track cache** to the model (`Dict String Track`) so UTMB-size GPX is parsed once on `RacesLoaded` / `RaceSaved` and reused on every navigation. Renders via `Html.Lazy.lazy3` so the SVG only re-builds when (track, mode, width) actually change.
+- Subscribed to `Browser.Events.onResize` so the FitWidth mode adapts when the user resizes the window.
+- Deprioritized TASK-003 (metadata editing) — it's cosmetic and was blocking the user's morning workflow. Pushed it to after the visual polish task.
+**What I verified:**
+- `npm run build` → exit 0. 6 modules compiled. JS now `63.97 kB / gzip 22.17 kB`, CSS `26.61 kB / gzip 5.59 kB`. ~1.5 s build.
+- `npm run smoke` → still passes (no storage layer changes).
+- Reviewed `Profile.elm` against crest's reference: same `mPerPx` math, same simplification tolerance, same path-builder shape; only differences are palette and the addition of a separate stroke path (crest used fill + thin stroke combined).
+- **Limitation:** rendering performance on UTMB-size GPX is *expected* to match crest's (the underlying simplification + SVG-path approach is identical), but not yet measured here without a browser.
+**What changed in the repo:** PR #3 (URL after push). New: `src/Profile.elm`. Modified: `src/Main.elm` (parsed-track cache, ScaleMode in model, WindowResized sub, profile section in race detail), `knowledge/planning/BACKLOG.md` (TASK-003 deprioritized), `knowledge/planning/DONE.md`.
+**What I learned:**
+- The decision to keep the raw GPX text on the `Race` record pays off here: I rebuild the `Track` from `race.gpxText` in-memory without round-tripping through IDB.
+- Parsing on `RacesLoaded` is a synchronous blocking cost. UTMB is ~200 ms in Crest. That's tolerable for a one-time boot cost; if it becomes painful as the race library grows, parse lazily on `UrlChanged → RaceDetail` instead.
+- The dark theme + rose accent reads well on the chart. Layered "ghost wave" UTMB-style rendering (mentioned in the project brief) is a separate visual-polish task — for v1 the single gradient profile is honest and gamified-leaning already.
+**Next:** TASK-005 — aid station CRUD: distance-from-start / distance-from-previous input, edit/delete, persist on the Race record, render markers on the profile.
