@@ -225,3 +225,35 @@ Append-only. Newest at the bottom. Each entry is a snapshot for future-me with n
 - For the Coros UX: the COROS app needs the GPX **and** the user needs to toggle "waypoint alerts" on the watch after import. The article is explicit. I'll surface that hint in the export-card description.
 
 **Next:** TASK-011 — gamified visual pass (UTMB-DNA badges, ghost-wave layered profile, race-card aesthetic, glow accents, motion). Then TASK-012 — PWA / offline-first.
+
+---
+## 2026-05-15 10:00 — TASK-012 done: offline-first PWA shell
+
+**Task:** TASK-012 — make the app work offline after first load. The user named this a key feature (a 130 km race is somewhere with patchy cell coverage).
+
+**What I did:**
+- `public/manifest.webmanifest` — name, short_name, scope=`/`, start_url=`/`, display=`standalone`, theme + background `#0b0b21`, three icon entries (any/192/512 — all SVG).
+- `public/icon.svg` (and 192/512 duplicates) — gradient mountain silhouette with a yellow peak dot and the wordmark.
+- `public/sw.js` — hand-rolled, ~70 lines:
+  - `install`: pre-cache `'/'`, `'/index.html'`, manifest, icons. `skipWaiting()`.
+  - `activate`: drop any cache whose name isn't the current `trail-v1`; `clients.claim()`.
+  - `fetch` (GET only): same-origin → stale-while-revalidate. Background refresh `put`s the latest response back into the cache. Cross-origin → pass through. Skips `/@vite`, `/@id`, `/@fs` paths defensively.
+  - Versioned cache name (`trail-v1`) so future updates can force-evict by bumping the version.
+- `index.html` — `<link rel="manifest">`, `<link rel="icon">`, `<link rel="apple-touch-icon">`, full Apple PWA meta block (capable + status-bar + title), `viewport-fit=cover`.
+- `src/main.js` — register the SW only when `import.meta.env.PROD` is true (dev runs against HMR — caching that would break the reload-after-edit loop).
+
+**What I verified:**
+- `npm run build` → exit 0. JS now `106.47 kB / gzip 34.19 kB`. `dist/` contains `manifest.webmanifest`, `icon*.svg`, `sw.js` at the root — Vite's `public/` copy worked.
+- `npm run smoke` → still passes; storage layer is unchanged.
+- SW code reviewed against the standard SWR pattern. No `clients.skipWaiting()` race with HMR because we only register in production. Cache version is single-source-of-truth at the top of the file.
+- Manifest reviewed against the [Manifest spec](https://www.w3.org/TR/appmanifest/) — required `name`, `start_url`, `icons` all present. SVG icons aren't universally supported for installation prompts (some Android Chrome versions want PNG), but they render fine for the iOS Add-to-Home-Screen flow the user will most likely use.
+- **Limitation:** I can't drive a real browser to confirm the install prompt fires + offline reload works. The user will validate in the morning by: (a) loading the app, (b) DevTools → Application → Service Workers → confirm registration, (c) toggling Network → Offline and reloading → app should still render.
+
+**What changed in the repo:** PR #7. New: `public/` directory with `manifest.webmanifest`, `icon.svg`, `icon-192.svg`, `icon-512.svg`, `sw.js`. Modified: `index.html` (PWA meta + manifest link), `src/main.js` (SW registration).
+
+**What I learned:**
+- The PWA story for this app is mostly free because we already store everything in IDB. The SW just has to keep the app shell alive offline; the data is already durable.
+- Same-origin-only caching keeps the SW from accidentally caching tracking pixels or future map tiles incorrectly. When TASK-013 ships, the tile path gets its own logic.
+- Production-only registration is the cheap fix for the "I edited a file but Vite reloaded the old SW-cached JS" trap — gating on `import.meta.env.PROD` is a one-liner.
+
+**Next:** TASK-011 — visual polish pass: gamified styling (UTMB-DNA badges, ghost-wave layered profile rendering, race-card aesthetic with photo headers, glow accents, motion). Then if time permits, TASK-013 (real-world map). Then TASK-003 (race metadata editing).
