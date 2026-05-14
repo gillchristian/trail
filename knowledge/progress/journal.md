@@ -257,3 +257,44 @@ Append-only. Newest at the bottom. Each entry is a snapshot for future-me with n
 - Production-only registration is the cheap fix for the "I edited a file but Vite reloaded the old SW-cached JS" trap — gating on `import.meta.env.PROD` is a one-liner.
 
 **Next:** TASK-011 — visual polish pass: gamified styling (UTMB-DNA badges, ghost-wave layered profile rendering, race-card aesthetic with photo headers, glow accents, motion). Then if time permits, TASK-013 (real-world map). Then TASK-003 (race metadata editing).
+
+---
+## 2026-05-15 11:15 — TASK-011 done: gamified visual pass
+
+**Task:** TASK-011 — give the app a UTMB-DNA + own-personality polish without breaking the type-safe core.
+
+**What I did:**
+- **Profile chart (`Profile.elm`):**
+  - **Ghost-wave echo:** eight stroke copies of the profile path translated by ±2, ±4, ±6, ±8 px with fading stroke-opacity (0.22 outer → 0.06 inner). Reads as motion / depth — the signature "sound wave" feel from the UTMB samples.
+  - **Rose→amber gradient stroke** on the main profile line. Horizontal gradient (amber at start, rose at peak, red at finish) so the line itself looks like a race ribbon.
+  - **Fill gradient retuned** — rose 0.65 → 0.05 (more contrast against the dark canvas).
+  - **UTMB-style aid-station badge** replaces the previous amber pill. Now: circular ring (slate-950 fill, amber ring) with a 1-based number inside, plus a smaller amber pill *below* the badge with the station name. Vertical dashed amber line drops to the chart. `padTop` auto-bumps to 58 px when markers exist, 16 px when not.
+- **Index page (`Main.elm`):**
+  - **Race card** got a top accent stripe coloured by distance bucket (S < 30, M < 70, L < 120, XL otherwise: sky / amber / orange / rose), plus a category-letter badge tile in the upper-left of the card.
+  - Hover state: `-translate-y-0.5` + rose-tinted shadow. Now it feels like a card you can pick up.
+  - Aid-station summary becomes `★ N aid stations planned` in amber, or "No aid stations yet" in muted slate.
+- **Header (`Main.elm`):**
+  - Sticky on scroll (`sticky top-0 z-30`).
+  - Inline SVG mountain logo (small, gradient peak, amber summit dot — same geometry as the PWA icon).
+  - Wordmark uses a horizontal `from-amber-300 via-rose-400 to-rose-600 bg-clip-text` gradient.
+- **Motion (`styles/app.css`):**
+  - `@keyframes trail-draw` — `stroke-dashoffset 20000 → 0`, 1.1 s easing (cubic-bezier). Applied to the main profile stroke (`.trail-stroke`) and ghost layers (`.trail-ghost`, slightly slower for an offset-feeling reveal).
+  - `@keyframes trail-fade-in` — opacity + 4 px vertical slide; 0.35 s. Applied to race cards via `.trail-card-in`.
+  - `@keyframes trail-pulse` — subtle outward-ring pulse for emphasis; not wired up yet but available.
+  - **`@media (prefers-reduced-motion: reduce)` overrides all three** to be inert — accessibility first.
+
+**What I verified:**
+- `npm run build` → exit 0. JS now `108.58 kB / gzip 34.91 kB`, CSS `36.42 kB / gzip 7.08 kB`. Build time ~541 ms.
+- `npm run smoke` — still passes.
+- `Profile.elm` reviewed: ghost layers reuse the same `strokeD` path string; no new geometry computed. Animation classes are inert when `prefers-reduced-motion: reduce`.
+- Badge geometry reviewed by hand: badge centred 22 px above the top of the chart; pill 3 px below the badge; vertical dashed line starts at the bottom of the badge so it doesn't visually merge with the icon.
+- Distance-bucket thresholds match the user's race calendar (20 k = S, 50 k = M, 110 k = L, 130 k = XL).
+
+**What changed in the repo:** PR #8 (URL after push). Modified: `src/Profile.elm` (ghost layers + numbered-badge marker + gradient stroke), `src/Main.elm` (race card redesign + header logo/sticky), `src/styles/app.css` (animations + reduced-motion fallback).
+
+**What I learned:**
+- The ghost-wave effect was the cheapest big-wow improvement — eight extra `<path>` elements with `transform="translate(0, dy)"` and decaying opacity. SVG handles it fine even on UTMB-size simplified profiles.
+- Distance bucket categories give the index a visual sense of difficulty at a glance, without forcing the user to edit metadata. They derive from `race.distance` so they're always up to date.
+- `bg-clip-text text-transparent` with a gradient is the cheapest way to add a "logo-y" feel to a wordmark.
+
+**Next:** TASK-013 — real-world map view (Leaflet + OSM via JS port). If that doesn't fit, TASK-003 (race metadata editing). I'll also write a final end-of-night summary so the user can pick up cleanly tomorrow.

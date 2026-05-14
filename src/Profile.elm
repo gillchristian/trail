@@ -163,6 +163,7 @@ scaleLegend mode track containerWidth =
 type alias Marker =
     { distance : Float
     , label : String
+    , index : Int -- 1-based position among aid stations
     }
 
 
@@ -186,7 +187,11 @@ view track mode containerWidth markers =
             max 60 (eleRange / mPerPx)
 
         padTop =
-            16
+            if List.isEmpty markers then
+                16
+
+            else
+                58 -- room for badge + name pill above the chart
 
         padBottom =
             34
@@ -251,7 +256,18 @@ view track mode containerWidth markers =
                     , SA.y2 "1"
                     ]
                     [ Svg.stop [ SA.offset "0%", SA.stopColor "#E52E3A", SA.stopOpacity "0.65" ] []
-                    , Svg.stop [ SA.offset "100%", SA.stopColor "#E52E3A", SA.stopOpacity "0.1" ] []
+                    , Svg.stop [ SA.offset "100%", SA.stopColor "#E52E3A", SA.stopOpacity "0.05" ] []
+                    ]
+                , Svg.linearGradient
+                    [ SA.id "elev-stroke"
+                    , SA.x1 "0"
+                    , SA.y1 "0"
+                    , SA.x2 "1"
+                    , SA.y2 "0"
+                    ]
+                    [ Svg.stop [ SA.offset "0%", SA.stopColor "#fbbf24" ] []
+                    , Svg.stop [ SA.offset "30%", SA.stopColor "#ff5f6a" ] []
+                    , Svg.stop [ SA.offset "100%", SA.stopColor "#E52E3A" ] []
                     ]
                 ]
             , g [] gridLines
@@ -261,19 +277,52 @@ view track mode containerWidth markers =
                 , SA.stroke "none"
                 ]
                 []
+            , g [] (ghostLayers strokeD)
             , path
                 [ SA.d strokeD
                 , SA.fill "none"
-                , SA.stroke "#ff5f6a"
-                , SA.strokeWidth "1.5"
+                , SA.stroke "url(#elev-stroke)"
+                , SA.strokeWidth "1.8"
                 , SA.strokeLinejoin "round"
                 , SA.strokeLinecap "round"
+                , SA.class "trail-stroke"
                 ]
                 []
             , g [] kmTicks
             , g [] markerNodes
             ]
         ]
+
+
+{-| The UTMB-style "sound wave" echo: a fan of ghost copies of the
+profile stroke, each translated vertically by ±n pixels with a
+fading opacity. Reads as depth / movement on the main chart.
+-}
+ghostLayers : String -> List (Svg msg)
+ghostLayers d =
+    let
+        offsets =
+            [ -8, -6, -4, -2, 2, 4, 6, 8 ]
+
+        toLayer dy =
+            let
+                op =
+                    max 0.06 (0.22 - 0.02 * toFloat (abs dy))
+            in
+            path
+                [ SA.d d
+                , SA.fill "none"
+                , SA.stroke "#ff5f6a"
+                , SA.strokeWidth "1"
+                , SA.strokeOpacity (String.fromFloat op)
+                , SA.strokeLinejoin "round"
+                , SA.strokeLinecap "round"
+                , SA.transform ("translate(0," ++ String.fromInt dy ++ ")")
+                , SA.class "trail-ghost"
+                ]
+                []
+    in
+    List.map toLayer offsets
 
 
 viewMarker : Float -> Float -> (Float -> Float) -> Marker -> Svg msg
@@ -285,42 +334,72 @@ viewMarker yTop yBottom toX marker =
         label =
             marker.label
 
-        labelWidth =
-            -- rough estimate; we don't measure text in SVG. 7 px per char is fine for 11 px labels.
-            max 36 (toFloat (String.length label) * 7 + 14)
+        -- Circular numbered badge sits above the chart; rectangular
+        -- name pill sits just below the badge. Vertical dashed line
+        -- drops to the chart.
+        badgeR =
+            12
 
-        labelHeight =
-            18
+        badgeCy =
+            yTop - 22
 
-        labelTop =
-            yTop - labelHeight - 4
+        pillW =
+            max 48 (toFloat (String.length label) * 7 + 14)
+
+        pillH =
+            16
+
+        pillTop =
+            badgeCy + badgeR + 3
     in
     g []
         [ line
             [ SA.x1 (fmt x)
             , SA.x2 (fmt x)
-            , SA.y1 (fmt yTop)
+            , SA.y1 (fmt (badgeCy + badgeR))
             , SA.y2 (fmt yBottom)
             , SA.stroke "#fbbf24"
             , SA.strokeWidth "1"
-            , SA.strokeDasharray "2 2"
-            , SA.opacity "0.75"
+            , SA.strokeDasharray "2 3"
+            , SA.opacity "0.7"
             ]
             []
-        , Svg.rect
-            [ SA.x (fmt (x - labelWidth / 2))
-            , SA.y (fmt labelTop)
-            , SA.width (fmt labelWidth)
-            , SA.height (fmt labelHeight)
-            , SA.rx "9"
-            , SA.fill "#fbbf24"
+        -- Badge ring (outer)
+        , Svg.circle
+            [ SA.cx (fmt x)
+            , SA.cy (fmt badgeCy)
+            , SA.r (String.fromFloat badgeR)
+            , SA.fill "#0b0b21"
+            , SA.stroke "#fbbf24"
+            , SA.strokeWidth "2"
             ]
             []
         , text_
             [ SA.x (fmt x)
-            , SA.y (fmt (labelTop + 12))
+            , SA.y (fmt (badgeCy + 4))
             , SA.textAnchor "middle"
             , SA.fontSize "11"
+            , SA.fontWeight "700"
+            , SA.fill "#fbbf24"
+            , SA.fontFamily "system-ui, -apple-system, sans-serif"
+            ]
+            [ Svg.text (String.fromInt marker.index) ]
+        -- Name pill
+        , Svg.rect
+            [ SA.x (fmt (x - pillW / 2))
+            , SA.y (fmt pillTop)
+            , SA.width (fmt pillW)
+            , SA.height (fmt pillH)
+            , SA.rx "8"
+            , SA.fill "#fbbf24"
+            , SA.opacity "0.95"
+            ]
+            []
+        , text_
+            [ SA.x (fmt x)
+            , SA.y (fmt (pillTop + 11))
+            , SA.textAnchor "middle"
+            , SA.fontSize "10"
             , SA.fontWeight "600"
             , SA.fill "#0b0b21"
             , SA.fontFamily "system-ui, -apple-system, sans-serif"

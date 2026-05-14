@@ -1100,13 +1100,17 @@ title route =
 
 viewHeader : Route -> Html Msg
 viewHeader route =
-    div [ class "px-6 py-5 border-b border-slate-800/60 bg-slate-950/95 backdrop-blur" ]
-        [ div [ class "max-w-screen-2xl mx-auto flex items-baseline gap-4" ]
+    div [ class "px-6 py-4 border-b border-slate-800/60 bg-slate-950/95 backdrop-blur sticky top-0 z-30" ]
+        [ div [ class "max-w-screen-2xl mx-auto flex items-center gap-4" ]
             [ a
                 [ Route.href Route.Index
-                , class "text-2xl font-semibold tracking-tight text-rose-500 hover:text-rose-400 transition-colors"
+                , class "flex items-center gap-2.5 hover:opacity-90 transition-opacity"
                 ]
-                [ text "Trail" ]
+                [ viewLogo
+                , span [ class "text-2xl font-bold tracking-tight bg-gradient-to-r from-amber-300 via-rose-400 to-rose-600 bg-clip-text text-transparent" ]
+                    [ text "Trail" ]
+                ]
+            , span [ class "text-slate-700" ] [ text "·" ]
             , p [ class "text-sm text-slate-400" ]
                 [ text
                     (case route of
@@ -1127,6 +1131,45 @@ viewHeader route =
                     )
                 ]
             ]
+        ]
+
+
+viewLogo : Html msg
+viewLogo =
+    Svg.svg
+        [ SA.width "28"
+        , SA.height "28"
+        , SA.viewBox "0 0 64 64"
+        ]
+        [ Svg.defs []
+            [ Svg.linearGradient
+                [ SA.id "logo-peak", SA.x1 "0", SA.y1 "0", SA.x2 "0", SA.y2 "1" ]
+                [ Svg.stop [ SA.offset "0%", SA.stopColor "#ff5f6a" ] []
+                , Svg.stop [ SA.offset "100%", SA.stopColor "#E52E3A" ] []
+                ]
+            ]
+        , Svg.path
+            [ SA.d "M6 50 L22 28 L30 38 L42 18 L58 50 Z"
+            , SA.fill "url(#logo-peak)"
+            , SA.opacity "0.85"
+            ]
+            []
+        , Svg.path
+            [ SA.d "M6 50 L22 28 L30 38 L42 18 L58 50"
+            , SA.fill "none"
+            , SA.stroke "#ff5f6a"
+            , SA.strokeWidth "2"
+            , SA.strokeLinejoin "round"
+            , SA.strokeLinecap "round"
+            ]
+            []
+        , Svg.circle
+            [ SA.cx "42"
+            , SA.cy "18"
+            , SA.r "2.5"
+            , SA.fill "#fbbf24"
+            ]
+            []
         ]
 
 
@@ -1309,16 +1352,32 @@ viewRaceGrid races =
 
 viewRaceCard : Race -> Html Msg
 viewRaceCard race =
+    let
+        ( catLetter, catColor, catLabel ) =
+            distanceCategory race.distance
+    in
     div
-        [ class "group relative bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden hover:border-rose-500/60 transition-colors" ]
-        [ a
+        [ class "trail-card-in group relative bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden hover:border-rose-500/60 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-rose-500/10 transition-all duration-200" ]
+        [ div [ class ("h-1.5 w-full " ++ catColor) ] []
+        , a
             [ Route.href (Route.RaceDetail race.id)
             , class "block p-5 space-y-4"
             ]
-            [ div []
-                [ p [ class "text-lg font-semibold text-slate-100 truncate" ] [ text race.name ]
-                , p [ class "text-xs text-slate-500 truncate" ]
-                    [ text (raceSubtitle race) ]
+            [ div [ class "flex items-start gap-3" ]
+                [ div
+                    [ class
+                        ("flex-shrink-0 w-12 h-12 rounded-lg flex items-center justify-center text-white font-bold text-lg shadow-lg "
+                            ++ catColor
+                        )
+                    ]
+                    [ text catLetter ]
+                , div [ class "min-w-0 flex-1" ]
+                    [ p [ class "text-base font-semibold text-slate-100 truncate" ] [ text race.name ]
+                    , p [ class "text-[10px] uppercase tracking-wider text-slate-500" ]
+                        [ text catLabel ]
+                    , p [ class "text-xs text-slate-500 truncate mt-0.5" ]
+                        [ text (raceSubtitle race) ]
+                    ]
                 ]
             , div [ class "grid grid-cols-3 gap-2 text-center" ]
                 [ miniStat (formatKm race.distance) "km"
@@ -1326,17 +1385,19 @@ viewRaceCard race =
                 , miniStat (formatInt race.loss) "m−"
                 ]
             , if List.isEmpty race.aidStations then
-                text ""
+                p [ class "text-xs text-slate-600" ]
+                    [ text "No aid stations yet." ]
 
               else
-                p [ class "text-xs text-slate-500" ]
+                p [ class "text-xs text-amber-400/70" ]
                     [ text
-                        (String.fromInt (List.length race.aidStations)
+                        ("★ "
+                            ++ String.fromInt (List.length race.aidStations)
                             ++ (if List.length race.aidStations == 1 then
-                                    " aid station"
+                                    " aid station planned"
 
                                 else
-                                    " aid stations"
+                                    " aid stations planned"
                                )
                         )
                     ]
@@ -1349,6 +1410,25 @@ viewRaceCard race =
             ]
             [ text "✕" ]
         ]
+
+
+distanceCategory : Float -> ( String, String, String )
+distanceCategory meters =
+    let
+        km =
+            meters / 1000
+    in
+    if km < 30 then
+        ( "S", "bg-sky-500", "Short" )
+
+    else if km < 70 then
+        ( "M", "bg-amber-500", "Medium" )
+
+    else if km < 120 then
+        ( "L", "bg-orange-500", "Long" )
+
+    else
+        ( "XL", "bg-rose-600", "Ultra" )
 
 
 raceSubtitle : Race -> String
@@ -1392,7 +1472,14 @@ viewRaceDetail model race =
             Dict.get (raceIdToString race.id) model.parsedTracks
 
         markers =
-            List.map (\a -> { distance = a.distance, label = aidShortLabel a }) (sortAidStations race.aidStations)
+            sortAidStations race.aidStations
+                |> List.indexedMap
+                    (\i a ->
+                        { distance = a.distance
+                        , label = aidShortLabel a
+                        , index = i + 1
+                        }
+                    )
     in
     div [ class "max-w-screen-2xl mx-auto mt-8 space-y-8 px-6" ]
         [ a [ Route.href Route.Index, class "inline-flex items-center gap-2 text-sm text-slate-400 hover:text-slate-100" ]
