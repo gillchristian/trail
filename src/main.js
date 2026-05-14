@@ -103,3 +103,19 @@ app.ports.downloadFile.subscribe(({ filename, content, mime }) => {
   // Give the browser a tick to start the download before we revoke.
   setTimeout(() => URL.revokeObjectURL(url), 250)
 })
+
+// ============================================================
+// Service worker registration (production only).
+//
+// Vite's dev server serves via HMR — caching it would break the
+// reload-after-edit loop. import.meta.env.PROD is true only in
+// `vite build`'s output.
+// ============================================================
+
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch((err) => {
+      console.warn('Trail SW registration failed:', err)
+    })
+  })
+}
