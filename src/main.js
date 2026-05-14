@@ -104,6 +104,28 @@ app.ports.downloadFile.subscribe(({ filename, content, mime }) => {
   setTimeout(() => URL.revokeObjectURL(url), 250)
 })
 
+app.ports.pickImageFilePort.subscribe(() => {
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = 'image/*'
+  input.style.display = 'none'
+  document.body.appendChild(input)
+  input.onchange = () => {
+    const file = input.files && input.files[0]
+    document.body.removeChild(input)
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = () => {
+      app.ports.imagePickedAsDataUrl.send(reader.result)
+    }
+    reader.onerror = () => {
+      app.ports.storageError.send(`image read: ${reader.error?.message || 'unknown error'}`)
+    }
+    reader.readAsDataURL(file)
+  }
+  input.click()
+})
+
 // ============================================================
 // Service worker registration (production only).
 //

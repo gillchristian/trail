@@ -298,3 +298,34 @@ Append-only. Newest at the bottom. Each entry is a snapshot for future-me with n
 - `bg-clip-text text-transparent` with a gradient is the cheapest way to add a "logo-y" feel to a wordmark.
 
 **Next:** TASK-013 — real-world map view (Leaflet + OSM via JS port). If that doesn't fit, TASK-003 (race metadata editing). I'll also write a final end-of-night summary so the user can pick up cleanly tomorrow.
+
+---
+## 2026-05-15 12:00 — TASK-003 done: race metadata editing + cover image
+
+**Task:** TASK-003 — fill out the race metadata story. Edit name/date/location/url/notes inline, attach a cover image.
+
+**What I did:**
+- `Download.elm` gained two more ports: `pickImageFile` (outgoing, fires a JS file picker) and `imagePicked` (incoming, ships the chosen image back as a data URL via `FileReader.readAsDataURL`). The data-URL pattern is deliberate — a `blob:` URL would not survive a reload, and we persist cover images in IDB.
+- `Main.elm`:
+  - New `MetaEditor = MetaClosed | MetaOpen MetaForm` and a full set of `MetaSet…` / `MetaPickCover` / `MetaCoverPicked` / `MetaClearCover` / `MetaSubmit` messages.
+  - `MetaSubmit` saves an updated race (name trimmed-then-fallback-to-original, empty date → `Nothing`, otherwise pass through). On `RaceSaved` the editor closes.
+  - "Edit details" button next to the race title on the detail page; clicking it expands an inline form (name, date, location, url, notes, cover image picker with replace/remove controls + preview thumbnail).
+  - Race detail page renders a hero banner from the cover image (with a slate gradient overlay so the title remains readable).
+  - Race cards on the index use the cover as a 112 px-tall background strip above the card body, with the category accent stripe still pinned to the very top.
+  - `URL` and `notes` fields render on the race-detail page below the title when set (URL becomes a `target="_blank"` link; notes preserve newlines via `whitespace-pre-line`).
+- `src/main.js`: wired the image-picker port. Creates a hidden `<input type=file accept="image/*">`, calls `.click()`, `readAsDataURL` on change, ships the result back. Removes the input from the DOM either way.
+
+**What I verified:**
+- `npm run build` → exit 0. JS `114.22 kB / gzip 36.18 kB`, CSS `38.35 kB / gzip 7.24 kB`.
+- `npm run smoke` → still passes.
+- Cover-image picker code reviewed: the FileReader path produces a `data:image/…;base64,…` URL which JSON-serialises cleanly through the IDB save path. Two-megapixel JPEGs typically come in under 1 MB encoded — well within Chrome's structured-clone limits. Larger images degrade gracefully because we don't decode them ourselves.
+- Backwards-compat: `coverImage` was already a `Maybe String` on `Race` from TASK-002, with a `D.nullable` decoder. No migration needed.
+- **Limitation:** can't browser-test the picker click flow here. The wiring is symmetric (one outgoing port + one inbound sub) and mirrors the GPX upload flow I already validated.
+
+**What changed in the repo:** PR #9. Modified: `src/Main.elm` (meta state + form + hero banner + card cover background), `src/Download.elm` (image-picker ports), `src/main.js` (port wiring).
+
+**What I learned:**
+- The "Maybe save a blob: URL" trap was the actual subtle thing here. With Chromium's `URL.createObjectURL`, the URL is only valid for the document lifetime; once we reload, those references are dead. Data URLs cost more bytes but are persistent. Always use `readAsDataURL` for "I need this image later."
+- Hero banner + card-strip aesthetics now wire together. When the user attaches a photo for the upcoming 20 k, both the index card and the race-detail page change immediately.
+
+**Next:** TASK-013 — real-world map view (Leaflet + OSM via JS port). Last on the backlog. After that, end-of-night summary.

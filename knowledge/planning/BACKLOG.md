@@ -16,7 +16,7 @@ Ordered. Top item is next. Promote into `CURRENT.md` when started.
 - [x] TASK-011 — Gamified visual pass: UTMB-DNA badges, layered/ghost-wave elevation, race-card aesthetic, glow accents, micro-animations — (L) — ✓ PR #8
 - [x] TASK-012 — Offline-first: PWA manifest + service worker for app shell + IDB confirmed durable — (M) — ✓ PR #7
 - [ ] TASK-013 — Real-world map overview view via Leaflet/OSM JS port — (M)
-- [ ] TASK-003 — Race metadata editing (name inline + date/location/url/notes + cover image upload) — (S) — **deprioritized; can land alongside the visual polish task**
+- [x] TASK-003 — Race metadata editing (name inline + date/location/url/notes + cover image upload) — (S) — ✓ PR #9
 
 ## Parking lot
 

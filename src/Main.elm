@@ -125,6 +125,21 @@ type AidEditor
     | AidOpen AidForm
 
 
+type alias MetaForm =
+    { name : String
+    , date : String
+    , location : String
+    , url : String
+    , notes : String
+    , coverImage : Maybe String
+    }
+
+
+type MetaEditor
+    = MetaClosed
+    | MetaOpen MetaForm
+
+
 type TableMode
     = ByKm
     | BySection
@@ -144,6 +159,7 @@ type alias Model =
     , storageError : Maybe String
     , pendingDelete : Maybe RaceId
     , aidEditor : AidEditor
+    , metaEditor : MetaEditor
     , planTableMode : TableMode
     , targetTimeText : String
     , kmTimeText : String
@@ -166,6 +182,7 @@ init flags url key =
       , storageError = Nothing
       , pendingDelete = Nothing
       , aidEditor = AidClosed
+      , metaEditor = MetaClosed
       , planTableMode = ByKm
       , targetTimeText = ""
       , kmTimeText = ""
@@ -227,6 +244,18 @@ type Msg
     | ExportCsvSections
     | ExportGpxForCoros
     | ExportProjectFile
+      -- metadata edit
+    | OpenMetaEdit
+    | CloseMetaEdit
+    | MetaSetName String
+    | MetaSetDate String
+    | MetaSetLocation String
+    | MetaSetUrl String
+    | MetaSetNotes String
+    | MetaPickCover
+    | MetaCoverPicked String
+    | MetaClearCover
+    | MetaSubmit
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -390,6 +419,7 @@ update msg model =
                         , kmsCache = nextKms
                         , upload = NotUploading
                         , aidEditor = AidClosed
+                        , metaEditor = MetaClosed
                       }
                     , navCmd
                     )
@@ -730,6 +760,104 @@ update msg model =
                 Nothing ->
                     ( model, Cmd.none )
 
+        OpenMetaEdit ->
+            case currentRace model of
+                Just race ->
+                    ( { model | metaEditor = MetaOpen (metaFormFromRace race) }, Cmd.none )
+
+                Nothing ->
+                    ( model, Cmd.none )
+
+        CloseMetaEdit ->
+            ( { model | metaEditor = MetaClosed }, Cmd.none )
+
+        MetaSetName s ->
+            ( updateMetaForm (\f -> { f | name = s }) model, Cmd.none )
+
+        MetaSetDate s ->
+            ( updateMetaForm (\f -> { f | date = s }) model, Cmd.none )
+
+        MetaSetLocation s ->
+            ( updateMetaForm (\f -> { f | location = s }) model, Cmd.none )
+
+        MetaSetUrl s ->
+            ( updateMetaForm (\f -> { f | url = s }) model, Cmd.none )
+
+        MetaSetNotes s ->
+            ( updateMetaForm (\f -> { f | notes = s }) model, Cmd.none )
+
+        MetaPickCover ->
+            ( model, Download.pickImageFile )
+
+        MetaCoverPicked dataUrl ->
+            ( updateMetaForm (\f -> { f | coverImage = Just dataUrl }) model, Cmd.none )
+
+        MetaClearCover ->
+            ( updateMetaForm (\f -> { f | coverImage = Nothing }) model, Cmd.none )
+
+        MetaSubmit ->
+            case ( model.metaEditor, currentRace model ) of
+                ( MetaOpen form, Just race ) ->
+                    let
+                        trimmedName =
+                            String.trim form.name
+
+                        finalName =
+                            if String.isEmpty trimmedName then
+                                race.name
+
+                            else
+                                trimmedName
+
+                        date =
+                            let
+                                t =
+                                    String.trim form.date
+                            in
+                            if String.isEmpty t then
+                                Nothing
+
+                            else
+                                Just t
+
+                        updatedRace =
+                            { race
+                                | name = finalName
+                                , date = date
+                                , location = String.trim form.location
+                                , url = String.trim form.url
+                                , notes = form.notes
+                                , coverImage = form.coverImage
+                            }
+                    in
+                    ( { model | metaEditor = MetaClosed }
+                    , Storage.saveRace (encodeRace updatedRace)
+                    )
+
+                _ ->
+                    ( model, Cmd.none )
+
+
+updateMetaForm : (MetaForm -> MetaForm) -> Model -> Model
+updateMetaForm f model =
+    case model.metaEditor of
+        MetaOpen form ->
+            { model | metaEditor = MetaOpen (f form) }
+
+        MetaClosed ->
+            model
+
+
+metaFormFromRace : Race -> MetaForm
+metaFormFromRace race =
+    { name = race.name
+    , date = Maybe.withDefault "" race.date
+    , location = race.location
+    , url = race.url
+    , notes = race.notes
+    , coverImage = race.coverImage
+    }
+
 
 isProjectFile : String -> Bool
 isProjectFile fname =
@@ -1054,6 +1182,7 @@ subscriptions _ =
         , Storage.gotRace RaceSaved
         , Storage.gotRaceDeleted RaceDeleted
         , Storage.gotError StorageError
+        , Download.imagePicked MetaCoverPicked
         , Browser.Events.onResize WindowResized
         ]
 
@@ -1358,7 +1487,20 @@ viewRaceCard race =
     in
     div
         [ class "trail-card-in group relative bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden hover:border-rose-500/60 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-rose-500/10 transition-all duration-200" ]
-        [ div [ class ("h-1.5 w-full " ++ catColor) ] []
+        [ case race.coverImage of
+            Just dataUrl ->
+                div
+                    [ class "relative h-28 border-b border-slate-800"
+                    , A.style "background-image" ("url(" ++ dataUrl ++ ")")
+                    , A.style "background-size" "cover"
+                    , A.style "background-position" "center"
+                    ]
+                    [ div [ class "absolute inset-0 bg-gradient-to-t from-slate-900 to-slate-900/10" ] []
+                    , div [ class ("absolute top-0 left-0 right-0 h-1.5 " ++ catColor) ] []
+                    ]
+
+            Nothing ->
+                div [ class ("h-1.5 w-full " ++ catColor) ] []
         , a
             [ Route.href (Route.RaceDetail race.id)
             , class "block p-5 space-y-4"
@@ -1484,10 +1626,50 @@ viewRaceDetail model race =
     div [ class "max-w-screen-2xl mx-auto mt-8 space-y-8 px-6" ]
         [ a [ Route.href Route.Index, class "inline-flex items-center gap-2 text-sm text-slate-400 hover:text-slate-100" ]
             [ text "← Back to races" ]
+        , viewRaceHero race
         , div [ class "flex items-end justify-between gap-4 flex-wrap" ]
             [ div [ class "min-w-0" ]
-                [ h1 [ class "text-3xl font-bold tracking-tight text-slate-100" ] [ text race.name ]
+                [ div [ class "flex items-center gap-3 flex-wrap" ]
+                    [ h1 [ class "text-3xl font-bold tracking-tight text-slate-100" ] [ text race.name ]
+                    , case model.metaEditor of
+                        MetaClosed ->
+                            button
+                                [ onClick OpenMetaEdit
+                                , class "px-3 py-1.5 text-xs border border-slate-700 rounded-md hover:bg-slate-800 text-slate-300"
+                                ]
+                                [ text "Edit details" ]
+
+                        MetaOpen _ ->
+                            text ""
+                    ]
                 , p [ class "mt-2 text-sm text-slate-500" ] [ text (raceSubtitle race) ]
+                , case ( race.url, race.notes ) of
+                    ( "", "" ) ->
+                        text ""
+
+                    ( "", _ ) ->
+                        p [ class "mt-2 text-sm text-slate-400 max-w-prose whitespace-pre-line" ] [ text race.notes ]
+
+                    ( url, "" ) ->
+                        a
+                            [ A.href url
+                            , A.target "_blank"
+                            , A.rel "noopener noreferrer"
+                            , class "mt-2 inline-block text-sm text-rose-400 hover:text-rose-300 underline"
+                            ]
+                            [ text url ]
+
+                    ( url, notes ) ->
+                        div [ class "mt-2 space-y-2" ]
+                            [ a
+                                [ A.href url
+                                , A.target "_blank"
+                                , A.rel "noopener noreferrer"
+                                , class "inline-block text-sm text-rose-400 hover:text-rose-300 underline"
+                                ]
+                                [ text url ]
+                            , p [ class "text-sm text-slate-400 max-w-prose whitespace-pre-line" ] [ text notes ]
+                            ]
                 ]
             , div [ class "grid grid-cols-3 gap-3 sm:gap-4" ]
                 [ bigStat "Distance" (formatKm race.distance) "km"
@@ -1495,6 +1677,12 @@ viewRaceDetail model race =
                 , bigStat "Loss" (formatInt race.loss) "m"
                 ]
             ]
+        , case model.metaEditor of
+            MetaOpen form ->
+                viewMetaForm form
+
+            MetaClosed ->
+                text ""
         , case cachedTrack of
             Just track ->
                 viewProfileSection model track containerWidth markers
@@ -1585,6 +1773,129 @@ aidShortLabel a =
 
     else
         nameTrim
+
+
+viewRaceHero : Race -> Html msg
+viewRaceHero race =
+    case race.coverImage of
+        Just dataUrl ->
+            div
+                [ class "relative rounded-2xl overflow-hidden border border-slate-800 h-40 sm:h-56"
+                , A.style "background-image" ("url(" ++ dataUrl ++ ")")
+                , A.style "background-size" "cover"
+                , A.style "background-position" "center"
+                ]
+                [ div [ class "absolute inset-0 bg-gradient-to-t from-slate-950/90 to-slate-950/10" ] [] ]
+
+        Nothing ->
+            text ""
+
+
+viewMetaForm : MetaForm -> Html Msg
+viewMetaForm form =
+    div [ class "rounded-2xl bg-slate-900 border border-slate-800 p-5 space-y-4" ]
+        [ div [ class "flex items-baseline justify-between" ]
+            [ h3 [ class "text-base font-semibold text-slate-100" ] [ text "Edit race details" ]
+            , button
+                [ onClick CloseMetaEdit, class "text-xs text-slate-500 hover:text-slate-200" ]
+                [ text "Cancel" ]
+            ]
+        , div [ class "grid grid-cols-1 sm:grid-cols-2 gap-4" ]
+            [ field "Name"
+                [ input
+                    [ A.type_ "text"
+                    , A.value form.name
+                    , onInput MetaSetName
+                    , inputClass
+                    ]
+                    []
+                ]
+            , field "Date (optional)"
+                [ input
+                    [ A.type_ "date"
+                    , A.value form.date
+                    , onInput MetaSetDate
+                    , inputClass
+                    ]
+                    []
+                ]
+            , field "Location (optional)"
+                [ input
+                    [ A.type_ "text"
+                    , A.value form.location
+                    , A.placeholder "Chamonix, FR"
+                    , onInput MetaSetLocation
+                    , inputClass
+                    ]
+                    []
+                ]
+            , field "URL (optional)"
+                [ input
+                    [ A.type_ "url"
+                    , A.value form.url
+                    , A.placeholder "https://utmbmontblanc.com/…"
+                    , onInput MetaSetUrl
+                    , inputClass
+                    ]
+                    []
+                ]
+            ]
+        , field "Notes"
+            [ textarea
+                [ A.value form.notes
+                , A.placeholder "Anything that should travel with this race — checklist, strategy, mental cues…"
+                , A.rows 4
+                , onInput MetaSetNotes
+                , inputClass
+                ]
+                []
+            ]
+        , div [ class "space-y-2" ]
+            [ p [ class "text-xs text-slate-500 uppercase tracking-wider" ] [ text "Cover image (optional)" ]
+            , case form.coverImage of
+                Just dataUrl ->
+                    div [ class "flex items-center gap-3" ]
+                        [ div
+                            [ class "w-24 h-16 rounded-lg border border-slate-800 bg-slate-950"
+                            , A.style "background-image" ("url(" ++ dataUrl ++ ")")
+                            , A.style "background-size" "cover"
+                            , A.style "background-position" "center"
+                            ]
+                            []
+                        , div [ class "flex gap-2" ]
+                            [ button
+                                [ onClick MetaPickCover
+                                , class "px-3 py-1.5 text-xs border border-slate-700 rounded hover:bg-slate-800 text-slate-200"
+                                ]
+                                [ text "Replace" ]
+                            , button
+                                [ onClick MetaClearCover
+                                , class "px-3 py-1.5 text-xs text-slate-500 hover:text-rose-400"
+                                ]
+                                [ text "Remove" ]
+                            ]
+                        ]
+
+                Nothing ->
+                    button
+                        [ onClick MetaPickCover
+                        , class "px-3 py-1.5 text-xs border border-dashed border-slate-700 rounded hover:bg-slate-800 text-slate-300"
+                        ]
+                        [ text "Pick an image" ]
+            ]
+        , div [ class "flex justify-end gap-2" ]
+            [ button
+                [ onClick CloseMetaEdit
+                , class "px-4 py-2 text-sm border border-slate-700 rounded-md hover:bg-slate-800 text-slate-200"
+                ]
+                [ text "Cancel" ]
+            , button
+                [ onClick MetaSubmit
+                , class "px-4 py-2 text-sm bg-rose-600 text-white rounded-md hover:bg-rose-500 font-medium"
+                ]
+                [ text "Save changes" ]
+            ]
+        ]
 
 
 viewProfileSection : Model -> Track -> Float -> List Marker -> Html Msg
