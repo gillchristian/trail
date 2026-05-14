@@ -7,7 +7,7 @@ Ordered. Top item is next. Promote into `CURRENT.md` when started.
 - [x] TASK-001 — Scaffold the Elm + Vite + Tailwind app, lift Gpx.elm from crest, basic "hello / upload / parse" working end-to-end — (M) ✓ PR #1
 - [x] TASK-002 — IndexedDB storage layer + race index page (upload GPX → race appears, persists across reload) — (M) ✓ PR #2
 - [x] TASK-004 — True-1:1 profile view (port crest's Main.elm rendering into the Race page) — (M) — ✓ PR #3
-- [ ] TASK-005 — Aid-station CRUD: add by distance-from-start or distance-from-previous, edit, delete, persist — (M)
+- [x] TASK-005 — Aid-station CRUD: add by distance-from-start or distance-from-previous, edit, delete, persist — (M) — ✓ PR #4
 - [ ] TASK-006 — Per-km planning view (left card with 1:1 mini-profile, right inputs: notes + pace, prev/next nav) — (L)
 - [ ] TASK-007 — Pace distribution engine (Tobler, ADR-0003) + total-target UI, locked vs auto kms — (M)
 - [ ] TASK-008 — Planning table view (km / section toggle) + CSV export in both modes — (M)
