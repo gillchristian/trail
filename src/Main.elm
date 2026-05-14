@@ -1217,6 +1217,9 @@ title route =
         Route.RaceDetail _ ->
             "Trail — race"
 
+        Route.RaceMap _ ->
+            "Trail — map"
+
         Route.PlanTable _ ->
             "Trail — plan"
 
@@ -1248,6 +1251,9 @@ viewHeader route =
 
                         Route.RaceDetail _ ->
                             "Race detail."
+
+                        Route.RaceMap _ ->
+                            "Map view."
 
                         Route.PlanTable _ ->
                             "Plan · table view."
@@ -1323,6 +1329,14 @@ viewContent model =
             case findRace rid races of
                 Just race ->
                     viewRaceDetail model race
+
+                Nothing ->
+                    viewRaceNotFound
+
+        ( Route.RaceMap rid, LoadedRaces races ) ->
+            case findRace rid races of
+                Just race ->
+                    viewRaceMap model race
 
                 Nothing ->
                     viewRaceNotFound
@@ -1702,8 +1716,155 @@ viewRaceDetail model race =
                 ]
                 [ text "Open the plan →" ]
             ]
+        , viewMapTeaser model race
         , viewExportPanel race
         ]
+
+
+viewMapTeaser : Model -> Race -> Html Msg
+viewMapTeaser model race =
+    div [ class "rounded-2xl bg-slate-900 border border-slate-800 p-5 flex items-center justify-between gap-4 flex-wrap" ]
+        [ div []
+            [ p [ class "font-medium text-slate-100" ] [ text "Open on the map" ]
+            , p [ class "text-sm text-slate-400 mt-1" ]
+                [ text "Real-world OSM tiles. Useful for spotting which forest you're about to enter."
+                ]
+            ]
+        , let
+            _ =
+                model
+          in
+          a
+            [ Route.href (Route.RaceMap race.id)
+            , class "px-4 py-2 border border-slate-700 rounded-md hover:bg-slate-800 text-sm font-medium text-slate-100"
+            ]
+            [ text "View on map →" ]
+        ]
+
+
+viewRaceMap : Model -> Race -> Html Msg
+viewRaceMap model race =
+    let
+        track =
+            Dict.get (raceIdToString race.id) model.parsedTracks
+
+        coords =
+            case track of
+                Just t ->
+                    t.points
+                        |> List.map (\p -> [ p.lat, p.lon ])
+
+                Nothing ->
+                    []
+
+        sortedAids =
+            sortAidStations race.aidStations
+
+        markers =
+            case track of
+                Just t ->
+                    sortedAids
+                        |> List.indexedMap
+                            (\i a ->
+                                let
+                                    coord =
+                                        findCoordAt a.distance t
+                                in
+                                case coord of
+                                    Just ( lat, lon ) ->
+                                        Just
+                                            (Encode.object
+                                                [ ( "lat", Encode.float lat )
+                                                , ( "lon", Encode.float lon )
+                                                , ( "label", Encode.string (String.fromInt (i + 1)) )
+                                                , ( "name", Encode.string a.name )
+                                                , ( "index", Encode.int (i + 1) )
+                                                ]
+                                            )
+
+                                    Nothing ->
+                                        Nothing
+                            )
+                        |> List.filterMap identity
+
+                Nothing ->
+                    []
+
+        trackJson =
+            Encode.encode 0 (Encode.list (Encode.list Encode.float) coords)
+
+        markersJson =
+            Encode.encode 0 (Encode.list identity markers)
+    in
+    div [ class "max-w-screen-2xl mx-auto mt-8 px-6 space-y-6" ]
+        [ div [ class "text-sm text-slate-400 flex items-center gap-2" ]
+            [ a [ Route.href Route.Index, class "hover:text-slate-100" ] [ text "Races" ]
+            , span [ class "text-slate-700" ] [ text "/" ]
+            , a [ Route.href (Route.RaceDetail race.id), class "hover:text-slate-100" ] [ text race.name ]
+            , span [ class "text-slate-700" ] [ text "/" ]
+            , span [ class "text-slate-200" ] [ text "Map" ]
+            ]
+        , div [ class "flex items-end justify-between gap-4 flex-wrap" ]
+            [ h1 [ class "text-3xl font-bold tracking-tight text-slate-100" ] [ text race.name ]
+            , p [ class "text-sm text-slate-500" ]
+                [ text
+                    (formatFloat 1 (race.distance / 1000)
+                        ++ " km · "
+                        ++ String.fromInt (List.length sortedAids)
+                        ++ (if List.length sortedAids == 1 then
+                                " aid station"
+
+                            else
+                                " aid stations"
+                           )
+                    )
+                ]
+            ]
+        , case track of
+            Just _ ->
+                Html.node "trail-map"
+                    [ A.attribute "track" trackJson
+                    , A.attribute "markers" markersJson
+                    , A.style "display" "block"
+                    , A.style "width" "100%"
+                    , A.style "height" "70vh"
+                    , class "rounded-2xl border border-slate-800 overflow-hidden"
+                    ]
+                    []
+
+            Nothing ->
+                div [ class "rounded-2xl bg-slate-900 border border-slate-800 p-10 text-center text-slate-500" ]
+                    [ text "Parsing GPX…" ]
+        , p [ class "text-xs text-slate-500" ]
+            [ text "Tiles from OpenStreetMap. Once you've panned over an area, those tiles are cached for offline use." ]
+        ]
+
+
+findCoordAt : Float -> Track -> Maybe ( Float, Float )
+findCoordAt distance track =
+    let
+        pairs =
+            List.map2 Tuple.pair track.cumDist track.points
+
+        pick ( d, p ) best =
+            case best of
+                Nothing ->
+                    Just ( abs (d - distance), p )
+
+                Just ( bestDelta, _ ) ->
+                    let
+                        delta =
+                            abs (d - distance)
+                    in
+                    if delta < bestDelta then
+                        Just ( delta, p )
+
+                    else
+                        best
+    in
+    pairs
+        |> List.foldl pick Nothing
+        |> Maybe.map (\( _, p ) -> ( p.lat, p.lon ))
 
 
 viewExportPanel : Race -> Html Msg

@@ -22,6 +22,7 @@ import Url exposing (Url)
 type Route
     = Index
     | RaceDetail RaceId
+    | RaceMap RaceId
     | PlanTable RaceId
     | PlanKm RaceId Int
     | NotFound
@@ -63,6 +64,13 @@ fromUrl url =
 
                     else
                         PlanTable (raceIdFromString id)
+
+                [ "race", id, "map" ] ->
+                    if String.isEmpty id then
+                        NotFound
+
+                    else
+                        RaceMap (raceIdFromString id)
 
                 [ "race", id, "plan", kmStr ] ->
                     case ( String.isEmpty id, String.toInt kmStr ) of
@@ -108,6 +116,9 @@ toString route =
 
         RaceDetail id ->
             "#/race/" ++ raceIdToString id
+
+        RaceMap id ->
+            "#/race/" ++ raceIdToString id ++ "/map"
 
         PlanTable id ->
             "#/race/" ++ raceIdToString id ++ "/plan"
