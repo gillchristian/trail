@@ -10,4 +10,4 @@ Each entry: the TASK-NNN id, title, the date completed, and a one-line summary o
 
 ## Completed
 
-_(none yet)_
+- TASK-001 — scaffold Elm + Vite + Tailwind app — 2026-05-15 — Elm 0.19 + Tailwind v4 + Vite project bootstrapped, Gpx.elm lifted from crest, file-upload happy path renders track stats. PR #1, merged as `0419712`. See journal 2026-05-15 01:35.

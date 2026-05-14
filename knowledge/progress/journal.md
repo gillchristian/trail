@@ -44,3 +44,29 @@ Append-only. Newest at the bottom. Each entry is a snapshot for future-me with n
 - The `gillchristian/trail` GitHub repo already existed (empty); no need to `gh repo create`.
 - `.claude/settings.local.json` mentions `disabledMcpjsonServers: ["strava"]` — possible hint about project domain (the dir is named `trail`), but I won't act on this until the brief is in.
 **Next:** Receive project description from user. Capture it into `reference/project-brief.md` (raw notes first, then summary). Derive `BACKLOG.md`. Pull first task into `CURRENT.md`. Open the first PR branch.
+
+---
+## 2026-05-15 00:15 — project brief captured, ADRs written, TASK-001 launched
+
+**Task:** planning bootstrap
+**What I did:** Wrote `reference/project-brief.md` capturing the full Trail spec (features, constraints, visual direction, race fields, per-km card sizing, pace model, success criteria, raw user quotes). Wrote ADR-0001 (stack: Elm 0.19 + Tailwind v4 + Vite, mirroring crest), ADR-0002 (Coros aid-station GPX format — standard `<wpt>` with sym/type/desc, marked as field-test required because Coros docs don't pin the schema), ADR-0003 (Tobler-normalised slope-factor for grade-adjusted pace distribution with `Auto | Manual` lock states). Populated `BACKLOG.md` with TASK-001..TASK-013 in priority order (offline promoted, real-world map deferred to last per user). Pulled TASK-001 into `CURRENT.md` with acceptance criteria + plan.
+**What I verified:** All planning docs cross-reference correctly (decisions/INDEX lists all 3 ADRs; project-brief points to ADRs by number; BACKLOG sequence matches the priority order the user confirmed).
+**What changed in the repo:** Untracked new files (ADRs) + edits to planning + journal + project-brief. Staged for the TASK-001 branch.
+**What I learned:** The user gave precise answers worth preserving verbatim. Captured the original wording in the "Raw notes" section of the brief — future-me can re-read intent without sliding through my summary. The Coros docs question turned into an ADR with explicit field-test mitigation rather than a blocker — better outcome than stalling on it.
+**Next:** Branch `chore/task-001-scaffold`, scaffold the Elm app, smoke-test, PR, merge.
+
+---
+## 2026-05-15 01:35 — TASK-001 done: project scaffolded, merged as PR #1
+
+**Task:** TASK-001 — scaffold Elm + Vite + Tailwind app
+**What I did:** Mirrored the crest stack (same `vite.config.js`, `elm.json` dependency set, `@tailwindcss/vite`, `vite-plugin-elm`). Lifted `src/Gpx.elm` verbatim from crest. Wrote a stripped-down `src/Main.elm` with state `Empty | Parsing | Failed | Loaded`, drop-zone + file-picker, and a stat tiles view on Loaded (distance / gain / loss / point count). Dark theme baseline (slate-950 + rose-500). Updated `.gitignore` to exclude `node_modules/`, `dist/`, `elm-stuff/`.
+**What I verified:**
+- `npm install`: 16 packages, ok. Upstream high-severity ReDoS in `cross-spawn` (transitive via `vite-plugin-elm` → `node-elm-compiler`), no upstream fix, dev-only — accepted.
+- `npm run build`: exit 0. `dist/index.html 0.54 kB`, CSS `17.40 kB / gzip 4.43 kB`, JS `38.45 kB / gzip 13.44 kB`. Elm compiled 2 modules (Main, Gpx).
+- `npm run dev`: boots in 139 ms. `curl http://localhost:5173` returns the index with Trail title + dark body classes; `curl -I /src/main.js` → 200.
+- **Limitation:** I cannot drive a real browser from here, so the click-load-stats happy path wasn't end-to-end exercised. `Gpx.elm` is bit-identical to crest's proven implementation on the same 20k fixture (`oh_meu_deus_20k.gpx`). Browser-driven smoke test gets added in TASK-002 (it'll be implicit there since persistence requires the load path to work).
+**What changed in the repo:** PR #1 (https://github.com/gillchristian/trail/pull/1), squash-merged as `0419712 TASK-001: scaffold Elm + Vite + Tailwind app (#1)`. Adds: `package.json`, `package-lock.json`, `vite.config.js`, `elm.json`, `index.html`, `src/main.js`, `src/styles/app.css`, `src/Main.elm`, `src/Gpx.elm`, all planning docs, and `samples/` fixtures.
+**What I learned:**
+- Tried to bookkeeping-update `CURRENT.md` *after* the scaffold commit but before push — got caught in a dirty-working-tree-when-switching-branches dance after merge. **Going forward**: bookkeeping (DONE.md / CURRENT.md / journal) updates land as the *final* commit of each task branch, with the PR # known by then. For TASK-001 specifically, that bookkeeping is being done as the *first* commit of TASK-002's branch.
+- `--delete-branch` in `gh pr merge` runs server-side, but the local branch + tracking ref aren't auto-pruned. Cleaned up manually with `git push origin --delete <branch>` + `git branch -D`.
+**Next:** Implement TASK-002 (IndexedDB storage + race index + minimal routing + race detail stub).
