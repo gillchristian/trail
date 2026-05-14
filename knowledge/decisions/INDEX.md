@@ -32,4 +32,6 @@ What does this make easy? What does this make hard? What will I have to revisit 
 
 ## Index
 
-_(none yet)_
+- [0001 — Stack: Elm 0.19 + Tailwind v4 + Vite](0001-stack.md)
+- [0002 — Aid-station GPX format for Coros Pace Strategy](0002-coros-aid-station-format.md) *(assumption — field-test required)*
+- [0003 — Grade-adjusted pace distribution (Tobler-based)](0003-pace-distribution.md)
