@@ -22,15 +22,18 @@ import Url exposing (Url)
 type Route
     = Index
     | RaceDetail RaceId
+    | PlanTable RaceId
+    | PlanKm RaceId Int
     | NotFound
 
 
-{-| Routes live in the fragment. The first path is "/", encoded as
-either an empty fragment or `#/`. Examples:
+{-| Routes live in the fragment. Examples:
 
-    https://trail.app/         -> Index
-    https://trail.app/#/       -> Index
-    https://trail.app/#/race/abc -> RaceDetail (RaceId "abc")
+    /                          -> Index
+    /#/                        -> Index
+    /#/race/abc                -> RaceDetail (RaceId "abc")
+    /#/race/abc/plan           -> PlanTable (RaceId "abc")
+    /#/race/abc/plan/0         -> PlanKm (RaceId "abc") 0
 
 -}
 fromUrl : Url -> Route
@@ -54,13 +57,31 @@ fromUrl url =
                     else
                         RaceDetail (raceIdFromString id)
 
+                [ "race", id, "plan" ] ->
+                    if String.isEmpty id then
+                        NotFound
+
+                    else
+                        PlanTable (raceIdFromString id)
+
+                [ "race", id, "plan", kmStr ] ->
+                    case ( String.isEmpty id, String.toInt kmStr ) of
+                        ( False, Just km ) ->
+                            if km >= 0 then
+                                PlanKm (raceIdFromString id) km
+
+                            else
+                                NotFound
+
+                        _ ->
+                            NotFound
+
                 _ ->
                     NotFound
 
 
 normalize : String -> String
 normalize s =
-    -- collapse leading "/", we treat "/x" and "x" the same below
     if String.startsWith "/" s then
         s
 
@@ -87,6 +108,12 @@ toString route =
 
         RaceDetail id ->
             "#/race/" ++ raceIdToString id
+
+        PlanTable id ->
+            "#/race/" ++ raceIdToString id ++ "/plan"
+
+        PlanKm id km ->
+            "#/race/" ++ raceIdToString id ++ "/plan/" ++ String.fromInt km
 
         NotFound ->
             "#/404"
