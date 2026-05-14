@@ -15,7 +15,9 @@
 // IMPORTANT: SW is only registered in production builds. Dev runs
 // against Vite's HMR client which we deliberately don't cache.
 
-const CACHE = 'trail-v1';
+const CACHE = 'trail-v2';
+const TILE_CACHE = 'trail-tiles-v1';
+const TILE_CACHE_MAX = 800; // ~25 MB at typical tile sizes
 
 const APP_SHELL = [
   '/',
@@ -25,6 +27,20 @@ const APP_SHELL = [
   '/icon-192.svg',
   '/icon-512.svg',
 ];
+
+function isTileRequest(url) {
+  // Any OpenStreetMap mirror's /Z/X/Y.png tile path.
+  return /^https:\/\/[a-c]\.tile\.openstreetmap\.org\/\d+\/\d+\/\d+\.png$/.test(url);
+}
+
+async function trimTileCache() {
+  const cache = await caches.open(TILE_CACHE);
+  const keys = await cache.keys();
+  if (keys.length <= TILE_CACHE_MAX) return;
+  const overflow = keys.length - TILE_CACHE_MAX;
+  // FIFO: keys() returns insertion order, so the oldest are at the front.
+  await Promise.all(keys.slice(0, overflow).map((k) => cache.delete(k)));
+}
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -40,10 +56,11 @@ self.addEventListener('install', (event) => {
 });
 
 self.addEventListener('activate', (event) => {
+  const keep = new Set([CACHE, TILE_CACHE]);
   event.waitUntil(
     caches
       .keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
+      .then((keys) => Promise.all(keys.filter((k) => !keep.has(k)).map((k) => caches.delete(k))))
       .then(() => self.clients.claim())
   );
 });
@@ -53,6 +70,31 @@ self.addEventListener('fetch', (event) => {
   if (req.method !== 'GET') return;
 
   const url = new URL(req.url);
+
+  // OSM tile: cache-first. Tiles are immutable per Z/X/Y, so once we have
+  // them we never need to re-fetch — perfect for offline race-day use.
+  if (isTileRequest(url.toString())) {
+    event.respondWith(
+      caches.open(TILE_CACHE).then(async (cache) => {
+        const cached = await cache.match(req);
+        if (cached) return cached;
+        try {
+          const resp = await fetch(req);
+          if (resp && resp.ok) {
+            cache.put(req, resp.clone());
+            trimTileCache();
+          }
+          return resp;
+        } catch (e) {
+          // Offline + uncached tile: return a 504 so Leaflet shows its
+          // blank-tile fallback instead of choking.
+          return new Response('', { status: 504, statusText: 'Offline' });
+        }
+      })
+    );
+    return;
+  }
+
   const sameOrigin = url.origin === self.location.origin;
   if (!sameOrigin) return;
 

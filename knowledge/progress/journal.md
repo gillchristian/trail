@@ -329,3 +329,37 @@ Append-only. Newest at the bottom. Each entry is a snapshot for future-me with n
 - Hero banner + card-strip aesthetics now wire together. When the user attaches a photo for the upcoming 20 k, both the index card and the race-detail page change immediately.
 
 **Next:** TASK-013 — real-world map view (Leaflet + OSM via JS port). Last on the backlog. After that, end-of-night summary.
+
+---
+## 2026-05-15 13:30 — TASK-013 done: real-world map view
+
+**Task:** TASK-013 — real-world OSM map (last backlog item).
+
+**What I did:**
+- Added Leaflet via `npm install leaflet`. New file `src/leaflet-element.js` defines a `<trail-map>` custom element. Inputs come in as JSON-encoded attributes (`track`, `markers`) — no Elm-side ports needed; the custom element's life-cycle is bound to the DOM node so map cleanup happens when Elm removes the host element.
+- Inside the element:
+  - `L.map` initialised on `connectedCallback`. OSM tile layer.
+  - Track drawn as two stacked polylines: a thick rose halo (opacity 0.25, weight 8) + a thin rose-300 core (weight 3). Reads like the profile chart's gradient stroke.
+  - Aid stations as `L.divIcon` markers — amber circle with a 1-based number, black border. Popup binds the station name.
+  - `L.Icon.Default.mergeOptions` overrides icon paths with bundler-resolved imports — Vite inlines the default marker PNGs as data URLs, so they ship with the JS bundle.
+- New `Route.RaceMap RaceId` variant; new path `#/race/:id/map`.
+- `Main.viewRaceMap` snaps each aid station to the closest track point (same Haversine + cumDist routine used by the GPX exporter, refactored into `findCoordAt`) and ships the coords + marker objects to the custom element via JSON-encoded attribute strings.
+- `viewMapTeaser` panel on the race detail page links to the map. Placed between the planning CTA and the export panel.
+- **Tile caching** in `public/sw.js`: a new `TILE_CACHE` keyed on `trail-tiles-v1`. Tile requests (matched against `https://[a-c].tile.openstreetmap.org/Z/X/Y.png`) go through cache-first. New tiles get FIFO-trimmed at 800 entries (~25 MB; configurable). Offline + uncached = 504 so Leaflet shows its blank-tile fallback rather than choking.
+- Bumped `CACHE` to `trail-v2` so the activate handler invalidates the prior app-shell cache.
+
+**What I verified:**
+- `npm run build` → exit 0. Bundle is `276.29 kB JS / gzip 87.29 kB`, `53.96 kB CSS / gzip 13.77 kB`. Leaflet adds ~150 KB JS + ~16 KB CSS. Acceptable for the last feature.
+- `npm run smoke` → still passes.
+- Reviewed Leaflet integration: custom element is the right shape — `attributeChangedCallback` re-renders on attribute change; `disconnectedCallback` cleans up the map instance to avoid leaking when Elm unmounts the node.
+- Reviewed SW tile-cache path: regex matches all three OSM mirrors; FIFO trim runs only after successful writes; offline fallback returns 504 (not a crash).
+- **Limitation:** browser-level map render not verified. Custom-element wiring + JSON parsing + Leaflet API are all standard. Marker PNGs being inlined as data URLs confirmed by greping the bundle (3 `data:image/png;base64,…` strings of marker dimensions).
+
+**What changed in the repo:** PR #10. New: `src/leaflet-element.js`. Modified: `src/main.js` (import), `src/Route.elm` (RaceMap variant), `src/Main.elm` (viewRaceMap + viewMapTeaser + findCoordAt), `public/sw.js` (tile cache path, CACHE bumped to v2), `package.json` + `package-lock.json` (leaflet).
+
+**What I learned:**
+- Custom elements are *significantly* less plumbing than Elm ports for self-contained third-party JS widgets. The map life-cycle stays inside the host DOM node and connects/disconnects via standard browser callbacks. No subscribe/unsubscribe dance, no port name conflicts.
+- The "snap aid station to closest track point" routine is now used in three places (profile mini-card, profile chart marker label, map marker, GPX export). Worth extracting to a helper if a fourth call site appears.
+- OSM tile caching is essentially free with the SW pattern I already had — the only nuance is the FIFO eviction so the cache doesn't grow unbounded across multiple races.
+
+**Next:** Final wrap-up. Backlog is empty. Time for an end-of-night summary in the journal so the user can pick up cleanly tomorrow.

@@ -1,4 +1,5 @@
 import './styles/app.css'
+import './leaflet-element.js'
 import { Elm } from './Main.elm'
 
 // ============================================================
