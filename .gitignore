@@ -18,3 +18,8 @@ Thumbs.db
 
 # Claude Code (per-user, not shared)
 .claude/settings.local.json
+
+# Build
+node_modules/
+dist/
+elm-stuff/
