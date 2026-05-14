@@ -118,3 +118,26 @@ Append-only. Newest at the bottom. Each entry is a snapshot for future-me with n
 - Parsing on `RacesLoaded` is a synchronous blocking cost. UTMB is ~200 ms in Crest. That's tolerable for a one-time boot cost; if it becomes painful as the race library grows, parse lazily on `UrlChanged → RaceDetail` instead.
 - The dark theme + rose accent reads well on the chart. Layered "ghost wave" UTMB-style rendering (mentioned in the project brief) is a separate visual-polish task — for v1 the single gradient profile is honest and gamified-leaning already.
 **Next:** TASK-005 — aid station CRUD: distance-from-start / distance-from-previous input, edit/delete, persist on the Race record, render markers on the profile.
+
+---
+## 2026-05-15 05:30 — TASK-005 done: aid-station CRUD + profile markers
+
+**Task:** TASK-005 — aid stations
+**What I did:**
+- `Types.elm`: added `AidStation` (id, name, distance in meters, restSeconds, services, notes) and `Service` (Water | Food | Medical | WC | DropBag) with icon/label/string helpers. `Race` gained `aidStations : List AidStation` and `aidStationSeq : Int` (per-race counter — no uuid lib needed). Decoder uses `D.oneOf` for backwards-compat: old IDB records (TASK-002 era) without these fields default to `[]` / `0`.
+- `Profile.elm`: added `Marker { distance, label }` and a markers parameter to `view`. Markers render as amber dashed vertical lines with a pill label above the chart. Bumped to `Html.Lazy.lazy4` so memoization still kicks in on (track, mode, width, markers).
+- `Main.elm`: aid-station form state (`AidEditor = AidClosed | AidOpen AidForm`) plus an `AidForm` record (editing, name, mode, distanceKm, restMinutes, services, error). Msgs: `OpenAddAid / OpenEditAid / CloseAid / AidSetName / AidSetMode / AidSetDistanceKm / AidSetRestMinutes / AidToggleService / AidSubmit / AidDelete`. Distance input has a "From previous" / "From start" toggle (default "from previous" — matches how race organisers usually quote distances).
+- Race-detail page: profile section + new aid-stations section. Empty state → "Add" button → inline form. List of stations shows distance-from-start, distance-from-previous, distance-to-finish, planned rest, service icons, with hover-reveal edit/delete affordances.
+- Profile-chart markers reuse the same numbering (1, 2, …) as the list rows. Labels truncated to 12 chars to avoid overlap on dense routes.
+**What I verified:**
+- `npm run build` → exit 0. JS now `75.48 kB / gzip 25.57 kB`, CSS `28.87 kB / gzip 5.89 kB`. Build time ~584 ms.
+- `npm run smoke` → still passes; no storage layer changes.
+- Backwards-compat: decoder reviewed line-by-line. `aidStations` and `aidStationSeq` both wrapped in `D.oneOf [ field …, succeed default ]`. Old records from TASK-002 will decode with `aidStations = []`, `aidStationSeq = 0`.
+- Validation reviewed by hand: name trimmed-must-not-be-empty; distanceKm must parse as Float (commas converted to dots); restMinutes must parse as Int ≥ 0; absolute distance must be within `race.distance + 5 m` (5 m grace for last-aid-at-finish).
+- **Limitation:** I cannot exercise the form click-through here. Will browser-test in the morning.
+**What changed in the repo:** PR #4. Modified: `src/Types.elm`, `src/Profile.elm`, `src/Main.elm`, planning bookkeeping.
+**What I learned:**
+- Per-race id sequence is much simpler than threading a uuid generator through ports for sub-records. It also makes the ids stable across `.trail` import/export (a uuid would change on re-export).
+- The `D.oneOf` pattern for backwards-compatible decoders is exactly the right tool — no migration step needed in the IDB layer.
+- Form state lives at the top-level model for now. When a single page passes ~250 lines (Main.elm just crossed 1000 total), I'll split into `Pages/Race.elm` and let it hold its own page-local state.
+**Next:** TASK-006 — per-km planning view (the centerpiece UX): left-column 1:1 mini-profile of a single km, right-column notes + target pace, prev/next nav, aid stations shown within whatever km they fall in.

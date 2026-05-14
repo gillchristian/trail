@@ -1,5 +1,6 @@
 module Profile exposing
-    ( ScaleMode(..)
+    ( Marker
+    , ScaleMode(..)
     , defaultTrueScale
     , isTrueScale
     , metersPerPixel
@@ -156,11 +157,21 @@ scaleLegend mode track containerWidth =
 
 
 
+-- MARKERS
+
+
+type alias Marker =
+    { distance : Float
+    , label : String
+    }
+
+
+
 -- CHART
 
 
-view : Track -> ScaleMode -> Float -> Html msg
-view track mode containerWidth =
+view : Track -> ScaleMode -> Float -> List Marker -> Html msg
+view track mode containerWidth markers =
     let
         eleRange =
             track.maxEle - track.minEle
@@ -216,6 +227,9 @@ view track mode containerWidth =
 
         kmTicks =
             distanceTicks track.totalDist mPerPx padLeft (padTop + chartHeight)
+
+        markerNodes =
+            List.map (viewMarker padTop (padTop + chartHeight) toX) markers
     in
     div [ class "bg-slate-900 border border-slate-800 rounded-2xl overflow-x-auto" ]
         [ svg
@@ -257,7 +271,61 @@ view track mode containerWidth =
                 ]
                 []
             , g [] kmTicks
+            , g [] markerNodes
             ]
+        ]
+
+
+viewMarker : Float -> Float -> (Float -> Float) -> Marker -> Svg msg
+viewMarker yTop yBottom toX marker =
+    let
+        x =
+            toX marker.distance
+
+        label =
+            marker.label
+
+        labelWidth =
+            -- rough estimate; we don't measure text in SVG. 7 px per char is fine for 11 px labels.
+            max 36 (toFloat (String.length label) * 7 + 14)
+
+        labelHeight =
+            18
+
+        labelTop =
+            yTop - labelHeight - 4
+    in
+    g []
+        [ line
+            [ SA.x1 (fmt x)
+            , SA.x2 (fmt x)
+            , SA.y1 (fmt yTop)
+            , SA.y2 (fmt yBottom)
+            , SA.stroke "#fbbf24"
+            , SA.strokeWidth "1"
+            , SA.strokeDasharray "2 2"
+            , SA.opacity "0.75"
+            ]
+            []
+        , Svg.rect
+            [ SA.x (fmt (x - labelWidth / 2))
+            , SA.y (fmt labelTop)
+            , SA.width (fmt labelWidth)
+            , SA.height (fmt labelHeight)
+            , SA.rx "9"
+            , SA.fill "#fbbf24"
+            ]
+            []
+        , text_
+            [ SA.x (fmt x)
+            , SA.y (fmt (labelTop + 12))
+            , SA.textAnchor "middle"
+            , SA.fontSize "11"
+            , SA.fontWeight "600"
+            , SA.fill "#0b0b21"
+            , SA.fontFamily "system-ui, -apple-system, sans-serif"
+            ]
+            [ Svg.text label ]
         ]
 
 
