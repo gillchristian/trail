@@ -178,3 +178,50 @@ Append-only. Newest at the bottom. Each entry is a snapshot for future-me with n
 - The 1:1 mini-profile per km is hugely revealing — a 50 m gentle climb over a km looks completely different from a 250 m wall. The user's instinct to make this view the center of the planning UX was correct.
 
 **Next:** TASK-008 — CSV export of the planning table (both km mode and section mode). Then TASK-009 (GPX export for Coros).
+
+---
+## 2026-05-15 09:15 — TASK-008 + TASK-009 + TASK-010 done: full export/import suite
+
+**Task:** combined PR for CSV export, Coros-ready GPX export, and `.trail` project-file round-trip. All share the same download port.
+
+**What I did:**
+- `Download.elm` — one-shot port `downloadFile(filename, content, mime)`. JS side builds a Blob, makes a hidden `<a download>`, clicks it, revokes the URL after a tick.
+- `Csv.elm` — two builders:
+  - `kmsCsv`: one row per km (km#, span start/end, distance, ele start/end, Δ ele, gain, loss, slope %, target time s + HH:MM:SS, pace, source = auto/manual, cumulative s + HH:MM:SS, aid name(s) in this km, aid rest s, notes).
+  - `sectionsCsv`: one row per section (label = `Start → Aid` or `Aid → Aid` or `Aid → Finish`), with section totals + an interleaved aid-rest column.
+  - Fields with `,` / `"` / newlines get RFC-4180 quoted; embedded `"` get doubled.
+- `GpxExport.elm` — schema per ADR-0002. Aid stations snap to the closest track point by Haversine via `cumDist`. Each becomes:
+  ```xml
+  <wpt lat="…" lon="…">
+    <ele>…</ele>
+    <name>…</name>
+    <desc>Km X · services · Rest M:SS</desc>
+    <sym>Restaurant|Drinking Water|First Aid|Flag, Blue</sym>
+    <type>Aid Station</type>
+  </wpt>
+  ```
+  Symbol picked from the standard Garmin set based on services (food → Restaurant; water-only → Drinking Water; medical-only → First Aid; else Flag, Blue). Waypoints inserted before `<trk>` (GPX 1.1 ordering). XML-escape on names/descriptions.
+- `ProjectFile.elm` — `.trail` format = `{ format: "trail-project", version: 1, race: <encoded Race> }`. Encode pretty-printed (indent 2) for readability. Decode validates format+version, defers to `Types.decodeRace` for the payload.
+- `Main.elm`:
+  - Upload picker now accepts `.gpx`, `.trail`, and `application/json`.
+  - `GotContent` branches on filename: `.trail` → `ProjectFile.decode` then save (with id dropped so JS assigns a fresh uuid; `createdAt` re-stamped to `model.now` so the import floats to the top).
+  - Race detail page: new "Export" section with two cards (GPX for Coros — disabled when no aid stations; .trail project file — always enabled).
+  - Plan table view: "Download CSV" button next to the by-km/by-section toggle; downloads the currently visible mode.
+- Filename helpers: `safe race.name → race-name-coros.gpx | race-name.trail | race-name-km.csv | race-name-sections.csv`.
+
+**What I verified:**
+- `npm run build` → exit 0. JS now `106.26 kB / gzip 34.09 kB`, CSS `31.56 kB / gzip 6.25 kB`. Build time ~1 s.
+- `npm run smoke` → still passes (storage layer unchanged).
+- ADR-0002 cross-checked: produced `<wpt>` block is GPX 1.1 conformant; uses standard Garmin `<sym>` values; ordering (wpt → trk) matches GPX best practice; coords carried verbatim from the snapped track point (we never invent positions).
+- `.trail` round-trip reviewed by inspection: encoder uses `Types.encodeRace`; decoder uses `Types.decodeRace`; both already exercise backwards-compat (`aidStations`, `aidStationSeq`, `plan` all default if missing). So a `.trail` exported from this build will decode on a future build that adds new fields, as long as old fields stay supported.
+- CSV format reviewed for quoting correctness on names with commas (e.g. "Cafetería, Oncol") — passes through the `encodeField` path with double-quote wrapping.
+- **Limitation:** the actual Coros pickup (waypoint alerts in Pace Strategy) is field-testable only on the watch. ADR-0002 already flagged this as a real-watch validation step.
+
+**What changed in the repo:** PR #6. New: `src/Download.elm`, `src/Csv.elm`, `src/GpxExport.elm`, `src/ProjectFile.elm`. Modified: `src/Main.elm` (export panel, CSV button, .trail-aware upload), `src/main.js` (download port wiring).
+
+**What I learned:**
+- The `.trail` format being literally `{format, version, race: <encodeRace race>}` means *every* future Race-shape change automatically propagates to the file format. Backwards-compat for old `.trail` files is handled by the same `D.oneOf` defaults we already maintain in `Types.decodeRace`.
+- Snapping aid-station coords to track points (rather than storing lat/lon at create-time) means coordinates remain correct even if the user re-imports a `.trail` and the snap-target is recomputed. The aid-station model stays minimal: distance is the source of truth.
+- For the Coros UX: the COROS app needs the GPX **and** the user needs to toggle "waypoint alerts" on the watch after import. The article is explicit. I'll surface that hint in the export-card description.
+
+**Next:** TASK-011 — gamified visual pass (UTMB-DNA badges, ghost-wave layered profile, race-card aesthetic, glow accents, motion). Then TASK-012 — PWA / offline-first.

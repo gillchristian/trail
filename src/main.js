@@ -89,3 +89,17 @@ app.ports.storageDelete.subscribe(async (id) => {
     app.ports.storageError.send(`delete: ${e?.message || e}`)
   }
 })
+
+app.ports.downloadFile.subscribe(({ filename, content, mime }) => {
+  const blob = new Blob([content], { type: mime || 'application/octet-stream' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  a.style.display = 'none'
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  // Give the browser a tick to start the download before we revoke.
+  setTimeout(() => URL.revokeObjectURL(url), 250)
+})

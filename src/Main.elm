@@ -17,10 +17,13 @@ a page passes ~250 lines on its own.
 import Browser
 import Browser.Events
 import Browser.Navigation as Nav
+import Csv
 import Dict exposing (Dict)
+import Download
 import File exposing (File)
 import File.Select as Select
 import Gpx exposing (Track)
+import GpxExport
 import Html exposing (Html, a, button, div, h1, h2, h3, input, label, p, span, text, textarea)
 import Html.Attributes as A exposing (class, classList)
 import Html.Events as E exposing (onBlur, onClick, onInput, preventDefaultOn)
@@ -28,6 +31,7 @@ import Html.Lazy
 import Json.Decode as D
 import Json.Encode as Encode
 import Planning exposing (Km, KmResult, KmSource(..))
+import ProjectFile
 import Profile exposing (Marker, ScaleMode(..))
 import Route exposing (Route)
 import Storage
@@ -218,6 +222,11 @@ type Msg
     | SetKmNotesText String
     | CommitKmNotesForKm Int
     | ResetKmToAuto Int
+      -- exports
+    | ExportCsvKms
+    | ExportCsvSections
+    | ExportGpxForCoros
+    | ExportProjectFile
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -257,7 +266,11 @@ update msg model =
             ( { model | dragOver = False }, Cmd.none )
 
         OpenPicker ->
-            ( model, Select.file [ "application/gpx+xml", ".gpx" ] PickedFile )
+            ( model
+            , Select.file
+                [ "application/gpx+xml", ".gpx", ".trail", "application/json" ]
+                PickedFile
+            )
 
         GotFiles file _ ->
             ( { model | dragOver = False, upload = Parsing (File.name file) }
@@ -270,18 +283,39 @@ update msg model =
             )
 
         GotContent fileName content ->
-            case Gpx.parseGPX content of
-                Err err ->
-                    ( { model | upload = UploadFailed fileName err }, Cmd.none )
+            if isProjectFile fileName then
+                case ProjectFile.decode content of
+                    Err err ->
+                        ( { model | upload = UploadFailed fileName err }, Cmd.none )
 
-                Ok track ->
-                    let
-                        draft =
-                            buildDraftRace model.now track content
-                    in
-                    ( { model | upload = Persisting fileName }
-                    , Storage.saveRace (encodeRace draft)
-                    )
+                    Ok importedRace ->
+                        let
+                            -- Drop the imported id so JS assigns a fresh one
+                            -- (lets users import the same .trail twice safely)
+                            -- and stamp a new createdAt so it sorts to the top.
+                            draft =
+                                { importedRace
+                                    | id = raceIdFromString ""
+                                    , createdAt = model.now
+                                }
+                        in
+                        ( { model | upload = Persisting fileName }
+                        , Storage.saveRace (encodeRace draft)
+                        )
+
+            else
+                case Gpx.parseGPX content of
+                    Err err ->
+                        ( { model | upload = UploadFailed fileName err }, Cmd.none )
+
+                    Ok track ->
+                        let
+                            draft =
+                                buildDraftRace model.now track content
+                        in
+                        ( { model | upload = Persisting fileName }
+                        , Storage.saveRace (encodeRace draft)
+                        )
 
         RacesLoaded value ->
             case D.decodeValue Types.decodeRaces value of
@@ -601,6 +635,124 @@ update msg model =
 
                 Nothing ->
                     ( model, Cmd.none )
+
+        ExportCsvKms ->
+            case currentRace model of
+                Just race ->
+                    let
+                        kms =
+                            Dict.get (raceIdToString race.id) model.kmsCache
+                                |> Maybe.withDefault []
+
+                        results =
+                            Planning.distribute
+                                { target = race.plan.targetSeconds
+                                , kms = kms
+                                , plan = race.plan
+                                , aidRestSeconds = Planning.aidRestTotal race.aidStations
+                                }
+
+                        content =
+                            Csv.kmsCsv { race = race, kms = kms, results = results }
+
+                        filename =
+                            csvFilename race "km"
+                    in
+                    ( model
+                    , Download.file
+                        { filename = filename
+                        , content = content
+                        , mime = "text/csv"
+                        }
+                    )
+
+                Nothing ->
+                    ( model, Cmd.none )
+
+        ExportCsvSections ->
+            case currentRace model of
+                Just race ->
+                    let
+                        kms =
+                            Dict.get (raceIdToString race.id) model.kmsCache
+                                |> Maybe.withDefault []
+
+                        results =
+                            Planning.distribute
+                                { target = race.plan.targetSeconds
+                                , kms = kms
+                                , plan = race.plan
+                                , aidRestSeconds = Planning.aidRestTotal race.aidStations
+                                }
+
+                        content =
+                            Csv.sectionsCsv { race = race, kms = kms, results = results }
+
+                        filename =
+                            csvFilename race "sections"
+                    in
+                    ( model
+                    , Download.file
+                        { filename = filename
+                        , content = content
+                        , mime = "text/csv"
+                        }
+                    )
+
+                Nothing ->
+                    ( model, Cmd.none )
+
+        ExportGpxForCoros ->
+            case ( currentRace model, Dict.get (currentRaceIdString model) model.parsedTracks ) of
+                ( Just race, Just track ) ->
+                    ( model
+                    , Download.file
+                        { filename = GpxExport.filenameFor race
+                        , content = GpxExport.exportWithAidStations race track
+                        , mime = "application/gpx+xml"
+                        }
+                    )
+
+                _ ->
+                    ( model, Cmd.none )
+
+        ExportProjectFile ->
+            case currentRace model of
+                Just race ->
+                    ( model
+                    , Download.file
+                        { filename = ProjectFile.filenameFor race
+                        , content = ProjectFile.encode race
+                        , mime = "application/json"
+                        }
+                    )
+
+                Nothing ->
+                    ( model, Cmd.none )
+
+
+isProjectFile : String -> Bool
+isProjectFile fname =
+    String.endsWith ".trail" (String.toLower fname)
+
+
+currentRaceIdString : Model -> String
+currentRaceIdString model =
+    case currentRace model of
+        Just race ->
+            raceIdToString race.id
+
+        Nothing ->
+            ""
+
+
+csvFilename : Race -> String -> String
+csvFilename race tag =
+    let
+        base =
+            ProjectFile.filenameFor race |> String.dropRight 6
+    in
+    base ++ "-" ++ tag ++ ".csv"
 
 
 hydratePlanInputs : Model -> Model
@@ -1101,7 +1253,7 @@ viewUploadBanner model =
         ( labelText, sub, disabled ) =
             case model.upload of
                 NotUploading ->
-                    ( "Drop a .gpx file", "or click to choose one", False )
+                    ( "Drop a .gpx or .trail file", "or click to choose one", False )
 
                 Parsing fname ->
                     ( "Parsing " ++ fname ++ "…", "this should take a moment", True )
@@ -1275,6 +1427,63 @@ viewRaceDetail model race =
                 ]
                 [ text "Open the plan →" ]
             ]
+        , viewExportPanel race
+        ]
+
+
+viewExportPanel : Race -> Html Msg
+viewExportPanel race =
+    let
+        hasAids =
+            not (List.isEmpty race.aidStations)
+    in
+    div [ class "rounded-2xl bg-slate-900 border border-slate-800 p-5 space-y-3" ]
+        [ div [ class "flex items-baseline gap-3" ]
+            [ h2 [ class "text-xl font-semibold text-slate-100" ] [ text "Export" ]
+            , span [ class "text-xs text-slate-500" ] [ text "everything lives on this device · take it with you" ]
+            ]
+        , div [ class "grid grid-cols-1 sm:grid-cols-2 gap-3" ]
+            [ exportCard
+                { titleText = "GPX for Coros"
+                , description =
+                    if hasAids then
+                        "Re-emit the original GPX with your aid stations as standard waypoints. Upload it to the COROS app, then enable Waypoint Alerts on the route — that's what surfaces aid stations in Pace Strategy."
+
+                    else
+                        "Add aid stations first — without them the export is identical to the source."
+                , buttonText = "Download .gpx"
+                , msg = ExportGpxForCoros
+                , disabled = not hasAids
+                }
+            , exportCard
+                { titleText = "Project file (.trail)"
+                , description = "Everything about this race in one file: GPX, aid stations, target time, per-km plan, notes. Import it back here later, or share it."
+                , buttonText = "Download .trail"
+                , msg = ExportProjectFile
+                , disabled = False
+                }
+            ]
+        ]
+
+
+exportCard :
+    { titleText : String
+    , description : String
+    , buttonText : String
+    , msg : Msg
+    , disabled : Bool
+    }
+    -> Html Msg
+exportCard opts =
+    div [ class "rounded-xl bg-slate-950 border border-slate-800 p-4 flex flex-col gap-3" ]
+        [ p [ class "font-medium text-slate-100" ] [ text opts.titleText ]
+        , p [ class "text-xs text-slate-400 flex-1" ] [ text opts.description ]
+        , button
+            [ onClick opts.msg
+            , A.disabled opts.disabled
+            , class "px-3 py-2 text-sm bg-rose-600 text-white rounded-md hover:bg-rose-500 disabled:opacity-40 disabled:cursor-not-allowed w-fit"
+            ]
+            [ text opts.buttonText ]
         ]
 
 
@@ -1768,13 +1977,26 @@ planStat label value note =
 
 viewPlanTabs : Race -> TableMode -> Html Msg
 viewPlanTabs _ mode =
-    div [ class "flex items-center justify-between" ]
+    div [ class "flex items-center justify-between gap-3 flex-wrap" ]
         [ div [ class "flex items-center gap-1 bg-slate-900 border border-slate-800 rounded-lg p-1" ]
             [ tabButton "By km" (mode == ByKm) (SetPlanTableMode ByKm)
             , tabButton "By section" (mode == BySection) (SetPlanTableMode BySection)
             ]
-        , p [ class "text-xs text-slate-500" ]
-            [ text "Tap a row to edit a km in detail." ]
+        , div [ class "flex items-center gap-2" ]
+            [ button
+                [ onClick
+                    (if mode == ByKm then
+                        ExportCsvKms
+
+                     else
+                        ExportCsvSections
+                    )
+                , class "px-3 py-1.5 text-sm border border-slate-700 rounded-md hover:bg-slate-800 text-slate-200 flex items-center gap-2"
+                ]
+                [ text "Download CSV" ]
+            , p [ class "text-xs text-slate-500" ]
+                [ text "Tap a row to edit a km in detail." ]
+            ]
         ]
 
 
