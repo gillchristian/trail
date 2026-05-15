@@ -482,3 +482,27 @@ Append-only. Newest at the bottom. Each entry is a snapshot for future-me with n
 - The spec's `§4.5` named examples (UTMB at "40–55 m/km Mountainous") and the math anchors disagree slightly: UTMB by the cutoffs is "Very mountainous" (~57 m/km). Treated the cutoffs as the contract; the named examples are approximate.
 - The cadence agent was still mid-work on its TASK-001 when this shipped. trail and cadence make progress in parallel; their PRs don't interact because cadence's work is purely backend.
 **Next:** TASK-015 (per-km segment classification by grade) or TASK-017 (profile data model). TASK-015 is the smaller follow-on; TASK-017 unlocks TASK-018 (predictor) which is the larger arc. Pick at the next prompt.
+
+---
+## 2026-05-15 17:05 — cadence verification + addendum 1 spec
+
+**Task:** verification + spec (no TASK-NNN — cross-project bookkeeping).
+**What I did:** Verified cadence's five-PR trail-integration arc end-to-end against the running local server (`localhost:3001`):
+- Schema migrated cleanly (`tokens` + `sessions`, migrations 013–016 applied).
+- Two sessions coexist for athlete 130301875 (`origin=cadence` from 16:37, `origin=trail` from 16:55). Independent `last_seen_at` proves the multi-session split works.
+- `/auth/strava?origin=trail` round-trips back to `localhost:5174/?token=…` with a valid session token. CORS preflight from `localhost:5174` returns the expected allow-origin echo.
+- `GET /api/activities/{id}/streams?keys=...` returns the `key_by_type` shape with full-resolution data (6168 points for an 18 km run = ~1 point/3 m). Allowlist rejection (`keys=bogus_key`) returns 400 with the documented error message. Missing-auth returns 401.
+- `GET /api/athlete` returns 200 with `X-Data-Source: strava` on first call, `cache` on second.
+
+**Finding:** the athlete response is the **SummaryAthlete** shape (`id, firstname, sex, city, country, premium, ...`), missing `max_heartrate, weight, ftp, measurement_preference`. Strava's `/athlete` returns DetailedAthlete only when the OAuth scope includes `profile:read_all`. Cadence currently requests only `activity:read_all`.
+
+Wrote `knowledge/reference/cadence-backend-spec-addendum-1-profile-scope.md` — a one-line scope change + cache-bust migration + re-auth choreography. Includes a copy-pasteable hand-off brief at §"Hand-off brief for the cadence agent". Updated BACKLOG.md note on TASK-023 to reflect the addendum exists.
+
+**What I verified:** All curl probes documented above. Specific values quoted in the cadence verification turn. Trail-side: no code change, just the spec + BACKLOG/journal updates.
+**What changed in the repo:** PR #17. New `knowledge/reference/cadence-backend-spec-addendum-1-profile-scope.md`. Modified `knowledge/planning/BACKLOG.md` (TASK-023 note expanded) + this journal entry.
+**What I learned:**
+- Strava's OAuth `scope` is per-request; no app-level config change required.
+- Strava's refresh flow preserves the original scope on the refreshed access token, so deploying the scope change is non-disruptive — existing sessions keep working until the user re-auths through `/auth/strava`, at which point Strava shows an *incremental* consent screen for just the added scope.
+- The athlete cache uses a negative-`athlete_id` sentinel in `activity_cache`. Bust it with a one-shot migration after the scope change to avoid serving stale SummaryAthlete shape for up to 24 h.
+- Multi-session model survives the re-auth flow naturally because `SetTokens` upserts by `athlete_id` — all existing sessions for that athlete resolve to the upgraded tokens automatically. No session-row migration needed.
+**Next:** Resume trail's numeric PR order — TASK-015 next. The addendum spec is pending hand-off; the user can paste §"Hand-off brief" into a cadence Claude Code session whenever they want it shipped. Not blocking anything trail-side until TASK-022 (calibration) — `max_heartrate` is the field we'd consume there.
