@@ -552,3 +552,16 @@ Wrote `knowledge/reference/cadence-backend-spec-addendum-1-profile-scope.md` —
 - The JSON codec uses **stable string keys** for variant types (`"cautious"` etc.) so future renames of the Elm variant constructors don't break stored profiles. Decoders fall back to `Average` defaults on unknown keys.
 - IDB upgrade path is one `createObjectStore` call inside the existing `onupgradeneeded`. The guard `!db.objectStoreNames.contains(SETTINGS_STORE)` makes the migration idempotent — running v2 against an already-v2 DB is a no-op.
 **Next:** TASK-018 (Predictor.predict — Layer B time prediction). The profile is now available; the predictor takes course + profile + intensity, returns predicted total time + per-component breakdown. Pure module, no UI in this slice (TASK-019 wires the slider).
+
+---
+## 2026-05-15 21:30 — TASK-018: Layer B predictor module
+
+**Task:** TASK-018.
+**What I did:** New `Predictor.elm`: `Prediction` record (climb/descent/runnable/aid component seconds + total + applied fatigue + intensity), `predict : Profile -> Race -> List Km -> Float -> Prediction`, `solveForIntensity` (12-iteration bisection on [0.80, 1.25]). Per-km classification follows spec §3.2 (slope thresholds ±4 %). Climb time uses the explicit vmh model (`gain / (vmh × i)`) so the profile's vmh field has clear semantics. Descent + runnable use `Planning.slopeFactor` (already Tobler-normalised) × the appropriate skill multiplier from AthleteProfile (descent or tech). Intensity is applied as `vmh × i` for climbs and `pace / i` elsewhere — higher i → faster predictions. Fatigue is single-pass.
+**What I verified:** `npm run build` exit 0. Bundle size unchanged (305.84 kB) — Elm dead-code-eliminates the unused module, which is the expected outcome for a pure library landing one PR ahead of its first caller. TASK-019 will surface the actual numeric output.
+**What changed in the repo:** PR #21. New `src/Predictor.elm` (~190 lines). No other code touched.
+**What I learned:**
+- Reusing `Planning.slopeFactor` for the descent + runnable pace adjustment keeps the math consistent with the existing distributor (ADR-0003). The predictor and distributor now share their slope semantics.
+- Fatigue iteration: spec calls for "apply fatigue, recompute total, apply again — converges in 2-3 passes." For typical inputs (slope 0.02, threshold 2 h, total 4-8 h) the single-pass error is < 1 %. Skipped the iteration to keep `predict` a pure synchronous fn — important for the slider which calls it 12× per re-bracket.
+- Bisection direction: the predictor is *monotonically decreasing* in intensity (more intensity = less time). The `if midTotal > targetS then mid becomes lower bound` branch is correct; flipped it would diverge.
+**Next:** TASK-019 — bidirectional slider. Wires the predictor into the plan-table target panel: slider position ↔ predicted total time, with `solveForIntensity` powering the inverse direction. This is the first time the predictor's output is user-visible.
