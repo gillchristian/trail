@@ -41,7 +41,7 @@ The roadmap doc covers the why and the trade-offs. These entries are the *chunks
 - **TASK-020 — Confidence indicator surfacing on predictor output.** Annotated by profile source. (S.)
 - **TASK-021 — Strava streams parser.** Reconstruct a usable `Gpx.Track`-shaped value from cadence's streams response (keyed-object form, see spec §4.4). Pure Elm decoder + transform; takes JSON, produces `{ points, cumDist, totalDist }`. Local-only — works on any streams JSON, whether from cadence or a manual dump. (M.)
 - **TASK-022 — Calibration from past activities.** Fit `vmh`, fatigue slope, optional HR bands. Surface "what changed and why." Depends on TASK-021 (streams parser) + TASK-024 (auth wiring). (L — split when picked up.)
-- ~~**TASK-023 — Decision: OAuth helper or stay manual.**~~ **Resolved 2026-05-15.** Decision: extend `cadence`'s backend. Spec at `knowledge/reference/cadence-backend-spec.md`; cadence is implementing as 5 PRs.
+- ~~**TASK-023 — Decision: OAuth helper or stay manual.**~~ **Resolved 2026-05-15.** Decision: extend `cadence`'s backend. Spec at `knowledge/reference/cadence-backend-spec.md`; cadence shipped all 5 PRs. Addendum 1 (broaden OAuth scope to `profile:read_all` for `max_heartrate` / `weight` / `ftp` / `measurement_preference`) drafted at `knowledge/reference/cadence-backend-spec-addendum-1-profile-scope.md` — pending hand-off to a cadence session.
 - **TASK-024 — Strava OAuth integration in trail.** Now unblocked. Recent-activity browser (`GET /api/activities` from cadence), multi-select link-to-race, refresh-token flow (just storing the session token; cadence handles refresh). Starts as soon as cadence ships their TASK-003 (state-routing). (L.)
 
 Open questions to resolve before promoting any of the above: see roadmap §9.
