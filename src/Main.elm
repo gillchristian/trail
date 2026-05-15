@@ -1260,11 +1260,37 @@ update msg model =
             -- carry a ~3 MB gpxText field; serialising it on every
             -- input event makes the drag laggy. The actual save
             -- happens on SliderCommit (the 'change' event).
-            case String.toFloat str of
-                Just i ->
+            --
+            -- We also update targetTimeText so the Target Time input
+            -- visibly tracks the drag — otherwise that input keeps
+            -- the old persisted value and a focus/blur on it would
+            -- re-commit the stale number.
+            case ( String.toFloat str, currentRace model ) of
+                ( Just i, Just race ) ->
+                    let
+                        kms =
+                            Dict.get (raceIdToString race.id) model.kmsCache
+                                |> Maybe.withDefault []
+                    in
+                    if List.isEmpty kms then
+                        ( { model | sliderDraft = Just i }, Cmd.none )
+
+                    else
+                        let
+                            prediction =
+                                Predictor.predict model.profile race kms i
+                        in
+                        ( { model
+                            | sliderDraft = Just i
+                            , targetTimeText = formatHhmm prediction.totalS
+                          }
+                        , Cmd.none
+                        )
+
+                ( Just i, Nothing ) ->
                     ( { model | sliderDraft = Just i }, Cmd.none )
 
-                Nothing ->
+                _ ->
                     ( model, Cmd.none )
 
         SliderCommit str ->
@@ -1289,7 +1315,10 @@ update msg model =
                             newRace =
                                 { race | plan = newPlan }
                         in
-                        ( { model | sliderDraft = Nothing }
+                        ( { model
+                            | sliderDraft = Nothing
+                            , targetTimeText = formatHhmm prediction.totalS
+                          }
                         , Storage.saveRace (encodeRace newRace)
                         )
 

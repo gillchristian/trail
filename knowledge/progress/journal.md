@@ -719,3 +719,15 @@ Bundle progression: 286 kB → 322 kB JS / 90 kB → 100 kB gzip. New modules: `
 - Caching computed-once values is much cheaper than reaching for `Html.Lazy` when the inputs aren't referentially stable (Dict.get returns a fresh `Maybe` every call). Cache the data; let the view be small and cheap on each render.
 - The cumulative-distance + point stride loop is now a single foldl pass — was four passes previously. Even uncached it'd be ~4× faster, but caching makes the re-render free.
 **Next:** Still the same as the closeout — TASK-022 deferred, visual smoke pending on the remaining shipped features. The gpxText-as-separate-row refactor is a tracked follow-up.
+
+---
+## 2026-05-16 00:05 — fix: target-time input tracks the slider drag
+
+**Task:** small UX bugfix.
+**What I did:** User reported that the Target Time input stayed stale during slider drag — only the Predicted Finish updated. The visible-but-stale value made focus/blur on the field re-commit the old number via `CommitTargetTime`. Fix: in `SliderInput`, also call `Predictor.predict` at the drafted intensity and set `model.targetTimeText = formatHhmm prediction.totalS`. `SliderCommit` does the same on release. Predict is < 2 ms for UTMB, so doing it per input event is fine — only the IDB save is heavy, and that still stays on SliderCommit.
+**What I verified:** `npm run build` exit 0, JS 322.61 → 322.81 kB (+200 B for the now-shared compute path in both handlers). No new warnings.
+**What changed in the repo:** PR #30. Modified `src/Main.elm` only — extended `SliderInput` to compute the prediction + update `targetTimeText`; `SliderCommit` also sets it on save so the two inputs stay locked even if the user releases outside the range.
+**What I learned:**
+- Two displays of the same derived value (target time number + slider position) need to update in lockstep or focus events on either one will surface the desynchronisation. The slider-as-derived approach (intensity ↔ target via `solveForIntensity`) is right; the bug was forgetting that `targetTimeText` is a *third* display of the same value.
+- Predict is cheap enough to run per input event. Save is what was expensive. Keep that split clear when sketching event handlers.
+**Next:** Same as before — TASK-022 deferred, visual smoke pending.
