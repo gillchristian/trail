@@ -14,6 +14,7 @@ a page passes ~250 lines on its own.
 
 -}
 
+import ActualGpx
 import Browser
 import Browser.Events
 import Browser.Navigation as Nav
@@ -38,6 +39,7 @@ import Storage
 import Svg
 import Svg.Attributes as SA
 import Task
+import Time
 import Types
     exposing
         ( AidStation
@@ -164,6 +166,7 @@ type alias Model =
     , targetTimeText : String
     , kmTimeText : String
     , kmNotesText : String
+    , actualRunError : Maybe String
     }
 
 
@@ -187,6 +190,7 @@ init flags url key =
       , targetTimeText = ""
       , kmTimeText = ""
       , kmNotesText = ""
+      , actualRunError = Nothing
       }
     , Storage.loadAll
     )
@@ -257,6 +261,12 @@ type Msg
     | MetaCoverPicked String
     | MetaClearCover
     | MetaSubmit
+      -- actual run
+    | OpenActualGpxPicker RaceId
+    | PickedActualGpxFile RaceId File
+    | GotActualGpxContent RaceId Int String
+    | ClearActualRun RaceId
+    | ActualGpxFailed String
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -841,6 +851,62 @@ update msg model =
                 _ ->
                     ( model, Cmd.none )
 
+        OpenActualGpxPicker rid ->
+            ( { model | actualRunError = Nothing }
+            , Select.file [ "application/gpx+xml", ".gpx" ] (PickedActualGpxFile rid)
+            )
+
+        PickedActualGpxFile rid file ->
+            ( model
+            , Task.perform identity
+                (Task.map2 (GotActualGpxContent rid)
+                    (Time.now |> Task.map Time.posixToMillis)
+                    (File.toString file)
+                )
+            )
+
+        GotActualGpxContent rid uploadedAtMs content ->
+            case ActualGpx.parse content of
+                Err e ->
+                    ( { model | actualRunError = Just e }, Cmd.none )
+
+                Ok track ->
+                    case findRace rid (currentRaces model) of
+                        Nothing ->
+                            ( model, Cmd.none )
+
+                        Just race ->
+                            let
+                                splits =
+                                    ActualGpx.computeSplits track |> Dict.fromList
+
+                                actual =
+                                    { splits = splits
+                                    , totalSeconds = track.totalElapsedS
+                                    , totalDistance = track.totalDist
+                                    , uploadedAt = uploadedAtMs
+                                    }
+
+                                updatedRace =
+                                    { race | actualSplits = Just actual }
+                            in
+                            ( { model | actualRunError = Nothing }
+                            , Storage.saveRace (encodeRace updatedRace)
+                            )
+
+        ClearActualRun rid ->
+            case findRace rid (currentRaces model) of
+                Nothing ->
+                    ( model, Cmd.none )
+
+                Just race ->
+                    ( { model | actualRunError = Nothing }
+                    , Storage.saveRace (encodeRace { race | actualSplits = Nothing })
+                    )
+
+        ActualGpxFailed err ->
+            ( { model | actualRunError = Just err }, Cmd.none )
+
 
 updateMetaForm : (MetaForm -> MetaForm) -> Model -> Model
 updateMetaForm f model =
@@ -1047,6 +1113,7 @@ buildDraftRace now track gpxText =
     , aidStations = []
     , aidStationSeq = 0
     , plan = defaultPlan
+    , actualSplits = Nothing
     }
 
 
@@ -2727,6 +2794,7 @@ viewPlanTable model race =
         [ viewPlanCrumb race
         , viewPlanHeader race
         , viewPlanTargetPanel race aidRest currentSum model.targetTimeText
+        , viewActualRunStrip model race
         , viewPlanTabs race model.planTableMode
         , case model.planTableMode of
             ByKm ->
@@ -2735,6 +2803,93 @@ viewPlanTable model race =
             BySection ->
                 viewSectionTable race kms results
         ]
+
+
+viewActualRunStrip : Model -> Race -> Html Msg
+viewActualRunStrip model race =
+    let
+        errorBanner =
+            case model.actualRunError of
+                Just msg ->
+                    p [ class "mt-2 text-sm text-rose-400" ]
+                        [ text ("Couldn't parse actual run: " ++ msg) ]
+
+                Nothing ->
+                    text ""
+    in
+    case race.actualSplits of
+        Nothing ->
+            div [ class "rounded-2xl bg-slate-900 border border-slate-800 p-4 flex items-center justify-between gap-4 flex-wrap" ]
+                [ div [ class "min-w-0" ]
+                    [ p [ class "font-medium text-slate-100" ] [ text "Link actual run" ]
+                    , p [ class "text-sm text-slate-400 mt-0.5" ]
+                        [ text "Upload the .gpx of your completed run to compare per-km splits against the plan." ]
+                    , errorBanner
+                    ]
+                , button
+                    [ onClick (OpenActualGpxPicker race.id)
+                    , class "px-4 py-2 text-sm border border-slate-700 rounded-md hover:bg-slate-800 text-slate-100 whitespace-nowrap"
+                    ]
+                    [ text "Upload .gpx" ]
+                ]
+
+        Just actual ->
+            div [ class "rounded-2xl bg-slate-900 border border-emerald-500/30 p-4 flex items-center justify-between gap-4 flex-wrap" ]
+                [ div [ class "flex items-center gap-6 flex-wrap min-w-0" ]
+                    [ div []
+                        [ p [ class "text-[10px] uppercase tracking-wider text-emerald-400/80" ] [ text "Actual run linked" ]
+                        , p [ class "text-2xl font-semibold text-slate-100 tabular-nums mt-0.5" ]
+                            [ text (formatHhmm actual.totalSeconds) ]
+                        ]
+                    , div []
+                        [ p [ class "text-[10px] uppercase tracking-wider text-slate-500" ] [ text "Distance run" ]
+                        , p [ class "text-lg text-slate-200 tabular-nums mt-0.5" ]
+                            [ text (formatFloat 2 (actual.totalDistance / 1000) ++ " km") ]
+                        ]
+                    , let
+                        plannedSum =
+                            Dict.foldl (\_ s acc -> acc + s) 0 actual.splits
+
+                        targetForCompare =
+                            race.plan.targetSeconds |> Maybe.withDefault 0
+                      in
+                      if targetForCompare > 0 then
+                        let
+                            diff =
+                                actual.totalSeconds - targetForCompare
+
+                            ( label, tone ) =
+                                if diff > 0 then
+                                    ( "+" ++ formatMmss diff ++ " vs target", "text-rose-400" )
+
+                                else if diff < 0 then
+                                    ( "−" ++ formatMmss (abs diff) ++ " vs target", "text-emerald-400" )
+
+                                else
+                                    ( "On target", "text-emerald-400" )
+                        in
+                        div []
+                            [ p [ class "text-[10px] uppercase tracking-wider text-slate-500" ] [ text "vs Target" ]
+                            , p [ class ("text-lg tabular-nums mt-0.5 " ++ tone) ] [ text label ]
+                            ]
+
+                      else
+                        text ""
+                    ]
+                , div [ class "flex items-center gap-2" ]
+                    [ button
+                        [ onClick (OpenActualGpxPicker race.id)
+                        , class "px-3 py-1.5 text-sm border border-slate-700 rounded-md hover:bg-slate-800 text-slate-200"
+                        ]
+                        [ text "Replace" ]
+                    , button
+                        [ onClick (ClearActualRun race.id)
+                        , class "px-3 py-1.5 text-sm border border-slate-700 rounded-md hover:bg-slate-800 text-slate-400 hover:text-rose-400"
+                        ]
+                        [ text "Unlink" ]
+                    , errorBanner
+                    ]
+                ]
 
 
 viewPlanCrumb : Race -> Html Msg
@@ -2904,20 +3059,35 @@ viewKmTable race kms results =
 
         cumulativeRows =
             kmsWithCumulative race aidByKm results kms
+
+        hasActual =
+            race.actualSplits /= Nothing
+
+        actualHeaders =
+            if hasActual then
+                [ Html.th [ class "px-4 py-3 text-right" ] [ text "Actual" ]
+                , Html.th [ class "px-4 py-3 text-right" ] [ text "Δ vs plan" ]
+                ]
+
+            else
+                []
     in
     div [ class "rounded-2xl bg-slate-900 border border-slate-800 overflow-x-auto" ]
         [ Html.table [ class "w-full text-sm" ]
             [ Html.thead [ class "text-xs uppercase tracking-wider text-slate-500" ]
                 [ Html.tr []
-                    [ Html.th [ class "px-4 py-3 text-left" ] [ text "Km" ]
-                    , Html.th [ class "px-4 py-3 text-left" ] [ text "Span" ]
-                    , Html.th [ class "px-4 py-3 text-right" ] [ text "Δ ele" ]
-                    , Html.th [ class "px-4 py-3 text-left" ] [ text "Grade" ]
-                    , Html.th [ class "px-4 py-3 text-right" ] [ text "Pace" ]
-                    , Html.th [ class "px-4 py-3 text-right" ] [ text "Time" ]
-                    , Html.th [ class "px-4 py-3 text-right" ] [ text "Cum" ]
-                    , Html.th [ class "px-4 py-3 text-left" ] [ text "Notes / stops" ]
-                    ]
+                    ([ Html.th [ class "px-4 py-3 text-left" ] [ text "Km" ]
+                     , Html.th [ class "px-4 py-3 text-left" ] [ text "Span" ]
+                     , Html.th [ class "px-4 py-3 text-right" ] [ text "Δ ele" ]
+                     , Html.th [ class "px-4 py-3 text-left" ] [ text "Grade" ]
+                     , Html.th [ class "px-4 py-3 text-right" ] [ text "Pace" ]
+                     , Html.th [ class "px-4 py-3 text-right" ] [ text "Time" ]
+                     ]
+                        ++ actualHeaders
+                        ++ [ Html.th [ class "px-4 py-3 text-right" ] [ text "Cum" ]
+                           , Html.th [ class "px-4 py-3 text-left" ] [ text "Notes / stops" ]
+                           ]
+                    )
                 ]
             , Html.tbody [] cumulativeRows
             ]
@@ -2987,81 +3157,148 @@ viewKmRow race km result stops notes cumulative =
                     ]
                 ]
     in
+    let
+        kmCell =
+            Html.td [ class "px-4 py-3 align-top tabular-nums text-slate-300 font-medium" ]
+                [ text (String.fromInt (km.index + 1)) ]
+
+        spanCell =
+            Html.td [ class "px-4 py-3 align-top text-slate-400 tabular-nums whitespace-nowrap" ]
+                [ text
+                    (formatFloat 2 (km.distStart / 1000)
+                        ++ " → "
+                        ++ formatFloat 2 (km.distEnd / 1000)
+                        ++ " km"
+                    )
+                ]
+
+        eleCell =
+            Html.td [ class "px-4 py-3 align-top text-right tabular-nums" ]
+                [ span
+                    [ classList
+                        [ ( "font-medium", True )
+                        , ( "text-rose-300", deltaEle > 0 )
+                        , ( "text-emerald-300", deltaEle < 0 )
+                        , ( "text-slate-400", deltaEle == 0 )
+                        ]
+                    ]
+                    [ text
+                        ((if deltaEle > 0 then
+                            "+"
+
+                          else
+                            ""
+                         )
+                            ++ formatInt deltaEle
+                            ++ " m"
+                        )
+                    ]
+                ]
+
+        gradeCell =
+            Html.td [ class "px-4 py-3 align-top" ]
+                [ let
+                    ( gLabel, gTone ) =
+                        gradeClass km.slope
+                  in
+                  span
+                    [ class
+                        ("inline-flex items-center px-2 py-0.5 rounded text-[10px] uppercase tracking-wider whitespace-nowrap ring-1 ring-inset "
+                            ++ gTone
+                        )
+                    ]
+                    [ text gLabel ]
+                ]
+
+        paceCell =
+            Html.td [ class "px-4 py-3 align-top text-right text-slate-300 tabular-nums" ] [ text pace ]
+
+        plannedCell =
+            Html.td [ class "px-4 py-3 align-top text-right" ] [ timeCell ]
+
+        actualCells =
+            case race.actualSplits of
+                Just actual ->
+                    let
+                        maybeActualS =
+                            Dict.get km.index actual.splits
+
+                        actualCell =
+                            Html.td [ class "px-4 py-3 align-top text-right text-slate-200 tabular-nums" ]
+                                [ case maybeActualS of
+                                    Just s ->
+                                        text (formatMmss s)
+
+                                    Nothing ->
+                                        span [ class "text-slate-700" ] [ text "—" ]
+                                ]
+
+                        diffCell =
+                            Html.td [ class "px-4 py-3 align-top text-right tabular-nums" ]
+                                [ case maybeActualS of
+                                    Just s ->
+                                        let
+                                            diff =
+                                                s - result.seconds
+
+                                            ( tone, prefix ) =
+                                                if diff > 0 then
+                                                    ( "text-rose-300", "+" )
+
+                                                else if diff < 0 then
+                                                    ( "text-emerald-300", "−" )
+
+                                                else
+                                                    ( "text-slate-400", "" )
+                                        in
+                                        span [ class tone ]
+                                            [ text (prefix ++ formatMmss (abs diff)) ]
+
+                                    Nothing ->
+                                        span [ class "text-slate-700" ] [ text "—" ]
+                                ]
+                    in
+                    [ actualCell, diffCell ]
+
+                Nothing ->
+                    []
+
+        cumCell =
+            Html.td [ class "px-4 py-3 align-top text-right text-slate-300 tabular-nums" ]
+                [ text (formatHmsLong cumulative) ]
+
+        notesCell =
+            Html.td [ class "px-4 py-3 align-top text-slate-400 text-xs" ]
+                [ if List.isEmpty stops && String.isEmpty notes then
+                    span [ class "text-slate-700" ] [ text "—" ]
+
+                  else
+                    div [ class "space-y-1" ]
+                        (List.map
+                            (\a ->
+                                div [ class "text-amber-300" ]
+                                    [ text ("★ " ++ a.name ++ " · +" ++ formatRest a.restSeconds) ]
+                            )
+                            stops
+                            ++ (if String.isEmpty notes then
+                                    []
+
+                                else
+                                    [ p [ class "text-slate-400 line-clamp-2" ] [ text notes ] ]
+                               )
+                        )
+                ]
+    in
     Html.tr
         [ class "border-t border-slate-800 hover:bg-slate-950/60 transition-colors cursor-pointer"
         , onClick (NavigateTo (Route.PlanKm race.id km.index))
         , A.attribute "role" "link"
         , A.attribute "tabindex" "0"
         ]
-        [ Html.td [ class "px-4 py-3 align-top tabular-nums text-slate-300 font-medium" ]
-            [ text (String.fromInt (km.index + 1)) ]
-        , Html.td [ class "px-4 py-3 align-top text-slate-400 tabular-nums whitespace-nowrap" ]
-            [ text
-                (formatFloat 2 (km.distStart / 1000)
-                    ++ " → "
-                    ++ formatFloat 2 (km.distEnd / 1000)
-                    ++ " km"
-                )
-            ]
-        , Html.td [ class "px-4 py-3 align-top text-right tabular-nums" ]
-            [ span
-                [ classList
-                    [ ( "font-medium", True )
-                    , ( "text-rose-300", deltaEle > 0 )
-                    , ( "text-emerald-300", deltaEle < 0 )
-                    , ( "text-slate-400", deltaEle == 0 )
-                    ]
-                ]
-                [ text
-                    ((if deltaEle > 0 then
-                        "+"
-
-                      else
-                        ""
-                     )
-                        ++ formatInt deltaEle
-                        ++ " m"
-                    )
-                ]
-            ]
-        , Html.td [ class "px-4 py-3 align-top" ]
-            [ let
-                ( gLabel, gTone ) =
-                    gradeClass km.slope
-              in
-              span
-                [ class
-                    ("inline-flex items-center px-2 py-0.5 rounded text-[10px] uppercase tracking-wider whitespace-nowrap ring-1 ring-inset "
-                        ++ gTone
-                    )
-                ]
-                [ text gLabel ]
-            ]
-        , Html.td [ class "px-4 py-3 align-top text-right text-slate-300 tabular-nums" ] [ text pace ]
-        , Html.td [ class "px-4 py-3 align-top text-right" ] [ timeCell ]
-        , Html.td [ class "px-4 py-3 align-top text-right text-slate-300 tabular-nums" ]
-            [ text (formatHmsLong cumulative) ]
-        , Html.td [ class "px-4 py-3 align-top text-slate-400 text-xs" ]
-            [ if List.isEmpty stops && String.isEmpty notes then
-                span [ class "text-slate-700" ] [ text "—" ]
-
-              else
-                div [ class "space-y-1" ]
-                    (List.map
-                        (\a ->
-                            div [ class "text-amber-300" ]
-                                [ text ("★ " ++ a.name ++ " · +" ++ formatRest a.restSeconds) ]
-                        )
-                        stops
-                        ++ (if String.isEmpty notes then
-                                []
-
-                            else
-                                [ p [ class "text-slate-400 line-clamp-2" ] [ text notes ] ]
-                           )
-                    )
-            ]
-        ]
+        ([ kmCell, spanCell, eleCell, gradeCell, paceCell, plannedCell ]
+            ++ actualCells
+            ++ [ cumCell, notesCell ]
+        )
 
 
 viewSectionTable : Race -> List Km -> Dict Int KmResult -> Html Msg

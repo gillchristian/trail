@@ -518,3 +518,22 @@ Wrote `knowledge/reference/cadence-backend-spec-addendum-1-profile-scope.md` —
 - The pill ring outline (`ring-1 ring-inset`) was the right call — flat-fill backgrounds (`bg-rose-500/15`) alone don't read on the hover-darkened row. The ring gives the pill enough edge to survive `:hover bg-slate-950/60`.
 - Cutoffs ±4 % and ±10 % match the spec table cleanly. The boundary semantics (`>=` for climbs, `>` for the runnable band so 0.04 is "Climb" not "Runnable") mirror the Δ ele cell which uses `> 0` / `< 0` / `== 0`.
 **Next:** TASK-016 — planned-vs-actual via manual GPX upload. The math (parse actual GPX, snap to course, compute per-km actual splits at the *planned* km boundaries, render diff column) is identical regardless of where the GPX came from — the file picker path is what we ship; TASK-021 later swaps the source for Strava streams.
+
+---
+## 2026-05-15 19:30 — TASK-016: planned-vs-actual via manual GPX
+
+**Task:** TASK-016 (largest single trail-side feature in the roadmap; first piece of the comparison/calibration arc).
+**What I did:** New `ActualGpx.elm` (parser for GPX with `<time>` tags + interpolated per-km split computation + Hinnant ISO 8601 → seconds without a date library). `Types.Race` gains `actualSplits : Maybe ActualSplits` with `{splits, totalSeconds, totalDistance, uploadedAt}`; back-compat decoder defaults to `Nothing`. Plan-table page gained a `viewActualRunStrip` between the target panel and the table tabs: collapsed "Link actual run" CTA when nothing's linked; expanded summary (total time, total distance, ±vs target delta) + Replace/Unlink buttons when linked. km-table grows two columns when actualSplits is present: "Actual" (mm:ss) and "Δ vs plan" (rose-when-slower / emerald-when-faster, with `+`/`−` sign). viewKmRow refactored from a flat `<td>` list to named `let`-bindings + `List.concat` so the optional cells splice cleanly.
+**What I verified:**
+- `npm run build` exit 0. JS 289.02 → 296.31 kB (+7.3 KB); gzip 90.74 → 92.89 kB. No warnings.
+- Bundle string check: 8 new labels (`Link actual run`, `Upload .gpx`, `Actual run linked`, `Distance run`, `vs Target`, `Replace`, `Unlink`, `Δ vs plan`).
+- ISO 8601 conversion arithmetic walked through `2026-05-15T14:30:00Z`: days-since-epoch = 20588 (Hinnant), seconds-since-epoch = 1,779,580,200. Independently verified by raw `(56 years × 365) + 14 leap days + 134 day-of-year days = 20588`. Match.
+- Synthetic split sanity-check: 3 points at distances `{0, 1000, 2000}` m and elapsedS `{0, 300, 570}` → splits `{0: 300, 1: 270}` (km1 5:00, km2 4:30). The interpolating algorithm reduces correctly when boundaries land exactly on point distances.
+- **In-browser visual check NOT performed.** User will exercise the file picker + diff column on their actual race GPX before trusting the splits.
+**What changed in the repo:** PR #19. New `src/ActualGpx.elm`. Modified `src/Types.elm` (Race field + codecs), `src/Main.elm` (import, Msg variants, update handlers, plan-table strip + km-table cells, buildDraftRace + Model `actualRunError`). `elm.json` moved `elm/time` to direct deps.
+**What I learned:**
+- Elm rejects 4-tuples (only 2 and 3). Caught the parser by surprise mid-build; fixed by switching the raw-point intermediate to a small record.
+- The straightforward "split = elapsedS at point - prevSplit elapsedS" algorithm dumps all time into one km when a single point straddles multiple km boundaries (sparse Coros tracks). Linear interpolation at each boundary crossing keeps the splits reasonable.
+- Adding a Maybe field to a long record-shaped value requires touching the encoder, the decoder, the core builder, `buildDraftRace`, and the model. The Elm compiler caught every site; nothing slipped.
+- Splits are computed against *actual* track distance, not the planned course. v2/TASK-021 can snap to planned km boundaries via Haversine when we want "where on the planned course was I at each plan-km" semantics. For now "how fast did each km of my actual trace go" is the right answer.
+**Next:** TASK-017 (profile data model + IDB + settings page) — foundation for the predictor arc (TASK-018, TASK-019, TASK-020). No Strava deps; ~60-90 min of UI + storage shape work.
