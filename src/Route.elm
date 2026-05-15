@@ -25,6 +25,7 @@ type Route
     | RaceMap RaceId
     | PlanTable RaceId
     | PlanKm RaceId Int
+    | PlanSection RaceId Int
     | NotFound
 
 
@@ -84,6 +85,18 @@ fromUrl url =
                         _ ->
                             NotFound
 
+                [ "race", id, "plan", "section", secStr ] ->
+                    case ( String.isEmpty id, String.toInt secStr ) of
+                        ( False, Just sec ) ->
+                            if sec >= 0 then
+                                PlanSection (raceIdFromString id) sec
+
+                            else
+                                NotFound
+
+                        _ ->
+                            NotFound
+
                 _ ->
                     NotFound
 
@@ -125,6 +138,9 @@ toString route =
 
         PlanKm id km ->
             "#/race/" ++ raceIdToString id ++ "/plan/" ++ String.fromInt km
+
+        PlanSection id sec ->
+            "#/race/" ++ raceIdToString id ++ "/plan/section/" ++ String.fromInt sec
 
         NotFound ->
             "#/404"

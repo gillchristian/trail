@@ -394,3 +394,31 @@ Append-only. Newest at the bottom. Each entry is a snapshot for future-me with n
 - For "fixed card shape with 1:1 elevation", the right move is to use the *race*'s max-range, not the current km's. That keeps the shape consistent and lets the user read flatness/steepness visually by how much headroom the silhouette leaves.
 
 **Next:** Per-section card view (the deferred part of feedback item #6). Then "more gamification" pass if the user comes back with more.
+
+---
+## 2026-05-15 08:30 — Per-section card view
+
+**Task:** the deferred part of feedback item #6 — a per-section card view.
+
+**What I did:**
+- New route `Route.PlanSection RaceId Int` → URL `#/race/:id/plan/section/:idx`. `Route.elm` parser + writer updated; `currentRace` extended; `viewContent` dispatch added.
+- `viewPlanSection` renders a two-column layout:
+  - **Left**: the section card (440 px wide). Header shows the section label and a small "section · X km wide · scale Y m/px" note (we drop the strict 1:1 here because sections span 1-15 km; per-km cards keep 1:1 as before). Mini-profile uses a per-section `mPerPx` that fits the whole section into the card width. Footer shows min / max / end elevation.
+  - **Right**: section plan panel — distance, time, pace, contained-km count; an amber "Ends at" card for the next aid station with its services and an "Edit aid station →" link back to race detail; or "🏁 This section finishes the race." for the final section. Below, a clickable list of contained kms with their times + auto/manual badges + `›` chevron.
+  - Prev / Next section nav with fixed-width buttons (210 px each).
+- **Section table rows now clickable**: every section row in `viewSectionTable` carries `onClick (NavigateTo (Route.PlanSection …))` + `role="link"` + `tabindex="0"`. Tapping a row opens the section card; tapping the aid-rest row does nothing (it's the rest, not the section).
+- `sectionsWithCumulative` retyped from `Html msg` to `Html Msg` to allow the new click handler.
+
+**What I verified:**
+- `npm run build` → exit 0. JS `286.85 kB / gzip 90.07 kB`, CSS `57.44 kB / gzip 14.13 kB`.
+- `npm run smoke` → still passes (no storage layer changes).
+- Cross-link integrity: from per-km card you can hit "Back to table"; from any km row in section card → opens that km's card; from "Back to table" → returns to the table view, etc.
+- `Planning.sectionsForRace` already returns `Section { kmIndices : List Int }` so listing contained kms is a `List.filter` away. No new math.
+
+**What changed in the repo:** PR #13 (URL after push). Modified: `src/Route.elm`, `src/Main.elm` (currentRace, viewContent, viewPlanSection + section-card SVG, section-table row click handler).
+
+**What I learned:**
+- Section card breaking the 1:1 invariant is the right call — a 12 km section drawn at 3 m/px (the km card scale) would be 4000 px wide. The user's mental model for sections is "what does this stretch between aids look like overall," not "what does it physically look like at unit scale."
+- Routes-with-id helpers (like `currentRace`) need to enumerate every variant explicitly. Burned by this twice in two PRs; that's the lesson confirmed.
+
+**Next:** "More gamification" pass — small polish (section-count badges on race cards, animated reveal on section card, refined cluster icons on map) if the user comes back with more. Otherwise idle.

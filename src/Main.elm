@@ -960,6 +960,9 @@ currentRace model =
         Route.PlanKm rid _ ->
             lookup rid
 
+        Route.PlanSection rid _ ->
+            lookup rid
+
         _ ->
             Nothing
 
@@ -1243,6 +1246,9 @@ title route =
         Route.PlanKm _ _ ->
             "Trail — plan km"
 
+        Route.PlanSection _ _ ->
+            "Trail — plan section"
+
         Route.NotFound ->
             "Trail — not found"
 
@@ -1277,6 +1283,9 @@ viewHeader route =
 
                         Route.PlanKm _ _ ->
                             "Plan · per km."
+
+                        Route.PlanSection _ _ ->
+                            "Plan · section."
 
                         Route.NotFound ->
                             "Lost?"
@@ -1370,6 +1379,14 @@ viewContent model =
             case findRace rid races of
                 Just race ->
                     viewPlanKm model race kmIndex
+
+                Nothing ->
+                    viewRaceNotFound
+
+        ( Route.PlanSection rid secIndex, LoadedRaces races ) ->
+            case findRace rid races of
+                Just race ->
+                    viewPlanSection model race secIndex
 
                 Nothing ->
                     viewRaceNotFound
@@ -2864,8 +2881,8 @@ viewSectionTable race kms results =
         ]
 
 
-sectionsWithCumulative : Race -> Dict Int KmResult -> List Planning.Section -> List (Html msg)
-sectionsWithCumulative _ results sections =
+sectionsWithCumulative : Race -> Dict Int KmResult -> List Planning.Section -> List (Html Msg)
+sectionsWithCumulative race results sections =
     let
         go section ( running, acc ) =
             let
@@ -2889,13 +2906,18 @@ sectionsWithCumulative _ results sections =
                     paceMinPerKm sectionSeconds section.distance
 
                 sectionRow =
-                    Html.tr [ class "border-t border-slate-800" ]
-                        [ Html.td [ class "px-4 py-3 text-slate-200" ] [ text section.label ]
+                    Html.tr
+                        [ class "border-t border-slate-800 hover:bg-slate-950/60 transition-colors cursor-pointer"
+                        , onClick (NavigateTo (Route.PlanSection race.id section.index))
+                        , A.attribute "role" "link"
+                        , A.attribute "tabindex" "0"
+                        ]
+                        [ Html.td [ class "px-4 py-3 text-white font-medium" ] [ text section.label ]
                         , Html.td [ class "px-4 py-3 text-right text-slate-300 tabular-nums" ] [ text (formatFloat 2 (section.distance / 1000) ++ " km") ]
                         , Html.td [ class "px-4 py-3 text-right text-rose-300 tabular-nums" ] [ text (formatInt section.gain ++ " m+") ]
                         , Html.td [ class "px-4 py-3 text-right text-emerald-300 tabular-nums" ] [ text (formatInt section.loss ++ " m−") ]
                         , Html.td [ class "px-4 py-3 text-right text-slate-300 tabular-nums" ] [ text pace ]
-                        , Html.td [ class "px-4 py-3 text-right text-slate-100 font-medium tabular-nums" ] [ text (formatHmsLong sectionSeconds) ]
+                        , Html.td [ class "px-4 py-3 text-right text-white font-medium tabular-nums" ] [ text (formatHmsLong sectionSeconds) ]
                         , Html.td [ class "px-4 py-3 text-right text-slate-300 tabular-nums" ] [ text (formatHmsLong runningAfterSection) ]
                         ]
 
@@ -2922,6 +2944,389 @@ sectionsWithCumulative _ results sections =
             List.foldl go ( 0, [] ) sections
     in
     List.reverse rowsRev
+
+
+
+-- PER-SECTION CARD VIEW
+
+
+viewPlanSection : Model -> Race -> Int -> Html Msg
+viewPlanSection model race secIndex =
+    let
+        kms =
+            Dict.get (raceIdToString race.id) model.kmsCache
+                |> Maybe.withDefault []
+
+        aidRest =
+            Planning.aidRestTotal race.aidStations
+
+        results =
+            Planning.distribute
+                { target = race.plan.targetSeconds
+                , kms = kms
+                , plan = race.plan
+                , aidRestSeconds = aidRest
+                }
+
+        sections =
+            Planning.sectionsForRace
+                { totalDistance = race.distance
+                , aidStations = race.aidStations
+                , kms = kms
+                }
+
+        section =
+            sections
+                |> List.filter (\s -> s.index == secIndex)
+                |> List.head
+
+        prevIndex =
+            if secIndex <= 0 then
+                Nothing
+
+            else
+                Just (secIndex - 1)
+
+        nextIndex =
+            if secIndex + 1 >= List.length sections then
+                Nothing
+
+            else
+                Just (secIndex + 1)
+    in
+    div [ class "max-w-screen-2xl mx-auto mt-8 px-6 space-y-6" ]
+        [ viewPlanCrumb race
+        , div [ class "flex items-end justify-between gap-4 flex-wrap" ]
+            [ h1 [ class "text-3xl font-bold tracking-tight text-white" ]
+                [ text ("Section " ++ String.fromInt (secIndex + 1) ++ " of " ++ String.fromInt (List.length sections)) ]
+            , a [ Route.href (Route.PlanTable race.id), class "text-sm text-slate-400 hover:text-slate-100" ]
+                [ text "Back to table" ]
+            ]
+        , case section of
+            Nothing ->
+                div [ class "rounded-2xl bg-slate-900 border border-slate-800 p-10 text-center text-slate-500" ]
+                    [ text "This section doesn't exist in this race." ]
+
+            Just s ->
+                viewSectionCardAndDetails model race kms results s prevIndex nextIndex
+        ]
+
+
+viewSectionCardAndDetails :
+    Model
+    -> Race
+    -> List Km
+    -> Dict Int KmResult
+    -> Planning.Section
+    -> Maybe Int
+    -> Maybe Int
+    -> Html Msg
+viewSectionCardAndDetails _ race kms results section prevIndex nextIndex =
+    let
+        containedKms =
+            kms |> List.filter (\km -> List.member km.index section.kmIndices)
+
+        sectionSeconds =
+            section.kmIndices
+                |> List.filterMap (\idx -> Dict.get idx results)
+                |> List.foldl (\r sum -> sum + r.seconds) 0
+
+        sectionPace =
+            paceMinPerKm sectionSeconds section.distance
+
+        navLink labelText maybeIdx =
+            case maybeIdx of
+                Just idx ->
+                    a
+                        [ Route.href (Route.PlanSection race.id idx)
+                        , class "px-4 py-2 text-sm border border-slate-700 rounded-md hover:bg-slate-800 hover:border-slate-600 text-slate-200 w-[210px] text-center"
+                        ]
+                        [ text labelText ]
+
+                Nothing ->
+                    span
+                        [ class "px-4 py-2 text-sm border border-slate-800 rounded-md text-slate-600 cursor-not-allowed w-[210px] text-center" ]
+                        [ text labelText ]
+    in
+    div [ class "grid grid-cols-1 lg:grid-cols-2 gap-6 items-start" ]
+        [ div [ class "flex flex-col items-center gap-4 lg:sticky lg:top-24" ]
+            [ viewSectionCard section containedKms
+            , div [ class "flex gap-3 justify-between" ]
+                [ navLink "← Prev section" prevIndex
+                , navLink "Next section →" nextIndex
+                ]
+            ]
+        , viewSectionDetails race section containedKms results sectionSeconds sectionPace
+        ]
+
+
+viewSectionCard : Planning.Section -> List Km -> Html msg
+viewSectionCard section containedKms =
+    let
+        cardWidth =
+            440.0
+
+        chartPadH =
+            16.0
+
+        chartWidth =
+            cardWidth - chartPadH * 2
+
+        -- The whole section is meant to fit in one card, so we drop 1:1
+        -- here and use a per-section mPerPx instead. A note on the card
+        -- makes the change of scale explicit.
+        mPerPx =
+            if section.distance <= 0 then
+                1
+
+            else
+                section.distance / chartWidth
+
+        eleRange =
+            containedKms
+                |> List.foldl
+                    (\km ( lo, hi ) -> ( min lo km.minEle, max hi km.maxEle ))
+                    ( 1.0e9, -1.0e9 )
+
+        ( minEle, maxEle ) =
+            if List.isEmpty containedKms then
+                ( 0, 0 )
+
+            else
+                eleRange
+
+        eleSpan =
+            max 1 (maxEle - minEle)
+
+        chartHeight =
+            max 90 (min 240 (eleSpan / mPerPx))
+
+        chartTopPad =
+            14
+
+        chartBottomPad =
+            22
+
+        chartTotalHeight =
+            chartTopPad + chartHeight + chartBottomPad
+
+        elevBaseline =
+            chartTopPad + chartHeight
+
+        toX d =
+            -- d is absolute distance from start; subtract section start.
+            chartPadH + (d - section.distStart) / mPerPx
+
+        toY ele =
+            elevBaseline - (ele - minEle) * (chartHeight / eleSpan)
+
+        coords =
+            containedKms
+                |> List.concatMap
+                    (\km ->
+                        List.map2 (\d p -> ( toX (km.distStart + d), toY p.ele )) km.cumDist km.points
+                    )
+
+        pathD =
+            buildAreaPathLocal coords elevBaseline
+
+        strokeD =
+            buildStrokePathLocal coords
+
+        sectionGain =
+            section.gain
+
+        sectionLoss =
+            section.loss
+    in
+    div
+        [ class "relative bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden flex flex-col"
+        , A.style "width" (String.fromFloat cardWidth ++ "px")
+        ]
+        [ div [ class "px-5 pt-4 pb-3 border-b border-slate-800" ]
+            [ p [ class "text-xs uppercase tracking-wider text-slate-500" ]
+                [ text
+                    ("Section · "
+                        ++ formatFloat 1 (section.distance / 1000)
+                        ++ " km wide · scale "
+                        ++ formatFloat 1 mPerPx
+                        ++ " m/px"
+                    )
+                ]
+            , p [ class "mt-1 text-2xl font-semibold text-white" ] [ text section.label ]
+            , div [ class "mt-2 flex items-baseline gap-3 text-sm tabular-nums" ]
+                [ span [ class "text-rose-300" ] [ text ("+" ++ formatInt sectionGain ++ " m") ]
+                , span [ class "text-emerald-300" ] [ text ("−" ++ formatInt sectionLoss ++ " m") ]
+                ]
+            ]
+        , div [ class "flex-1" ]
+            [ Svg.svg
+                [ SA.width (String.fromFloat cardWidth)
+                , SA.height (String.fromFloat chartTotalHeight)
+                , SA.viewBox ("0 0 " ++ String.fromFloat cardWidth ++ " " ++ String.fromFloat chartTotalHeight)
+                , A.style "display" "block"
+                ]
+                [ Svg.defs []
+                    [ Svg.linearGradient
+                        [ SA.id ("sec-fill-" ++ String.fromInt section.index)
+                        , SA.x1 "0"
+                        , SA.y1 "0"
+                        , SA.x2 "0"
+                        , SA.y2 "1"
+                        ]
+                        [ Svg.stop [ SA.offset "0%", SA.stopColor "#E52E3A", SA.stopOpacity "0.7" ] []
+                        , Svg.stop [ SA.offset "100%", SA.stopColor "#E52E3A", SA.stopOpacity "0.05" ] []
+                        ]
+                    ]
+                , Svg.path
+                    [ SA.d pathD
+                    , SA.fill ("url(#sec-fill-" ++ String.fromInt section.index ++ ")")
+                    , SA.stroke "none"
+                    ]
+                    []
+                , Svg.path
+                    [ SA.d strokeD
+                    , SA.fill "none"
+                    , SA.stroke "#ff5f6a"
+                    , SA.strokeWidth "1.8"
+                    , SA.strokeLinejoin "round"
+                    , SA.strokeLinecap "round"
+                    ]
+                    []
+                ]
+            ]
+        , div [ class "px-5 py-3 border-t border-slate-800 flex items-baseline justify-between text-xs text-slate-400 tabular-nums" ]
+            [ span [] [ text (formatInt minEle ++ " m") ]
+            , span [ class "text-amber-400" ] [ text ("⤒ " ++ formatInt maxEle ++ " m") ]
+            , span [] [ text (formatInt maxEle ++ " m") ]
+            ]
+        ]
+
+
+viewSectionDetails :
+    Race
+    -> Planning.Section
+    -> List Km
+    -> Dict Int KmResult
+    -> Int
+    -> String
+    -> Html Msg
+viewSectionDetails race section containedKms results sectionSeconds sectionPace =
+    div [ class "space-y-4" ]
+        [ div [ class "rounded-2xl bg-slate-900 border border-slate-800 p-5 space-y-4" ]
+            [ h3 [ class "text-base font-semibold text-white" ] [ text "Section plan" ]
+            , div [ class "grid grid-cols-2 sm:grid-cols-4 gap-3 tabular-nums" ]
+                [ smallStat "Distance" (formatFloat 1 (section.distance / 1000)) "km"
+                , smallStat "Time" (formatHmsLong sectionSeconds) ""
+                , smallStat "Pace" sectionPace "/km"
+                , smallStat "Kms"
+                    (String.fromInt (List.length containedKms))
+                    ""
+                ]
+            , case section.followedByAid of
+                Just aid ->
+                    div [ class "rounded-xl bg-amber-400/5 border border-amber-400/30 p-4 space-y-2" ]
+                        [ p [ class "text-xs uppercase tracking-wider text-amber-300" ]
+                            [ text "Ends at" ]
+                        , div [ class "flex items-baseline justify-between gap-3 flex-wrap" ]
+                            [ p [ class "text-lg font-semibold text-white" ] [ text aid.name ]
+                            , p [ class "text-sm text-amber-200 tabular-nums" ]
+                                [ text (formatFloat 1 (aid.distance / 1000) ++ " km · " ++ formatRest aid.restSeconds) ]
+                            ]
+                        , if List.isEmpty aid.services then
+                            text ""
+
+                          else
+                            p [ class "flex gap-2 text-lg" ]
+                                (List.map
+                                    (\s ->
+                                        span [ A.title (serviceLabel s) ]
+                                            [ text (serviceIcon s) ]
+                                    )
+                                    aid.services
+                                )
+                        , a
+                            [ Route.href (Route.RaceDetail race.id)
+                            , class "inline-block text-xs text-amber-300 hover:text-amber-200 underline"
+                            ]
+                            [ text "Edit aid station →" ]
+                        ]
+
+                Nothing ->
+                    div [ class "rounded-xl bg-slate-950 border border-slate-800 p-4 text-sm text-slate-400" ]
+                        [ text "🏁 This section finishes the race." ]
+            ]
+        , div [ class "rounded-2xl bg-slate-900 border border-slate-800 p-5 space-y-3" ]
+            [ h3 [ class "text-base font-semibold text-white" ] [ text "Kilometers in this section" ]
+            , div [ class "divide-y divide-slate-800" ]
+                (List.map (viewSectionKmRow race results) containedKms)
+            ]
+        ]
+
+
+viewSectionKmRow : Race -> Dict Int KmResult -> Km -> Html Msg
+viewSectionKmRow race results km =
+    let
+        result =
+            Dict.get km.index results
+                |> Maybe.withDefault { seconds = 0, source = AutoComputed }
+
+        deltaEle =
+            km.eleEnd - km.eleStart
+
+        pace =
+            paceMinPerKm result.seconds km.distance
+    in
+    a
+        [ Route.href (Route.PlanKm race.id km.index)
+        , class "flex items-center gap-4 py-3 px-1 hover:bg-slate-950/40 -mx-1 transition-colors rounded-md cursor-pointer"
+        ]
+        [ div [ class "flex items-center justify-center w-9 h-9 rounded-full bg-rose-500/15 border border-rose-500/40 text-rose-300 text-xs font-semibold flex-shrink-0" ]
+            [ text (String.fromInt (km.index + 1)) ]
+        , div [ class "min-w-0 flex-1" ]
+            [ p [ class "text-sm text-white font-medium tabular-nums" ]
+                [ text
+                    (formatFloat 2 (km.distStart / 1000)
+                        ++ " → "
+                        ++ formatFloat 2 (km.distEnd / 1000)
+                        ++ " km"
+                    )
+                ]
+            , p [ class "text-xs text-slate-500 tabular-nums" ]
+                [ text
+                    ((if deltaEle >= 0 then
+                        "+"
+
+                      else
+                        ""
+                     )
+                        ++ formatInt deltaEle
+                        ++ " m · "
+                        ++ pace
+                        ++ "/km"
+                    )
+                ]
+            ]
+        , div [ class "flex items-baseline gap-2 tabular-nums" ]
+            [ span [ class "text-sm text-white font-medium" ] [ text (formatMmss result.seconds) ]
+            , span
+                [ classList
+                    [ ( "text-[10px] uppercase tracking-wider", True )
+                    , ( "text-amber-300", result.source == UserManual )
+                    , ( "text-slate-600", result.source == AutoComputed )
+                    ]
+                ]
+                [ text
+                    (if result.source == UserManual then
+                        "M"
+
+                     else
+                        "A"
+                    )
+                ]
+            ]
+        , span [ class "text-slate-500 text-sm" ] [ text "›" ]
+        ]
 
 
 
