@@ -124,3 +124,35 @@ Append-only. Newest at the bottom. Each entry is a snapshot for future-me with n
 - For the rate-limit logger, kept the parsing tolerant: if the headers aren't a strict `int,int` pair we just don't log anything. Production traffic shouldn't depend on Strava header shape.
 **Next:** TASK-005 — `GET /api/athlete` pass-through with 24h cache. Reuse `activity_cache` with `-athleteID` sentinel to avoid a fresh migration.
 
+---
+## 2026-05-15 17:25 — TASK-005 shipped: athlete pass-through
+
+**Task:** TASK-005 (PR #6, merge sha `c21d44b`, https://github.com/gillchristian/strava/pull/6).
+**What I did:** Added `strava.Client.FetchAthlete(accessToken)` — single GET to `/athlete`, returns bytes + headers verbatim, calls `LogRateLimit`. Extended `ActivityCacheStore` with `GetAthlete`/`SetAthlete` thin wrappers that key the existing `activity_cache` table at `-athleteID` (Strava activity ids are positive, so the sentinel never collides). New `handlers/athlete.go` does auth → cache lookup (24h TTL via injectable clock) → Strava fetch on miss → cache write on success. Returns `X-Data-Source: cache` when served from cache, `X-Data-Source: strava` on refresh. Wired in `main.go`. Tests cover the TTL boundary table + the clock-injection contract.
+**What I verified:**
+- `go build -tags fts5 .` + `go vet -tags fts5 ./...` clean.
+- `go test -tags fts5 ./...` — all PASS.
+- Live HTTP smoke (seeded `tokens` + `sessions` with athlete_id=777, session=`SESS`, fake creds):
+  - No auth / bogus session → 401.
+  - Cache miss → Strava → 502 (logged `Athlete fetch error: strava athlete error: 401`).
+  - After seeding `INSERT INTO activity_cache (activity_id, response_json, cached_at) VALUES (-777, '{...}', now)` → 200 with `X-Data-Source: cache` and the seeded JSON body verbatim.
+  - `UPDATE activity_cache SET cached_at = 0 WHERE activity_id = -777` then re-call → falls through to Strava → 502. TTL gating works.
+  - `SELECT activity_id FROM activity_cache` → only `-777`. Sentinel doesn't collide with positive activity ids.
+- Failed Strava responses are not cached — only successful bodies overwrite `activity_cache`.
+**What changed in the repo:** `server/strava/client.go` (`FetchAthlete`), `server/store/activity_cache.go` (sentinel + 2 wrappers), `server/handlers/athlete.go` (new), `server/handlers/athlete_test.go` (new), `server/main.go` (handler + route).
+**What I learned:**
+- Reusing `activity_cache` at a negative sentinel was a clean way to avoid a migration. Documented the rationale in a one-liner above `athleteCacheKey` so a future reader doesn't go hunting for an athlete_cache table.
+- Injecting `now func() time.Time` on the handler kept the freshness test trivial — no real `time.Sleep` and the boundary cases (exactly-at-TTL is stale; 1s-under-TTL is fresh) are easy to assert.
+**Next:** Trail-integration backlog is complete (TASK-001..005). The corresponding consumer-side work lives in trail (TASK-024 in its BACKLOG). On the cadence side, BACKLOG is empty until new work arrives.
+
+---
+## 2026-05-15 17:35 — Close out trail-integration backlog
+
+**Task:** post-merge cleanup (no TASK-NNN).
+**What I did:** Folded the TASK-005 retro into `knowledge/progress/journal.md`, added it to `DONE.md`, cleared `CURRENT.md` back to its template-only state, and moved the five completed TASK-001..005 entries from `planning/BACKLOG.md` (which was the trail-integration arc) into a "Shipped (trail-integration)" section so future readers see at a glance that the arc is done.
+**What I verified:** No code changed. `git diff --stat` against master shows only the four planning/progress files touched. All five trail-spec PRs are on master in order: PR#2 (`3e85f86`), PR#3 (`1788389`), PR#4 (`a68896e`), PR#5 (`590c52c`), PR#6 (`c21d44b`).
+**What changed in the repo:** `knowledge/planning/CURRENT.md`, `knowledge/planning/BACKLOG.md`, `knowledge/planning/DONE.md`, `knowledge/progress/journal.md`.
+**What I learned:**
+- The "carry the prior task's retro into the next PR" convention worked well for chaining tasks but leaves the *last* task's retro to a dedicated closeout PR. Worth it — keeps each task's retro adjacent to a real code change instead of in a trailing master push.
+**Next:** Backlog is empty. New work will be promoted from a future BACKLOG addition (cadence-only ideas, or a fresh upstream spec from trail).
+
