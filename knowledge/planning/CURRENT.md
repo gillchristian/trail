@@ -4,7 +4,7 @@
 
 ## Active
 
-_(none — TASK-002 closing out via the open PR; TASK-003 will move here next)_
+_(none — TASK-014 shipped; TASK-015 or TASK-017 next)_
 
 ## Template for a task entry
 

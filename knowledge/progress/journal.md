@@ -464,3 +464,21 @@ Append-only. Newest at the bottom. Each entry is a snapshot for future-me with n
 - The spec pointer pattern (absolute path to `trail/knowledge/reference/cadence-backend-spec.md`) works because both repos sit under `~/dev/`. If we ever rename or move repos, those references need updating in cadence's knowledge/.
 - Cadence's existing commit history is loose (short subject lines, no bodies). The new PR workflow tightens this from now on; I added explicit "don't backfill old commits" guidance in `working-style.md` so the cadence agent doesn't try to clean history.
 **Next:** Hand-off ready. The user can now: open a Claude Code session in `~/dev/cadence/`, ask it to read `knowledge/README.md`, and start TASK-001. The trail spec at `~/dev/trail/knowledge/reference/cadence-backend-spec.md` remains the canonical contract.
+
+---
+## 2026-05-15 15:50 — TASK-014: course summary card additions
+
+**Task:** TASK-014 (first concrete slice from the pace-prediction roadmap).
+**What I did:** Added three pure helpers in `Main.elm` (`elevationDensity`, `densityLabel`, `equivalentFlatKm`) near `distanceCategory`. Modified `viewRaceCard` so the category-label line now reads `SHORT · MOUNTAINOUS · 41 m/km` with a colour-coded density bucket (slate → amber → rose as density climbs). Modified `viewRaceDetail` so the header stat grid grew from 3 to 5 cells — added `Density` and `Flat eq.` next to Distance / Gain / Loss. Grid responsive: `grid-cols-3` on mobile/tablet (wraps to two rows with the new cells), `grid-cols-5` on `lg+`.
+**What I verified:**
+- `npm run build` → exit 0. JS 286.85 → 288.34 kB (+1.5 KB); gzip 90.07 → 90.53 kB. "Success! Compiled 1 module." No warnings.
+- Bundle string presence: `grep -o "Mountainous\|Flat eq.\|Density\|..." dist/assets/index-*.js` returned all 7 expected new strings.
+- `npm run dev` → "VITE v6.4.2 ready in 127 ms"; `curl -sf localhost:5173/` returned 200 (1037 bytes shell — full UI is client-rendered).
+- **Did NOT do** an in-browser visual check — no GUI in this session. Build + bundle-string + dev-server-starts is the strongest verification I can do here. The pattern matches prior trail PRs that landed when the same constraint applied.
+- Arithmetic sanity: UTMB-shape (174 km / 9900 m / 9900 m) → density 57 m/km "Very mountainous", flat-eq 282.9 km. Matches spec §11.A.
+**What changed in the repo:** PR #16. Modified: `src/Main.elm` (three helpers added near `distanceCategory`; `viewRaceCard` category-label paragraph extended; `viewRaceDetail` stat grid changed). Reset `knowledge/planning/CURRENT.md` to empty. Added entry to `knowledge/planning/DONE.md`.
+**What I learned:**
+- Kept the three helpers inline in `Main.elm` per the project's "three usages before extraction" rule (current usages: 2 — card + detail). The predictor work in TASK-018 will be the third caller; that's the right moment to extract `Stats.elm`.
+- The spec's `§4.5` named examples (UTMB at "40–55 m/km Mountainous") and the math anchors disagree slightly: UTMB by the cutoffs is "Very mountainous" (~57 m/km). Treated the cutoffs as the contract; the named examples are approximate.
+- The cadence agent was still mid-work on its TASK-001 when this shipped. trail and cadence make progress in parallel; their PRs don't interact because cadence's work is purely backend.
+**Next:** TASK-015 (per-km segment classification by grade) or TASK-017 (profile data model). TASK-015 is the smaller follow-on; TASK-017 unlocks TASK-018 (predictor) which is the larger arc. Pick at the next prompt.

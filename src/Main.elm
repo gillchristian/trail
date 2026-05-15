@@ -1563,8 +1563,18 @@ viewRaceCard maybeTrack race =
                     [ text catLetter ]
                 , div [ class "min-w-0 flex-1" ]
                     [ p [ class "text-base font-semibold text-slate-100 truncate" ] [ text race.name ]
-                    , p [ class "text-[10px] uppercase tracking-wider text-slate-500" ]
-                        [ text catLabel ]
+                    , let
+                        dens =
+                            elevationDensity race.distance race.gain
+
+                        ( densText, densTone ) =
+                            densityLabel dens
+                      in
+                      p [ class "text-[10px] uppercase tracking-wider text-slate-500 truncate" ]
+                        [ text catLabel
+                        , span [ class ("ml-1.5 " ++ densTone) ]
+                            [ text ("· " ++ densText ++ " · " ++ formatInt dens ++ " m/km") ]
+                        ]
                     , p [ class "text-xs text-slate-500 truncate mt-0.5" ]
                         [ text (raceSubtitle race) ]
                     ]
@@ -1619,6 +1629,52 @@ distanceCategory meters =
 
     else
         ( "XL", "bg-rose-600", "Ultra" )
+
+
+{-| Elevation density in meters of gain per kilometer of distance.
+See pace-prediction-roadmap.md §11.A.
+-}
+elevationDensity : Float -> Float -> Float
+elevationDensity distanceMeters gainMeters =
+    if distanceMeters <= 0 then
+        0
+
+    else
+        gainMeters / (distanceMeters / 1000)
+
+
+{-| Six buckets from `(label, tone-class)`. Tone intensifies with density
+so the eye finds steep races on the index. Cutoffs match
+pace-prediction-roadmap.md §11.A.
+-}
+densityLabel : Float -> ( String, String )
+densityLabel mPerKm =
+    if mPerKm < 5 then
+        ( "Flat", "text-slate-400" )
+
+    else if mPerKm < 20 then
+        ( "Rolling", "text-sky-400" )
+
+    else if mPerKm < 40 then
+        ( "Hilly", "text-amber-400" )
+
+    else if mPerKm < 55 then
+        ( "Mountainous", "text-orange-400" )
+
+    else if mPerKm < 70 then
+        ( "Very mountainous", "text-rose-400" )
+
+    else
+        ( "Extreme", "text-rose-500" )
+
+
+{-| Refined Naismith-Scarf flat-equivalent distance in km:
+`D_km + ascent_m / 100 + descent_m / 1000`. The mental model:
+"this race feels like running X km on the flat."
+-}
+equivalentFlatKm : Float -> Float -> Float -> Float
+equivalentFlatKm distanceMeters gainMeters lossMeters =
+    distanceMeters / 1000 + gainMeters / 100 + lossMeters / 1000
 
 
 {-| Race-card "cover" when there's no user image: a real silhouette
@@ -1871,10 +1927,19 @@ viewRaceDetail model race =
                             , p [ class "text-sm text-slate-400 max-w-prose whitespace-pre-line" ] [ text notes ]
                             ]
                 ]
-            , div [ class "grid grid-cols-3 gap-3 sm:gap-4" ]
+            , let
+                dens =
+                    elevationDensity race.distance race.gain
+
+                eqKm =
+                    equivalentFlatKm race.distance race.gain race.loss
+              in
+              div [ class "grid grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4" ]
                 [ bigStat "Distance" (formatKm race.distance) "km"
                 , bigStat "Gain" (formatInt race.gain) "m"
                 , bigStat "Loss" (formatInt race.loss) "m"
+                , bigStat "Density" (formatInt dens) "m/km"
+                , bigStat "Flat eq." (formatFloat 1 eqKm) "km"
                 ]
             ]
         , case model.metaEditor of
