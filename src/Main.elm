@@ -3266,6 +3266,10 @@ viewPredictorStrip model race kms =
         text ""
 
     else
+        let
+            ( confLabel, confTone, confMargin ) =
+                confidenceFromProfile model race
+        in
         div [ class "rounded-2xl bg-slate-900 border border-slate-800 p-5 space-y-4" ]
             [ div [ class "flex items-baseline justify-between gap-4 flex-wrap" ]
                 [ div []
@@ -3279,7 +3283,11 @@ viewPredictorStrip model race kms =
                     [ p [ class "text-xs text-slate-500 uppercase tracking-wider" ] [ text "Predicted finish" ]
                     , p [ class "text-2xl font-semibold text-slate-100 tabular-nums" ]
                         [ text (formatHhmm prediction.totalS) ]
-                    , p [ class "text-xs text-slate-500 mt-0.5" ]
+                    , p [ class "text-xs text-slate-500 mt-0.5 tabular-nums" ]
+                        [ text ("± " ++ formatHhmm (round (toFloat prediction.totalS * confMargin)))
+                        , span [ class ("ml-2 " ++ confTone) ] [ text ("· " ++ confLabel) ]
+                        ]
+                    , p [ class "text-[10px] text-slate-600 mt-0.5" ]
                         [ text (predictionBreakdown prediction) ]
                     ]
                 ]
@@ -3351,6 +3359,34 @@ profileBriefLabel profile =
         ++ " vm/h · "
         ++ formatMmss profile.flatTrailPaceSecPerKm
         ++ "/km"
+
+
+{-| Confidence band for the predictor output. Until calibration
+ships (TASK-022) the profile is always "hand-tuned" with no past-data
+backing, so every race shows "Low (no past data) ± 20 %". When the
+user starts linking actuals (TASK-016) we can tighten:
+
+  - actuals on 1+ races for this distance band → Medium ± 10 %
+  - actuals on 2+ races across a 2× distance range → Medium-High ± 7 %
+
+The race itself carries the actualSplits we've already linked; the
+"how many other races have actuals?" question would need the full
+race list (not just `race`), so for now we go solely by "does this
+race have actuals." Future TASK-022 will refine.
+
+-}
+confidenceFromProfile : Model -> Race -> ( String, String, Float )
+confidenceFromProfile model race =
+    case race.actualSplits of
+        Just _ ->
+            -- We've seen actuals on this exact race — narrow the band
+            -- slightly since the planned vs actual data was used to
+            -- calibrate against. Pending real TASK-022 calibration
+            -- this is mostly aspirational.
+            ( "Medium-low · 1 actual linked", "text-sky-400", 0.15 )
+
+        Nothing ->
+            ( "Low · profile from presets", "text-slate-400", 0.20 )
 
 
 predictionBreakdown : Predictor.Prediction -> String
