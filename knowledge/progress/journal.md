@@ -168,3 +168,14 @@ Append-only. Newest at the bottom. Each entry is a snapshot for future-me with n
 - "Boring drift maintenance" (post-shipment language tidying) is part of keeping `knowledge/` from rotting. The convention is: whenever an arc ships, do a tidy-up PR like this one so the docs don't lie about being in flight.
 **Next:** Knowledge tree is in a state where promoting a fresh task from `planning/BACKLOG.md` (or dropping one directly into `CURRENT.md` with the template) is the only step needed to start new work.
 
+---
+## 2026-05-15 19:10 — Parking-lot followup: binary item resolved out-of-band
+
+**Task:** parking-lot maintenance (no TASK-NNN).
+**What I did:** The user shipped `9f78ee0` ("Small tweaks") on master between PR #7 (close-out) and PR #8 (tidy-up). That commit `.gitignore`s `server/cadence-server` and deletes the tracked file — exactly the followup my tidy-up PR had just added to the parking lot. Moved that entry into a small `## Resolved out-of-band` section in `BACKLOG.md` (with a pointer to the sha) and left the remaining parking-lot item ("Add Go tests for `store/`") in place.
+**What I verified:** `git show 9f78ee0 --stat` confirms `.gitignore` gained `server/cadence-server`, the file deletion is 15199186 → 0 bytes, and the only other changes are `.claude/settings.local.json` (user's MCP toggle) + a `client/package.json` script tweak. Nothing in those touches `knowledge/`.
+**What changed in the repo:** `knowledge/planning/BACKLOG.md` (moved one item), this journal entry.
+**What I learned:**
+- When the user pushes "small tweaks" out-of-band, the parking lot is the right place to catch that drift. A `## Resolved out-of-band` block is a cleaner footprint than silently deleting the entry — leaves a breadcrumb to the sha that resolved it.
+**Next:** Same as before — knowledge tree is ready for the next task.
+

@@ -28,5 +28,8 @@ Trail-side consumer integration (TASK-024 in trail's BACKLOG) is owned in the tr
 
 Half-baked ideas / followups noted during recent work. Promote to Active (with a TASK-NNN id) when you want one done.
 
-- **Decide what to do with the tracked `server/cadence-server` binary.** Either start committing it again after each backend change (matches existing repo policy but adds churn) or `.gitignore` it (Fly builds from source via Dockerfile, so prod doesn't read the tracked binary). Currently the tracked binary is the pre-TASK-001 build — stale relative to master.
 - **Add Go tests for `store/`.** Handlers + strava have tests now; `store/token.go` (transactional `SetTokens`, the `last_seen_at` bump, the no-tokens-wipe-on-logout invariant) and `store/activity_cache.go` (sentinel-key wrappers) would benefit from direct coverage rather than relying on the handler-level smoke. Use `modernc.org/sqlite` against a `:memory:` DB.
+
+## Resolved out-of-band
+
+- ~~Decide what to do with the tracked `server/cadence-server` binary.~~ User shipped `9f78ee0` ("Small tweaks") on 2026-05-15 which `.gitignore`s the binary and removes it from the tree. Done.
