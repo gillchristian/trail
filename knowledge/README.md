@@ -49,6 +49,6 @@ The initial backlog (`planning/BACKLOG.md`) is seeded with the five PRs that spe
 - `progress/blockers.md` — Things that genuinely require user input — surface at session end.
 - `decisions/INDEX.md` — Pointers to ADRs.
 - `reference/project-brief.md` — What cadence is and what's in scope.
-- `reference/trail-integration.md` — Pointer to the upstream spec driving current backlog.
+- `reference/trail-integration.md` — Summary of the trail integration (shipped 2026-05-15) and pointer to the upstream spec at `~/dev/trail/knowledge/reference/cadence-backend-spec.md`.
 - `reference/caching.md` — Three-layer caching strategy (activity list, activity detail, client-side).
 - `reference/glossary.md` — Project-specific terms.

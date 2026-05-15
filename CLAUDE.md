@@ -10,7 +10,7 @@
 4. **Verify before declaring done.** Hard gates in `knowledge/philosophy/verification.md`. `go build -tags fts5`, `go vet`, manual `curl` smoke, and the existing cadence frontend exercised against the change.
 5. **Journal everything.** Append to `knowledge/progress/journal.md` after every task. Future-you has no memory of this session.
 6. **When stuck, follow `knowledge/philosophy/when-stuck.md`.** Do not ask the user; do log to `knowledge/progress/blockers.md` when a real blocker exists, then pivot.
-7. **Trail drives the current backlog.** The canonical spec for the in-flight work is `/Users/bb8/dev/trail/knowledge/reference/cadence-backend-spec.md`. Don't reinterpret it silently; file a blocker if a section seems wrong.
+7. **When trail drives work, the canonical spec is `/Users/bb8/dev/trail/knowledge/reference/cadence-backend-spec.md`.** Don't reinterpret it silently; file a blocker if a section seems wrong. (The 2026-05-15 trail-integration arc — TASK-001..005 — is shipped; see `knowledge/planning/DONE.md`.)
 
 ## Quick map
 
@@ -19,7 +19,7 @@
 - `knowledge/planning/` — `CURRENT.md` (one active task), `BACKLOG.md` (queue), `DONE.md` (archive).
 - `knowledge/progress/` — `journal.md` (append-only log), `blockers.md` (things needing the user).
 - `knowledge/decisions/` — ADRs.
-- `knowledge/reference/` — `project-brief.md` (what cadence is), `trail-integration.md` (current initiative pointer), `glossary.md`.
+- `knowledge/reference/` — `project-brief.md` (what cadence is), `trail-integration.md` (shipped 2026-05-15, plus historical hand-off), `glossary.md`.
 
 ---
 

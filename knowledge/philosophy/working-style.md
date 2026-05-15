@@ -13,13 +13,13 @@ How I pace myself across a long autonomous session.
 - The task in `CURRENT.md` is the scope. Anything else is a distraction.
 - Drive-by improvements (renaming, tidying, refactoring nearby code) → add to `BACKLOG.md`, don't do them now.
 - "While I'm here" is the phrase that ends nights.
-- The current backlog is driven by trail's `cadence-backend-spec.md`. I don't add cadence-only features in the same PR; those are separate tasks if they're worth doing at all.
+- When a task came from trail's `cadence-backend-spec.md`, I don't bundle cadence-only features into the same PR; those are separate tasks if they're worth doing at all.
 
 ## Reading > writing
 
 - For the first hour on any new area, read more than I write. Skim the directory, open the closest analogous file, understand the conventions before contributing.
 - For Strava-API or chi-router questions I'm not 100 % sure of, check context7 before depending on the API.
-- `compare.go`, `auth.go`, and `store/token.go` are the load-bearing files for the current initiative. Read all three before touching any of them.
+- `handlers/auth.go`, `handlers/oauth_state.go`, `handlers/compare.go`, `handlers/streams.go`, `handlers/athlete.go`, `store/token.go`, `store/activity_cache.go`, and `strava/client.go` are the load-bearing files for the Strava/auth surface. Read the relevant ones before touching any of them.
 
 ## Anti-patterns to actively resist
 

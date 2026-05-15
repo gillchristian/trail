@@ -39,4 +39,7 @@ What does this make easy? What does this make hard? What will I have to revisit 
 
 ## Index
 
-_(none yet — first ADR will likely come from TASK-001's interpretation choices: e.g. whether to keep the old `tokens` table around for a deprecation window or drop it immediately.)_
+- [0001](0001-tokens-sessions-split.md) — Split `tokens` into `tokens` + `sessions` (TASK-001, PR #2).
+- [0002](0002-in-memory-oauth-state-store.md) — In-memory OAuth state store with active sweep (TASK-003, PR #4).
+- [0003](0003-oauth-state-before-strava-exchange.md) — Validate OAuth state before exchanging the Strava code (TASK-003, PR #4).
+- [0004](0004-athlete-cache-sentinel-key.md) — Athlete cache reuses `activity_cache` via a sentinel key (TASK-005, PR #6).

@@ -156,3 +156,15 @@ Append-only. Newest at the bottom. Each entry is a snapshot for future-me with n
 - The "carry the prior task's retro into the next PR" convention worked well for chaining tasks but leaves the *last* task's retro to a dedicated closeout PR. Worth it — keeps each task's retro adjacent to a real code change instead of in a trailing master push.
 **Next:** Backlog is empty. New work will be promoted from a future BACKLOG addition (cadence-only ideas, or a fresh upstream spec from trail).
 
+---
+## 2026-05-15 18:00 — Knowledge tidy-up after trail-integration shipment
+
+**Task:** post-shipment cleanup (no TASK-NNN).
+**What I did:** Wrote four ADRs for the non-trivial decisions made during TASK-001..005 — `decisions/0001-tokens-sessions-split.md`, `0002-in-memory-oauth-state-store.md`, `0003-oauth-state-before-strava-exchange.md`, `0004-athlete-cache-sentinel-key.md` — and indexed them in `decisions/INDEX.md`. Tightened post-shipment-stale language in `CLAUDE.md` (non-negotiable #7 now says "when trail drives work …" instead of asserting it as the current backlog), `reference/project-brief.md` (the "becoming" section is now a "shipped 2026-05-15" section pointing at DONE.md + the ADRs; success criteria flipped to past tense), `reference/trail-integration.md` (status banner at top, hand-off brief marked historical), and `planning/BACKLOG.md` (intro reads "when trail drives work" instead of asserting the spec drives the current backlog). Added the "carry prior retro into next PR" convention to `philosophy/pr-workflow.md` so future-me doesn't have to rediscover it. Added two parking-lot entries to `BACKLOG.md`: decide what to do with the stale tracked `server/cadence-server` binary, and write Go tests for `store/`.
+**What I verified:** No code changes. `git diff --stat` against master touches only knowledge/* and CLAUDE.md. `find knowledge -type f` matches the expected layout. `grep -n "current initiative\|current backlog\|in-flight"` against `knowledge/` returns nothing — no remaining present-tense statements about the shipped arc.
+**What changed in the repo:** 4 new ADR files; `decisions/INDEX.md`, `reference/project-brief.md`, `reference/trail-integration.md`, `planning/BACKLOG.md`, `philosophy/pr-workflow.md`, `CLAUDE.md`, this journal entry.
+**What I learned:**
+- Writing the ADRs after the fact was easy because the journal already had the rationale buried in each "What I learned" — the ADRs are essentially the *transferable* form of those notes.
+- "Boring drift maintenance" (post-shipment language tidying) is part of keeping `knowledge/` from rotting. The convention is: whenever an arc ships, do a tidy-up PR like this one so the docs don't lie about being in flight.
+**Next:** Knowledge tree is in a state where promoting a fresh task from `planning/BACKLOG.md` (or dropping one directly into `CURRENT.md` with the template) is the only step needed to start new work.
+

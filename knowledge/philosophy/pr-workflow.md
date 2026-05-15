@@ -28,6 +28,10 @@ Examples: `feat/task-001-sessions-table`, `feat/task-003-oauth-state-routing`, `
 - No `Co-Authored-By` trailers.
 - No emojis unless the existing history uses them.
 
+## Retro rollover convention
+
+Because step 8 below (updating `DONE.md` + journal) can't go directly to `master`, the retro for task **N** is carried into the PR for task **N+1**: that PR's branch updates `CURRENT.md` from N→N+1, appends the N retro to the journal, and adds N to `DONE.md`. The final task in an arc gets a dedicated `chore(knowledge): close out …` PR for its retro. This keeps every retro adjacent to a real code change and avoids any direct-push exceptions to rule 1 above.
+
 ## The full cycle for one PR
 
 1. **Pull the task** into `planning/CURRENT.md`. Write acceptance criteria.

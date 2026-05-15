@@ -2,11 +2,11 @@
 
 Ordered. Top item is next. Promote into `CURRENT.md` when started.
 
-The current backlog comes from the trail-integration initiative. The canonical spec is at:
+When trail drives work, the canonical spec is at:
 
 **`/Users/bb8/dev/trail/knowledge/reference/cadence-backend-spec.md`**
 
-Read it before pulling the first task. Each task below references the spec section that drives it.
+Read it before pulling any spec-driven task; each entry should reference the spec section that drives it. Cadence-only items go in the Parking lot until they're ready to be promoted.
 
 ## Active
 
@@ -26,4 +26,7 @@ Trail-side consumer integration (TASK-024 in trail's BACKLOG) is owned in the tr
 
 ## Parking lot
 
-_(empty — add cadence-only ideas here as they come up; trail-spec items go above)_
+Half-baked ideas / followups noted during recent work. Promote to Active (with a TASK-NNN id) when you want one done.
+
+- **Decide what to do with the tracked `server/cadence-server` binary.** Either start committing it again after each backend change (matches existing repo policy but adds churn) or `.gitignore` it (Fly builds from source via Dockerfile, so prod doesn't read the tracked binary). Currently the tracked binary is the pre-TASK-001 build — stale relative to master.
+- **Add Go tests for `store/`.** Handlers + strava have tests now; `store/token.go` (transactional `SetTokens`, the `last_seen_at` bump, the no-tokens-wipe-on-logout invariant) and `store/activity_cache.go` (sentinel-key wrappers) would benefit from direct coverage rather than relying on the handler-level smoke. Use `modernc.org/sqlite` against a `:memory:` DB.

@@ -1,10 +1,14 @@
 # Trail integration
 
+## Status
+
+**Shipped 2026-05-15.** TASK-001..005 (PRs #2..#6) are merged. See `planning/DONE.md` for the per-PR summary and the four ADRs in `decisions/` for the non-trivial choices (sessions split, in-memory state store, validation ordering, athlete cache sentinel). The hand-off brief at the bottom of this file is preserved verbatim — useful if a future agent ever needs to redo or extend the work.
+
 ## The relationship
 
 **Trail** (`~/dev/trail/`) is a separate Elm app for trail-race planning. It's local-first — race state, plans, and athlete profiles live in IndexedDB. The one thing it cannot do locally is the OAuth round-trip with Strava (needs a server with a client secret) and proxying authenticated Strava API calls.
 
-Rather than spin up a dedicated helper service, the user has chosen to extend **cadence**'s existing backend to serve both frontends. Cadence keeps its single-machine, single-user, SQLite-backed shape — it just grows two new endpoints (`/api/activities/{id}/streams`, optional `/api/athlete`), multi-origin CORS, OAuth `state`-based origin routing, and a sessions table.
+Rather than spin up a dedicated helper service, cadence's existing backend was extended to serve both frontends. Cadence keeps its single-machine, single-user, SQLite-backed shape — it grew two new endpoints (`/api/activities/{id}/streams`, `/api/athlete`), multi-origin CORS, OAuth `state`-based origin routing, and a sessions table.
 
 ## Where the canonical spec lives
 
@@ -12,17 +16,17 @@ Rather than spin up a dedicated helper service, the user has chosen to extend **
 
 This file is read-only from cadence's perspective. Trail is the upstream driver. If something in the spec seems wrong or contradictory, file a blocker in `progress/blockers.md` rather than editing trail's repo.
 
-## What's in scope for cadence
+## What shipped (in order)
 
-Five PRs, in order, each independently deployable:
+Each PR was independently deployable:
 
-1. **Sessions table** — split `tokens` (per athlete) from `sessions` (per logged-in frontend). Migrations 013–016. Spec §4.3 / §7.
-2. **Multi-origin CORS** — env var `FRONTEND_URLS`, comma-separated. Spec §4.1.
-3. **OAuth state routing** — `?origin=trail|cadence`, `state` carries nonce + origin, callback picks the right redirect target. Spec §4.2.
-4. **Streams endpoint** — `GET /api/activities/{id}/streams?keys=...` with an allowlist validator. No caching. Spec §4.4.
-5. **(Optional) Athlete pass-through** — `GET /api/athlete`, 24 h cache. Spec §4.5.
+1. **Sessions table** — split `tokens` (per athlete) from `sessions` (per logged-in frontend). Migrations 013–016. Spec §4.3 / §7. PR #2 (`3e85f86`). ADR `decisions/0001-tokens-sessions-split.md`.
+2. **Multi-origin CORS** — env var `FRONTEND_URLS`, comma-separated. Spec §4.1. PR #3 (`1788389`).
+3. **OAuth state routing** — `?origin=trail|cadence`, `state` carries nonce + origin, callback picks the right redirect target. Spec §4.2. PR #4 (`a68896e`). ADRs `0002-in-memory-oauth-state-store.md`, `0003-oauth-state-before-strava-exchange.md`.
+4. **Streams endpoint** — `GET /api/activities/{id}/streams?keys=...` with an allowlist validator. No caching. Spec §4.4. PR #5 (`590c52c`).
+5. **Athlete pass-through** — `GET /api/athlete`, 24 h cache. Spec §4.5. PR #6 (`c21d44b`). ADR `0004-athlete-cache-sentinel-key.md`.
 
-The detailed acceptance criteria are in `planning/BACKLOG.md`.
+Per-PR retro detail lives in `progress/journal.md` (entries 2026-05-15 15:50 through 17:25).
 
 ## What's out of scope for cadence
 
@@ -30,9 +34,9 @@ The detailed acceptance criteria are in `planning/BACKLOG.md`.
 - Endpoints that only trail uses, beyond §4.4 and §4.5. If trail later needs richer functionality, that's a new spec revision.
 - Webhooks, multi-user, real-time. None of this is part of the integration.
 
-## Hand-off brief (copy-pasteable)
+## Hand-off brief (historical, kept for reference)
 
-If starting a fresh agent session to work this initiative, the brief from spec §12 is reproduced below verbatim. Read the spec file in full before starting any task.
+This was the original kickoff brief from spec §12. Preserved verbatim in case the work ever needs to be re-done or extended; the live state of the work is now in `planning/DONE.md` and the four ADRs.
 
 > You're working in `~/dev/cadence/`. The trail project (a separate Elm app at `~/dev/trail/`) needs to use this backend for Strava OAuth + activity-streams proxy. The full spec is at `~/dev/trail/knowledge/reference/cadence-backend-spec.md`.
 >

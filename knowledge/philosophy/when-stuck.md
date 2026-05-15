@@ -8,8 +8,8 @@ Walk down this ladder when blocked. Don't skip rungs.
 
 1. **Re-read the task.** Open `planning/CURRENT.md`. Did I drift from the acceptance criteria? Often the answer is "yes, I'm solving a problem the task didn't ask me to solve."
 2. **Re-read recent journal entries.** `progress/journal.md` (last ~5 entries). Did past-me leave a hint? Did I already try this and learn something?
-3. **Re-read the upstream spec.** Most current backlog comes from `/Users/bb8/dev/trail/knowledge/reference/cadence-backend-spec.md`. If a requirement seems contradictory or unclear, the spec is the canonical source — not my recollection of it.
-4. **Read the code.** Not the code I'm writing — the code around it. Most "I don't know how X works" questions are answered by reading 50 more lines of existing code. `compare.go`, `auth.go`, and `store/token.go` are the load-bearing files for current work.
+3. **Re-read the upstream spec.** When the task came from a trail-driven spec, the canonical source is `/Users/bb8/dev/trail/knowledge/reference/cadence-backend-spec.md`. If a requirement seems contradictory or unclear, the spec is canonical — not my recollection of it.
+4. **Read the code.** Not the code I'm writing — the code around it. Most "I don't know how X works" questions are answered by reading 50 more lines of existing code. `handlers/auth.go`, `handlers/oauth_state.go`, `handlers/streams.go`, `handlers/athlete.go`, `store/token.go`, `store/activity_cache.go`, and `strava/client.go` are the load-bearing files for the Strava/auth surface.
 5. **Read the docs.** For external libraries/APIs (Strava, chi, modernc/sqlite), fetch fresh docs via context7. Training data is stale; published docs are not.
 6. **Reduce the problem.** Build the smallest possible reproduction. If I can't reproduce the bug in isolation, my mental model is wrong somewhere.
 7. **Try the boring option.** When choosing between a clever path and an obvious path, pick obvious. The boring option is reversible; the clever one usually isn't.

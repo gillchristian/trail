@@ -6,21 +6,22 @@
 
 The frontend renders monthly snapshots — running volume, pace, HR, elevation — via Recharts. The backend's caching and incremental-sync logic is the load-bearing piece: full historical backfill, FTS5 search by activity name, per-activity detail with HR-from-streams extraction.
 
-## What it's becoming (current initiative)
+## Also a backend for trail (shipped 2026-05-15)
 
-In addition to serving its own frontend, cadence's backend is being extended to also serve **trail** (`~/dev/trail/`), a separate Elm app for trail-race planning. Trail needs:
-- OAuth + token refresh (cadence already has this).
-- A streams pass-through endpoint (currently hardcoded to `distance,heartrate` inside `compare.go`; needs generalising).
-- Multi-origin CORS.
-- A sessions table that supports more than one logged-in frontend per athlete.
+In addition to serving its own frontend, cadence's backend serves **trail** (`~/dev/trail/`), a separate Elm app for trail-race planning. The 5-PR arc that wired this up (TASK-001..005, all in `planning/DONE.md`) added:
+- A `sessions` table so the same Strava athlete can be logged in to both frontends concurrently.
+- Multi-origin CORS via `FRONTEND_URLS`.
+- OAuth state-based origin routing (`?origin=trail|cadence`) with per-origin redirect targets.
+- `GET /api/activities/{id}/streams` — allow-listed pass-through with no caching.
+- `GET /api/athlete` — pass-through with a 24h cache.
 
-The full spec for this is at:
+The full spec was driven by trail and lives at:
 
 **`/Users/bb8/dev/trail/knowledge/reference/cadence-backend-spec.md`**
 
-Trail is the *driver*. Requirements live there; cadence implements. No trail-domain state lands on the cadence server — races, plans, and profiles stay in trail's IDB. Cadence is purely a thin Strava proxy with the existing token-refresh machinery.
+Trail remains the *driver* for any future revisions to this surface. Requirements live there; cadence implements. No trail-domain state lives on the cadence server — races, plans, and profiles stay in trail's IDB. Cadence is purely a thin Strava proxy with the existing token-refresh machinery.
 
-See `reference/trail-integration.md` for the summary and the hand-off brief.
+See `reference/trail-integration.md` for the integration summary and the original hand-off brief.
 
 ## Stack
 
@@ -33,7 +34,7 @@ See `reference/trail-integration.md` for the summary and the hand-off brief.
 ## Hard constraints
 
 - **Single machine, single user.** SQLite doesn't support concurrent writers across machines. Never scale beyond 1 Fly machine.
-- **One row per athlete in `tokens`.** This is the existing model. The trail-integration work splits this into `tokens` (per athlete) + `sessions` (per logged-in frontend) — a deliberate change documented in trail spec §4.3.
+- **One row per athlete in `tokens`; many rows per athlete in `sessions`.** Split landed 2026-05-15 (TASK-001, PR #2). See ADR `decisions/0001-tokens-sessions-split.md` and trail spec §4.3.
 - **Strava rate limits:** 100 req / 15 min, 1000 / day. Calibration-style burst flows from trail's side must throttle client-side.
 - **Live frontend.** Cadence's React frontend reads existing endpoints. Every backend change must preserve that contract.
 - **Author identity:** commits + PRs authored by the user only. No Claude attribution. The machine's git config is already correct.
@@ -48,7 +49,7 @@ See `reference/trail-integration.md` for the summary and the hand-off brief.
 
 - Multi-user. Anything that requires per-user data partitioning beyond the existing `athlete_id` keying.
 - Webhook ingestion (Strava can push events; we poll instead, simpler).
-- Any cadence-frontend feature work while the trail-integration backlog is active.
+- Any cadence-frontend feature work that contradicts trail's contract with this backend (trail spec §5 lists the endpoint surface trail relies on).
 
 ## Repo layout
 
@@ -57,9 +58,11 @@ See `reference/trail-integration.md` for the summary and the hand-off brief.
 - `package.json` (root) — thin npm wrapper that proxies to `client/`.
 - `fly.toml`, `Dockerfile` (in `server/`) — Fly deployment config.
 
-## Success criteria for the current initiative
+## Trail-integration success criteria (shipped)
 
-- All five tasks in `planning/BACKLOG.md` ship as separate PRs, each independently deployed.
-- Cadence's existing frontend keeps working at every step (verified manually in each PR).
+The 5-PR arc met these:
+
+- All five tasks shipped as independent PRs (#2..#6, all in `planning/DONE.md`).
+- Cadence's existing frontend kept working at every step (`/auth/{status,strava,logout}` shapes unchanged; `/api/activities` and `/api/activities/{id}/detail` unchanged).
 - Trail's frontend can authenticate via cadence's backend and fetch streams for any activity owned by the same Strava athlete.
-- No domain state for trail lives on the cadence server.
+- No trail-domain state lives on the cadence server.
