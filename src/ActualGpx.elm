@@ -2,6 +2,7 @@ module ActualGpx exposing
     ( ActualPoint
     , ActualTrack
     , computeSplits
+    , cumulativeDistances
     , parse
     )
 
