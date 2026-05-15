@@ -76,6 +76,11 @@ func main() {
 		ClientID:     clientID,
 		APIBaseURL:   apiBaseURL,
 		FrontendURL:  frontendURL,
+		FrontendURLs: map[string]string{
+			handlers.OriginCadence: env("FRONTEND_URL_CADENCE", frontendURL),
+			handlers.OriginTrail:   env("FRONTEND_URL_TRAIL", frontendURL),
+		},
+		OAuthState: handlers.NewOAuthStateStore(),
 	}
 
 	backfillHandler := &handlers.BackfillHandler{

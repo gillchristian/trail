@@ -18,7 +18,9 @@ type AuthHandler struct {
 	Strava       *strava.Client
 	ClientID     string
 	APIBaseURL   string
-	FrontendURL  string
+	FrontendURL  string            // legacy fallback redirect target
+	FrontendURLs map[string]string // origin -> redirect URL (overrides FrontendURL)
+	OAuthState   *OAuthStateStore
 }
 
 func getSessionToken(r *http.Request) string {
@@ -29,12 +31,44 @@ func getSessionToken(r *http.Request) string {
 	return ""
 }
 
+func (h *AuthHandler) redirectURLFor(origin string) string {
+	if u, ok := h.FrontendURLs[origin]; ok && u != "" {
+		return u
+	}
+	return h.FrontendURL
+}
+
 func (h *AuthHandler) StravaRedirect(w http.ResponseWriter, r *http.Request) {
+	origin := r.URL.Query().Get("origin")
+	if origin == "" {
+		origin = OriginCadence
+	}
+	if !IsAllowedOrigin(origin) {
+		http.Error(w, "Unknown origin", http.StatusBadRequest)
+		return
+	}
+
+	nonce, err := newOAuthNonce()
+	if err != nil {
+		log.Printf("OAuth nonce error: %v", err)
+		http.Error(w, "Internal error", http.StatusInternalServerError)
+		return
+	}
+	h.OAuthState.Put(nonce, origin)
+
+	state, err := encodeOAuthState(nonce, origin)
+	if err != nil {
+		log.Printf("OAuth state encode error: %v", err)
+		http.Error(w, "Internal error", http.StatusInternalServerError)
+		return
+	}
+
 	redirectURI := h.APIBaseURL + "/auth/callback"
 	u := fmt.Sprintf(
-		"https://www.strava.com/oauth/authorize?client_id=%s&response_type=code&redirect_uri=%s&scope=activity:read_all&approval_prompt=auto",
+		"https://www.strava.com/oauth/authorize?client_id=%s&response_type=code&redirect_uri=%s&scope=activity:read_all&approval_prompt=auto&state=%s",
 		h.ClientID,
 		url.QueryEscape(redirectURI),
+		url.QueryEscape(state),
 	)
 	http.Redirect(w, r, u, http.StatusFound)
 }
@@ -43,6 +77,35 @@ func (h *AuthHandler) Callback(w http.ResponseWriter, r *http.Request) {
 	code := r.URL.Query().Get("code")
 	if code == "" {
 		http.Error(w, "Missing authorization code", http.StatusBadRequest)
+		return
+	}
+
+	rawState := r.URL.Query().Get("state")
+	if rawState == "" {
+		http.Error(w, "Missing OAuth state", http.StatusBadRequest)
+		return
+	}
+
+	nonce, stateOrigin, err := decodeOAuthState(rawState)
+	if err != nil {
+		log.Printf("OAuth state decode error: %v", err)
+		http.Error(w, "Invalid OAuth state", http.StatusBadRequest)
+		return
+	}
+
+	storedOrigin, err := h.OAuthState.Take(nonce)
+	if err != nil {
+		log.Printf("OAuth nonce verification failed: %v", err)
+		http.Error(w, "Invalid or expired OAuth state", http.StatusBadRequest)
+		return
+	}
+	if storedOrigin != stateOrigin {
+		log.Printf("OAuth origin mismatch: state=%s stored=%s", stateOrigin, storedOrigin)
+		http.Error(w, "OAuth state mismatch", http.StatusBadRequest)
+		return
+	}
+	if !IsAllowedOrigin(stateOrigin) {
+		http.Error(w, "Unknown origin", http.StatusBadRequest)
 		return
 	}
 
@@ -60,7 +123,7 @@ func (h *AuthHandler) Callback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.Store.SetTokens(result.Tokens, sessionToken, "cadence"); err != nil {
+	if err := h.Store.SetTokens(result.Tokens, sessionToken, stateOrigin); err != nil {
 		log.Printf("Token store error: %v", err)
 		http.Error(w, "Authentication failed", http.StatusInternalServerError)
 		return
@@ -72,7 +135,7 @@ func (h *AuthHandler) Callback(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	http.Redirect(w, r, h.FrontendURL+"/?token="+url.QueryEscape(sessionToken), http.StatusFound)
+	http.Redirect(w, r, h.redirectURLFor(stateOrigin)+"/?token="+url.QueryEscape(sessionToken), http.StatusFound)
 }
 
 func (h *AuthHandler) Status(w http.ResponseWriter, r *http.Request) {

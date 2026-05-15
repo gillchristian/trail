@@ -4,38 +4,46 @@
 
 ## Active
 
-## TASK-002: Multi-origin CORS
+## TASK-003: OAuth state-based origin routing
 
-**Pulled from backlog:** 2026-05-15 16:00
-**Why this now:** Second PR of the trail-integration backlog and a hard prerequisite for the trail frontend ever being able to call this backend from a different origin. Tiny in scope (S) and unblocks TASK-003 (origin routing) cleanly.
-**Spec reference:** `/Users/bb8/dev/trail/knowledge/reference/cadence-backend-spec.md` §4.1
+**Pulled from backlog:** 2026-05-15 16:20
+**Why this now:** Third PR of the trail-integration backlog. Depends on TASK-001's `sessions.origin` column and TASK-002's multi-origin CORS. Without state-based routing, the OAuth callback can only ever redirect back to a single frontend, so trail can never finish login.
+**Spec reference:** `/Users/bb8/dev/trail/knowledge/reference/cadence-backend-spec.md` §4.2
 
 ### Acceptance criteria
-- [ ] `main.go` reads `FRONTEND_URLS` (comma-separated). If unset, falls back to existing `FRONTEND_URL` to preserve back-compat.
-- [ ] The parsed `[]string` is what's passed to `cors.Options.AllowedOrigins` — not a single string.
-- [ ] Whitespace around comma entries is trimmed; empty entries are dropped.
-- [ ] With `FRONTEND_URLS=http://localhost:5173,http://localhost:5174` set, both origins receive an `Access-Control-Allow-Origin` reflecting the request `Origin` header for a `GET /api/activities` preflight/normal request.
-- [ ] With only legacy `FRONTEND_URL=http://localhost:5173` set, that origin still works (back-compat).
-- [ ] An origin not in the list does not receive an `Access-Control-Allow-Origin` header (CORS denial).
-- [ ] `go build -tags fts5` and `go vet -tags fts5 ./...` pass.
-- [ ] Cadence frontend (`localhost:5173`) still loads against the running server (auth-status round-trip succeeds via CORS).
+- [ ] `/auth/strava` accepts `?origin=trail|cadence`, defaults to `cadence`. Unknown origins → 400.
+- [ ] A nonce (16 random bytes, base64url) is generated per request and stored in an in-memory map keyed by nonce → origin with a 5-minute TTL and a background sweep.
+- [ ] The Strava redirect includes `state=base64url(JSON({n: nonce, o: origin}))`.
+- [ ] `/auth/callback` rejects: missing state → 400; malformed state → 400; well-formed state with an unknown/expired/replayed nonce → 400; mismatched origin → 400.
+- [ ] On a valid state, the callback consumes the nonce (one-shot Take), exchanges the code, persists tokens with `origin` (from validated state), and redirects to the origin-specific frontend URL: `FRONTEND_URL_TRAIL` for `trail`, `FRONTEND_URL_CADENCE` for `cadence`, both falling back to `FRONTEND_URL`.
+- [ ] State validation runs BEFORE the Strava code exchange, so an invalid state does not burn the code.
+- [ ] Existing cadence OAuth flow (no `?origin` param) keeps working as before.
+- [ ] `go build -tags fts5` + `go vet -tags fts5 ./...` pass. Tests for state-store + codec exist and pass.
 
 ### Plan
-1. Refactor `env()` use in `main.go`: add a tiny helper to parse a comma-separated env var, trimming and dropping empties.
-2. Compute `allowedOrigins []string` as: prefer `FRONTEND_URLS` (split), else fall back to `[]string{frontendURL}`.
-3. Pass `allowedOrigins` to `cors.Options.AllowedOrigins`.
-4. `handlers.AuthHandler.FrontendURL` stays as a single string for the Callback redirect — that target is set explicitly per the spec (`FRONTEND_URL_TRAIL`/`FRONTEND_URL_CADENCE` arrive in TASK-003). For now we keep using `FRONTEND_URL` as the default redirect target so back-compat holds.
-5. Verify with two curl calls (5173, 5174), one denied-origin curl call, fresh build + vet.
+1. New file `handlers/oauth_state.go`: constants (`OriginCadence`, `OriginTrail`), `OAuthStateStore` (sync.Map + 5-min TTL + 1-min background sweep), `Put/Take`, `newOAuthNonce`, `encodeOAuthState/decodeOAuthState` (base64url(JSON{n, o})), `IsAllowedOrigin`.
+2. Update `handlers/auth.go`:
+   - `AuthHandler` gets `FrontendURLs map[string]string` and `OAuthState *OAuthStateStore` (and a `redirectURLFor(origin)` helper that falls back to `FrontendURL`).
+   - `StravaRedirect` parses `?origin`, validates, generates+stores nonce, includes `&state=` in the Strava URL.
+   - `Callback` reads `code` + `state`, decodes state, calls `OAuthState.Take(nonce)` to validate and consume, compares stored vs encoded origin, then proceeds with the existing token-exchange path passing `origin` into `SetTokens`. Redirects via `redirectURLFor`.
+3. Update `main.go`: populate `FrontendURLs` from `FRONTEND_URL_CADENCE` + `FRONTEND_URL_TRAIL` (env helper with `frontendURL` fallback), instantiate `OAuthState`.
+4. `handlers/oauth_state_test.go`: round-trip, garbage decode, one-shot Take, unknown nonce, expired nonce (inject a fake clock), `IsAllowedOrigin` cases, `redirectURLFor` per-origin + empty fallback.
+5. Manual smoke: build/vet/test; curl each error/positive path; extract a real state from `/auth/strava?origin=trail` and replay it twice to demonstrate the nonce is one-shot.
 
 ### Verification plan
 - `cd server && go build -tags fts5 .` — exit 0.
 - `cd server && go vet -tags fts5 ./...` — exit 0.
-- Run server with `FRONTEND_URLS=http://localhost:5173,http://localhost:5174`. For each allowed origin, send a normal GET to `/api/activities` with `Origin:` and observe `Access-Control-Allow-Origin: <that origin>` in the response. Send an OPTIONS preflight with `Origin: http://localhost:5173` and `Access-Control-Request-Method: GET` and observe the same.
-- Repeat with an explicitly disallowed origin (e.g. `http://localhost:9999`) — `Access-Control-Allow-Origin` must be absent.
-- Run server again with only legacy `FRONTEND_URL=http://localhost:5173` (no `FRONTEND_URLS`) and confirm 5173 still gets `Access-Control-Allow-Origin` (back-compat).
-- Quote each `curl -i` response section in the journal.
+- `go test -tags fts5 ./handlers` — all pass.
+- For each `curl -i` scenario, quote the status line + relevant headers in the journal:
+  - `/auth/strava` (no origin) → 302 to Strava with `&state=…`. Decode state, confirm `{"n":..., "o":"cadence"}`.
+  - `/auth/strava?origin=trail` → 302 with `o:"trail"` in state.
+  - `/auth/strava?origin=bogus` → 400 "Unknown origin".
+  - `/auth/callback` no code → 400; with code, no state → 400; garbage state → 400; well-formed JSON state with unknown nonce → 400.
+  - Round-trip: extract a real state, call `/auth/callback?code=fake&state=<that>` → 500 (Strava code exchange fails after state validation passed). Replay same state → 400 (nonce consumed).
 
 ### Notes during execution
+- State validation must happen before Strava exchange (spec §4.2 wording + the "replay 4xx's" acceptance line both demand it).
+- Spec says "5-min TTL eviction" — chose active sweep (goroutine, 1-min ticker) over passive-only, since the spec uses the word "eviction".
 
 ### Done
 
