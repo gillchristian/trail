@@ -27,3 +27,6 @@ dist-ssr
 .env
 tokens.json
 *.db
+
+# Bin
+server/cadence-server
