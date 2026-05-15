@@ -591,3 +591,16 @@ Wrote `knowledge/reference/cadence-backend-spec-addendum-1-profile-scope.md` —
 - The confidence rubric in roadmap §11.D references "fitted from N activities" semantics that don't exist until TASK-022. Going with the data we have today: presence/absence of actualSplits on *this* race. That's a thin proxy but it's honest — the user sees "no actuals, so wide band" or "one actual, slightly narrower." Future TASK-022 can refine to use the count of actuals across all races + an explicit `profile.source` field.
 - Putting the margin near the predicted finish (not on the slider) makes "the slider position is exact; the predicted time is approximate" clear visually. The component breakdown moved to a smaller font so the margin reads as the primary qualifier.
 **Next:** TASK-021 — Strava streams parser. Mirrors `ActualGpx` but consumes the keyed-object stream JSON cadence's endpoint returns. Pure module, no UI in this slice; TASK-024 (when it lands) plugs it into the actual-run upload flow.
+
+---
+## 2026-05-15 22:15 — TASK-021: Strava streams parser
+
+**Task:** TASK-021.
+**What I did:** New `StravaStreams.elm` decoder. Takes the keyed-object JSON value (`{time: {data: [...]}, distance: {data: [...]}, latlng: {data: [[lat,lng], ...]}, altitude: {data: [...]}}`) and produces an `ActualGpx.ActualTrack`. Reuses Strava's pre-computed cumulative distance directly rather than re-Haversine-ing (Strava's value is canonical). Handles stream-length mismatches by trimming to the shortest. Time stream is already elapsed-seconds-from-start — no ISO 8601 plumbing.
+**What I verified:** `npm run build` exit 0; bundle size unchanged (Elm dead-code-eliminates the module since no caller yet). TASK-024 will wire it and surface real values.
+**What changed in the repo:** PR #24. New `src/StravaStreams.elm` (~140 lines). Tiny edit to `src/ActualGpx.elm` to expose `cumulativeDistances` (forward-compatible — not consumed here since Strava gives us distance directly).
+**What I learned:**
+- Strava streams hand us cumulative distance for free. Using it preserves Strava's canonical track distance (small differences from Haversine on a noisy track can shift km boundaries by ~1-2 m).
+- The keyed-object shape (`{ "time": { "data": [...] } }`) is what cadence's TASK-004 returns when it forwards `key_by_type=true` to Strava. Decoder uses `D.oneOf [field, succeed default]` so missing streams (e.g. an activity without heartrate) decode to empty lists rather than failing.
+- `zip3` for `(time, latlng, altitude)` triples: 4-arity zips don't exist in Elm stdlib, and a 5th-tuple wouldn't compile anyway. Three's the natural cap.
+**Next:** TASK-022 (calibration from past activities) — large, depends on the OAuth integration which is TASK-024. I'll do TASK-024 first so the data flow is complete before calibration logic.
