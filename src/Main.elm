@@ -1439,7 +1439,7 @@ viewIndex model races =
             viewEmptyState
 
           else
-            viewRaceGrid races
+            viewRaceGrid model races
         ]
 
 
@@ -1521,14 +1521,14 @@ viewEmptyState =
         ]
 
 
-viewRaceGrid : List Race -> Html Msg
-viewRaceGrid races =
+viewRaceGrid : Model -> List Race -> Html Msg
+viewRaceGrid model races =
     div [ class "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5" ]
-        (List.map viewRaceCard races)
+        (List.map (\r -> viewRaceCard (Dict.get (raceIdToString r.id) model.parsedTracks) r) races)
 
 
-viewRaceCard : Race -> Html Msg
-viewRaceCard race =
+viewRaceCard : Maybe Track -> Race -> Html Msg
+viewRaceCard maybeTrack race =
     let
         ( catLetter, catColor, catLabel ) =
             distanceCategory race.distance
@@ -1548,7 +1548,7 @@ viewRaceCard race =
                     ]
 
             Nothing ->
-                viewCoverPlaceholder catColor catLetter
+                viewCoverSparkline catColor maybeTrack
         , a
             [ Route.href (Route.RaceDetail race.id)
             , class "block p-5 space-y-4"
@@ -1621,45 +1621,156 @@ distanceCategory meters =
         ( "XL", "bg-rose-600", "Ultra" )
 
 
-{-| Decorative banner shown when a race has no cover image. A
-diagonal-gradient strip in the category color with a faint mountain
-silhouette SVG, so the card stays the same shape as cover-bearing
-ones (grid rows stay even) but feels intentional instead of empty.
+{-| Race-card "cover" when there's no user image: a real silhouette
+of the race's elevation profile drawn at the card width. Each race
+becomes visually recognisable by its profile shape. If the parsed
+track isn't available yet (shouldn't happen post-RacesLoaded), we
+fall back to a generic stylised silhouette so the card stays the
+same shape.
 -}
-viewCoverPlaceholder : String -> String -> Html msg
-viewCoverPlaceholder catColor catLetter =
+viewCoverSparkline : String -> Maybe Track -> Html msg
+viewCoverSparkline catColor maybeTrack =
+    let
+        bandHeight =
+            112
+    in
     div
-        [ class
-            ("relative h-28 border-b border-slate-800 overflow-hidden "
-                ++ catColor
-                ++ "/30"
-            )
+        [ class "relative h-28 border-b border-slate-800 overflow-hidden bg-slate-950"
         ]
-        [ div [ class ("absolute inset-0 " ++ catColor ++ "/15") ] []
-        , div [ class "absolute inset-0 bg-gradient-to-br from-slate-950/60 via-slate-900/40 to-slate-900/80" ] []
-        , Svg.svg
-            [ SA.viewBox "0 0 320 96"
-            , SA.preserveAspectRatio "xMidYMid slice"
-            , SA.class "absolute inset-0 w-full h-full opacity-25"
-            ]
-            [ Svg.path
-                [ SA.d "M0 80 L40 60 L70 75 L110 30 L150 65 L190 40 L230 70 L270 35 L320 70 L320 96 L0 96 Z"
-                , SA.fill "currentColor"
-                , SA.class "text-white"
-                ]
-                []
-            , Svg.path
-                [ SA.d "M0 88 L60 70 L100 80 L160 50 L210 75 L260 60 L320 80 L320 96 L0 96 Z"
-                , SA.fill "currentColor"
-                , SA.fillOpacity "0.65"
-                , SA.class "text-slate-950"
-                ]
-                []
-            ]
-        , div [ class "absolute top-3 right-3 text-[10px] font-bold uppercase tracking-widest text-white/70" ]
-            [ text catLetter ]
-        , div [ class ("absolute top-0 left-0 right-0 h-1.5 " ++ catColor) ] []
+        [ div [ class ("absolute top-0 left-0 right-0 h-1.5 " ++ catColor) ] []
+        , case maybeTrack of
+            Just t ->
+                raceSparkline t bandHeight
+
+            Nothing ->
+                Svg.svg
+                    [ SA.viewBox "0 0 320 112"
+                    , SA.preserveAspectRatio "xMidYMid slice"
+                    , SA.class "absolute inset-0 w-full h-full opacity-30"
+                    ]
+                    [ Svg.path
+                        [ SA.d "M0 90 L40 70 L70 80 L110 40 L150 70 L190 50 L230 75 L270 45 L320 75 L320 112 L0 112 Z"
+                        , SA.fill "#ff5f6a"
+                        , SA.fillOpacity "0.4"
+                        ]
+                        []
+                    ]
         ]
+
+
+raceSparkline : Track -> Int -> Html msg
+raceSparkline track bandHeight =
+    let
+        width =
+            320.0
+
+        height =
+            toFloat bandHeight
+
+        pad =
+            8.0
+
+        chartW =
+            width
+
+        chartH =
+            height - pad * 2
+
+        eleRange =
+            max 1 (track.maxEle - track.minEle)
+
+        mPerPxX =
+            track.totalDist / chartW
+
+        -- The card's silhouette is read for shape, not strict 1:1.
+        -- We scale the elevation to fill the band's height with
+        -- some breathing room so flat routes don't render as a line.
+        yScale =
+            chartH / eleRange
+
+        coords =
+            List.map2 (\d p -> ( d / mPerPxX, pad + (track.maxEle - p.ele) * yScale ))
+                track.cumDist
+                track.points
+                |> List.indexedMap Tuple.pair
+                |> List.filter (\( i, _ ) -> modBy (max 1 (List.length track.points // 240)) i == 0)
+                |> List.map Tuple.second
+
+        pathD =
+            buildAreaForSparkline coords (height - pad)
+
+        strokeD =
+            buildStrokeForSparkline coords
+    in
+    Svg.svg
+        [ SA.viewBox ("0 0 " ++ String.fromFloat width ++ " " ++ String.fromFloat height)
+        , SA.preserveAspectRatio "none"
+        , SA.class "absolute inset-0 w-full h-full"
+        ]
+        [ Svg.defs []
+            [ Svg.linearGradient
+                [ SA.id "spark-fill", SA.x1 "0", SA.y1 "0", SA.x2 "0", SA.y2 "1" ]
+                [ Svg.stop [ SA.offset "0%", SA.stopColor "#ff5f6a", SA.stopOpacity "0.55" ] []
+                , Svg.stop [ SA.offset "100%", SA.stopColor "#E52E3A", SA.stopOpacity "0.05" ] []
+                ]
+            ]
+        , Svg.path
+            [ SA.d pathD
+            , SA.fill "url(#spark-fill)"
+            ]
+            []
+        , Svg.path
+            [ SA.d strokeD
+            , SA.fill "none"
+            , SA.stroke "#ff5f6a"
+            , SA.strokeWidth "1.4"
+            , SA.strokeLinejoin "round"
+            , SA.strokeLinecap "round"
+            ]
+            []
+        ]
+
+
+buildAreaForSparkline : List ( Float, Float ) -> Float -> String
+buildAreaForSparkline coords baseline =
+    case coords of
+        [] ->
+            ""
+
+        ( x0, y0 ) :: _ ->
+            let
+                middle =
+                    coords
+                        |> List.drop 1
+                        |> List.map (\( x, y ) -> "L " ++ formatFloat 2 x ++ " " ++ formatFloat 2 y)
+                        |> String.join " "
+
+                xLast =
+                    coords
+                        |> List.reverse
+                        |> List.head
+                        |> Maybe.map Tuple.first
+                        |> Maybe.withDefault x0
+            in
+            String.join " "
+                [ "M " ++ formatFloat 2 x0 ++ " " ++ formatFloat 2 baseline
+                , "L " ++ formatFloat 2 x0 ++ " " ++ formatFloat 2 y0
+                , middle
+                , "L " ++ formatFloat 2 xLast ++ " " ++ formatFloat 2 baseline
+                , "Z"
+                ]
+
+
+buildStrokeForSparkline : List ( Float, Float ) -> String
+buildStrokeForSparkline coords =
+    case coords of
+        [] ->
+            ""
+
+        ( x0, y0 ) :: rest ->
+            ("M " ++ formatFloat 2 x0 ++ " " ++ formatFloat 2 y0)
+                :: List.map (\( x, y ) -> "L " ++ formatFloat 2 x ++ " " ++ formatFloat 2 y) rest
+                |> String.join " "
 
 
 raceSubtitle : Race -> String
