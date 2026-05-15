@@ -4,43 +4,36 @@
 
 ## Active
 
-## TASK-001: Split `tokens` into `tokens` + `sessions`
+## TASK-002: Multi-origin CORS
 
-**Pulled from backlog:** 2026-05-15 15:20
-**Why this now:** First PR of the trail-integration backlog. The schema split is the load-bearing change every subsequent PR depends on (origin column for state-routing, multi-session for two-frontend coexistence).
-**Spec reference:** `/Users/bb8/dev/trail/knowledge/reference/cadence-backend-spec.md` §4.3 / §7
+**Pulled from backlog:** 2026-05-15 16:00
+**Why this now:** Second PR of the trail-integration backlog and a hard prerequisite for the trail frontend ever being able to call this backend from a different origin. Tiny in scope (S) and unblocks TASK-003 (origin routing) cleanly.
+**Spec reference:** `/Users/bb8/dev/trail/knowledge/reference/cadence-backend-spec.md` §4.1
 
 ### Acceptance criteria
-- [ ] Migrations 013–016 added to `server/store/migrate.go`: create `tokens_v2`, create `sessions` (PK session_token, FK athlete_id, columns origin/created_at/last_seen_at), copy data with `origin='cadence'`, drop old `tokens` + rename `tokens_v2` → `tokens`.
-- [ ] `store/token.go`: `GetTokensBySession` joins `sessions ⋈ tokens` on athlete_id and updates `last_seen_at` for the resolved session.
-- [ ] `store/token.go`: `SetTokens(tokens, sessionToken, origin)` upserts tokens by athlete_id + inserts a new sessions row (transactional).
-- [ ] `store/token.go`: `ClearTokensBySession` deletes from `sessions` only (tokens stay so other sessions for the same athlete keep working).
-- [ ] `handlers/auth.go` Callback passes `origin="cadence"` to `SetTokens` (default for back-compat).
-- [ ] Fresh DB: server starts, migrations apply cleanly, schema matches the new shape.
-- [ ] Existing `tokens.db` (copy of live): migrations apply idempotently, the existing session_token still resolves via `GetTokensBySession`, `sqlite3 tokens.db "SELECT count(*) FROM sessions"` returns ≥1.
-- [ ] Cadence frontend OAuth round-trip works end-to-end against the new schema (login, /api/activities returns data).
+- [ ] `main.go` reads `FRONTEND_URLS` (comma-separated). If unset, falls back to existing `FRONTEND_URL` to preserve back-compat.
+- [ ] The parsed `[]string` is what's passed to `cors.Options.AllowedOrigins` — not a single string.
+- [ ] Whitespace around comma entries is trimmed; empty entries are dropped.
+- [ ] With `FRONTEND_URLS=http://localhost:5173,http://localhost:5174` set, both origins receive an `Access-Control-Allow-Origin` reflecting the request `Origin` header for a `GET /api/activities` preflight/normal request.
+- [ ] With only legacy `FRONTEND_URL=http://localhost:5173` set, that origin still works (back-compat).
+- [ ] An origin not in the list does not receive an `Access-Control-Allow-Origin` header (CORS denial).
 - [ ] `go build -tags fts5` and `go vet -tags fts5 ./...` pass.
+- [ ] Cadence frontend (`localhost:5173`) still loads against the running server (auth-status round-trip succeeds via CORS).
 
 ### Plan
-1. Add migrations 013–016 to `server/store/migrate.go` (additive at the end of the migrations slice, IDs in order).
-2. Rewrite `store/token.go` for the new schema. Wrap `SetTokens` in a transaction so the two writes succeed or fail together.
-3. Update `handlers/auth.go` Callback site to pass `"cadence"` as origin.
-4. Backup current `server/tokens.db` to `server/tokens.db.bak`.
-5. Build + vet.
-6. Verify fresh-DB migration: `cp /dev/null /tmp/fresh.db && DB_PATH=/tmp/fresh.db go run -tags fts5 .` → no panic, then `sqlite3 /tmp/fresh.db ".schema"` shows new `tokens` (no session_token) and `sessions` table.
-7. Verify live-DB migration: run server against the actual `tokens.db`. Confirm `sqlite3 tokens.db "SELECT count(*) FROM sessions"` ≥ 1 and existing session token still resolves (curl `/auth/status` with the current Bearer token).
-8. Manual smoke: with both `npm run dev` (client) and the server running, click through the cadence app and confirm activities load. If session is dead, log in again and re-verify.
-9. Commit, open PR, merge, journal, advance.
+1. Refactor `env()` use in `main.go`: add a tiny helper to parse a comma-separated env var, trimming and dropping empties.
+2. Compute `allowedOrigins []string` as: prefer `FRONTEND_URLS` (split), else fall back to `[]string{frontendURL}`.
+3. Pass `allowedOrigins` to `cors.Options.AllowedOrigins`.
+4. `handlers.AuthHandler.FrontendURL` stays as a single string for the Callback redirect — that target is set explicitly per the spec (`FRONTEND_URL_TRAIL`/`FRONTEND_URL_CADENCE` arrive in TASK-003). For now we keep using `FRONTEND_URL` as the default redirect target so back-compat holds.
+5. Verify with two curl calls (5173, 5174), one denied-origin curl call, fresh build + vet.
 
 ### Verification plan
 - `cd server && go build -tags fts5 .` — exit 0.
 - `cd server && go vet -tags fts5 ./...` — exit 0.
-- Fresh-DB run: `DB_PATH=/tmp/fresh.db cd server && go run -tags fts5 .` — log line "Applied migration 013…016" appears once, "Server running" follows, no panic. Quote the relevant log lines in the journal.
-- `sqlite3 /tmp/fresh.db ".schema tokens"` → matches the new shape (no session_token).
-- `sqlite3 /tmp/fresh.db ".schema sessions"` → matches the new shape.
-- Live-DB run: same server start against `server/tokens.db.bak` copy, confirm session count > 0 in the new sessions table.
-- Curl smoke: `curl -i http://localhost:3001/auth/status -H "Authorization: Bearer $SESSION"` returns `{"authenticated":true,"athleteId":...}`.
-- Browser smoke: `npm run dev` + server, refresh `localhost:5173`, click "Connect Strava" (or rely on existing session), confirm activity list loads.
+- Run server with `FRONTEND_URLS=http://localhost:5173,http://localhost:5174`. For each allowed origin, send a normal GET to `/api/activities` with `Origin:` and observe `Access-Control-Allow-Origin: <that origin>` in the response. Send an OPTIONS preflight with `Origin: http://localhost:5173` and `Access-Control-Request-Method: GET` and observe the same.
+- Repeat with an explicitly disallowed origin (e.g. `http://localhost:9999`) — `Access-Control-Allow-Origin` must be absent.
+- Run server again with only legacy `FRONTEND_URL=http://localhost:5173` (no `FRONTEND_URLS`) and confirm 5173 still gets `Access-Control-Allow-Origin` (back-compat).
+- Quote each `curl -i` response section in the journal.
 
 ### Notes during execution
 

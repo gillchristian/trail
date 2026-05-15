@@ -10,4 +10,4 @@ Each entry: the TASK-NNN id, title, the date completed, and a one-line summary o
 
 ## Completed
 
-_(none yet — first entry will be TASK-001 once it lands)_
+- TASK-001 — Split `tokens` into `tokens` + `sessions` — 2026-05-15 — migrations 013-016, transactional `SetTokens(t, sessionToken, origin)`, `GetTokensBySession` joins + bumps `last_seen_at`, `ClearTokensBySession` removes session only. PR #2, merged `3e85f86`. See journal 2026-05-15 15:50.

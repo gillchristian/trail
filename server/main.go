@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 
 	"cadence-server/handlers"
 	"cadence-server/store"
@@ -22,6 +23,22 @@ func env(key, fallback string) string {
 	return fallback
 }
 
+func envList(key string) []string {
+	raw := os.Getenv(key)
+	if raw == "" {
+		return nil
+	}
+	parts := strings.Split(raw, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
 func main() {
 	godotenv.Load()
 
@@ -29,6 +46,11 @@ func main() {
 	frontendURL := env("FRONTEND_URL", "http://localhost:5173")
 	apiBaseURL := env("API_BASE_URL", "http://localhost:"+port)
 	dbPath := env("DB_PATH", "tokens.db")
+
+	allowedOrigins := envList("FRONTEND_URLS")
+	if len(allowedOrigins) == 0 {
+		allowedOrigins = []string{frontendURL}
+	}
 	clientID := os.Getenv("STRAVA_CLIENT_ID")
 	clientSecret := os.Getenv("STRAVA_CLIENT_SECRET")
 
@@ -79,7 +101,7 @@ func main() {
 	r := chi.NewRouter()
 
 	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins: []string{frontendURL},
+		AllowedOrigins: allowedOrigins,
 		AllowedMethods: []string{"GET", "POST", "OPTIONS"},
 		AllowedHeaders: []string{"Authorization", "Content-Type"},
 		ExposedHeaders: []string{"X-Data-Source"},
