@@ -152,11 +152,21 @@ buildPoints times latlngs alts =
         zipped
 
 
+{-| Tail-recursive 3-way zip. The naive `(a, b, c) :: zip3 xs ys zs`
+form blows the stack on real-world streams (6 000+ points per
+activity); Elm's TCE only kicks in when the recursive call is in
+tail position, which it isn't with a leading cons.
+-}
 zip3 : List a -> List b -> List c -> List ( a, b, c )
 zip3 xs ys zs =
+    zip3Help xs ys zs []
+
+
+zip3Help : List a -> List b -> List c -> List ( a, b, c ) -> List ( a, b, c )
+zip3Help xs ys zs acc =
     case ( xs, ys, zs ) of
         ( x :: xRest, y :: yRest, z :: zRest ) ->
-            ( x, y, z ) :: zip3 xRest yRest zRest
+            zip3Help xRest yRest zRest (( x, y, z ) :: acc)
 
         _ ->
-            []
+            List.reverse acc
