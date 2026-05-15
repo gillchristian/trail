@@ -1,15 +1,22 @@
 @import "tailwindcss";
 
-@theme {
-  --color-bg: #0b0b21;
-  --color-bg-elevated: #14142b;
-  --color-accent: #E52E3A;
-  --color-accent-soft: #ff5f6a;
-  --font-display: "Inter", system-ui, sans-serif;
+/* Pin the page to a real dark scheme so the browser doesn't try to
+   auto-tint based on system preferences. Belt-and-braces with the
+   inline `style="background:#020617"` on <html>/<body>. */
+:root {
+  color-scheme: dark;
+  background: #020617;
 }
 
 html, body, #app {
   height: 100%;
+  background: #020617;
+}
+
+@theme {
+  --color-trail-accent: #E52E3A;
+  --color-trail-accent-soft: #ff5f6a;
+  --color-trail-summit: #fbbf24;
 }
 
 /* ---------------------------------------------------------------- */

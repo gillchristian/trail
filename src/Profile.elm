@@ -228,10 +228,10 @@ view track mode containerWidth markers =
             buildStrokePath coords
 
         gridLines =
-            elevationGridLines track mPerPx padTop padLeft (padLeft + drawWidth)
+            elevationGridLines track mPerPx padTop padLeft (padLeft + drawWidth) chartHeight
 
         kmTicks =
-            distanceTicks track.totalDist mPerPx padLeft (padTop + chartHeight)
+            distanceTicks track.totalDist mPerPx padLeft (padTop + chartHeight) drawWidth
 
         markerNodes =
             List.map (viewMarker padTop (padTop + chartHeight) toX) markers
@@ -468,11 +468,16 @@ fmt f =
 -- GRID + TICKS
 
 
-elevationGridLines : Track -> Float -> Float -> Float -> Float -> List (Svg msg)
-elevationGridLines track mPerPx padTop x1 x2 =
+elevationGridLines : Track -> Float -> Float -> Float -> Float -> Float -> List (Svg msg)
+elevationGridLines track mPerPx padTop x1 x2 chartHeight =
     let
+        -- 28 px between elevation labels keeps them from stacking even on
+        -- tight (FitWidth on a phone) charts.
+        targetTicks =
+            max 2 (floor (chartHeight / 28))
+
         step =
-            niceStep (track.maxEle - track.minEle) 5
+            niceStep (track.maxEle - track.minEle) targetTicks
 
         first =
             toFloat (ceiling (track.minEle / step)) * step
@@ -509,11 +514,17 @@ elevationGridLines track mPerPx padTop x1 x2 =
     List.map lineFor ys
 
 
-distanceTicks : Float -> Float -> Float -> Float -> List (Svg msg)
-distanceTicks totalDist mPerPx padLeft yBaseline =
+distanceTicks : Float -> Float -> Float -> Float -> Float -> List (Svg msg)
+distanceTicks totalDist mPerPx padLeft yBaseline drawWidth =
     let
+        -- Reserve ~70 px per distance label ("22 km" with whitespace). Below
+        -- 2 ticks we still show start + end; above that, niceStep snaps to
+        -- a clean interval.
+        targetTicks =
+            max 2 (floor (drawWidth / 70))
+
         step =
-            niceStep totalDist 8
+            niceStep totalDist targetTicks
 
         ds =
             buildSeries 0 (totalDist + 0.0001) step
