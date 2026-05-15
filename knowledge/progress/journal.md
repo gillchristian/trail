@@ -179,3 +179,22 @@ Append-only. Newest at the bottom. Each entry is a snapshot for future-me with n
 - When the user pushes "small tweaks" out-of-band, the parking lot is the right place to catch that drift. A `## Resolved out-of-band` block is a cleaner footprint than silently deleting the entry — leaves a breadcrumb to the sha that resolved it.
 **Next:** Same as before — knowledge tree is ready for the next task.
 
+---
+## 2026-05-15 19:30 — TASK-006 shipped: broaden OAuth scope to profile:read_all
+
+**Task:** TASK-006 (PR #10, addendum to the trail-integration arc; spec: `/Users/bb8/dev/trail/knowledge/reference/cadence-backend-spec-addendum-1-profile-scope.md`).
+**What I did:** One-line change in `handlers/auth.go` — `(*AuthHandler).StravaRedirect` now requests `scope=activity:read_all,profile:read_all` instead of just `activity:read_all`. Added migration 017 `invalidate_athlete_cache_for_scope_upgrade` that runs `DELETE FROM activity_cache WHERE activity_id < 0` so any pre-deploy SummaryAthlete-shape rows (TASK-005 stored athlete payloads at the `-athleteID` sentinel — see ADR 0004) are evicted on next startup. Explicitly did NOT add a `scope` column to `tokens` (§4 of the addendum, deferred).
+**What I verified:**
+- `go build -tags fts5 .` + `go vet -tags fts5 ./...` clean.
+- `go test -tags fts5 ./...` — all PASS (no test changes needed).
+- Fresh-DB run applied 017 in order: `Applied migration 017_invalidate_athlete_cache_for_scope_upgrade` log line; athlete-cache rows = 0 (no-op on empty cache).
+- Simulated live DB: pre-seeded `(-777, '{...}', cached_at)` into a DB that only had migrations 001-016. Started the new server. Log: `Applied migration 017_invalidate_athlete_cache_for_scope_upgrade`. `SELECT count(*) FROM activity_cache WHERE activity_id < 0` = 0 afterward. Migrations table records 017.
+- Idempotency: re-running the server against the same DB produced no `Applied migration` lines — 017 is already recorded, the DELETE doesn't re-run.
+- OAuth redirect: `curl -s -i /auth/strava` Location header includes `scope=activity:read_all,profile:read_all`. Same with `?origin=trail`. State payload still encodes the origin correctly (`{"n":"...","o":"trail"}` decoded from the base64url state).
+**What changed in the repo:** `server/handlers/auth.go` (1-line scope change), `server/store/migrate.go` (migration 017 appended), `knowledge/planning/CURRENT.md` (TASK-006 plan), `knowledge/planning/DONE.md`, this journal entry.
+**What I learned:**
+- The re-auth choreography (addendum §3) is the only thing a user has to do post-deploy. Their existing session token still resolves; activities + streams keep working. The new scope only kicks in after they click "Connect Strava" again — Strava then shows an incremental-consent screen for profile access.
+- Migration 017 is also a worked example for any future "evict cached responses because the upstream shape changed" need: append a one-line `DELETE FROM activity_cache WHERE …` to `migrate.go`; the migrations table will keep it from re-running on subsequent boots.
+- Per-PR retro convention is bent slightly for a single-task arc: I included CURRENT.md plan, DONE.md entry, and this journal entry all in the same PR rather than splitting. DONE.md says "(merge sha in git log)" because the squash sha isn't known until merge — anyone curious can `gh pr view 10`.
+**Next:** Knowledge tree ready for the next task. Trail-side TASK-022 (calibration) consumes the new fields downstream.
+

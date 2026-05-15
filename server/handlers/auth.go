@@ -65,7 +65,7 @@ func (h *AuthHandler) StravaRedirect(w http.ResponseWriter, r *http.Request) {
 
 	redirectURI := h.APIBaseURL + "/auth/callback"
 	u := fmt.Sprintf(
-		"https://www.strava.com/oauth/authorize?client_id=%s&response_type=code&redirect_uri=%s&scope=activity:read_all&approval_prompt=auto&state=%s",
+		"https://www.strava.com/oauth/authorize?client_id=%s&response_type=code&redirect_uri=%s&scope=activity:read_all,profile:read_all&approval_prompt=auto&state=%s",
 		h.ClientID,
 		url.QueryEscape(redirectURI),
 		url.QueryEscape(state),

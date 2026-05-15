@@ -150,6 +150,10 @@ var migrations = []Migration{
 		SQL: `DROP TABLE tokens;
 		ALTER TABLE tokens_v2 RENAME TO tokens`,
 	},
+	{
+		ID:  "017_invalidate_athlete_cache_for_scope_upgrade",
+		SQL: `DELETE FROM activity_cache WHERE activity_id < 0`,
+	},
 }
 
 func RunMigrations(db *sql.DB) error {

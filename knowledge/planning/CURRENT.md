@@ -4,7 +4,7 @@
 
 ## Active
 
-_(none — trail-integration backlog complete; promote from `BACKLOG.md` when new work arrives)_
+_(none — TASK-006 shipping in this PR; see DONE.md + journal entry 2026-05-15 19:30. Promote from `BACKLOG.md` when new work arrives.)_
 
 ## Template for a task entry
 
