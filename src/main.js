@@ -11,6 +11,9 @@ const DB_VERSION = 2
 const RACES_STORE = 'races'
 const SETTINGS_STORE = 'settings'
 const ACTIVE_PROFILE_KEY = 'activeProfile'
+const STRAVA_TOKEN_KEY = 'stravaSessionToken'
+const BACKEND_URL =
+  import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001'
 
 const dbPromise = new Promise((resolve, reject) => {
   const req = indexedDB.open(DB_NAME, DB_VERSION)
@@ -78,6 +81,44 @@ async function saveProfile(value) {
   })
 }
 
+async function loadStravaToken() {
+  const db = await dbPromise
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(SETTINGS_STORE, 'readonly')
+    const req = tx.objectStore(SETTINGS_STORE).get(STRAVA_TOKEN_KEY)
+    req.onsuccess = () => resolve(req.result ? req.result.value : null)
+    req.onerror = () => reject(req.error)
+  })
+}
+
+async function saveStravaToken(token) {
+  const db = await dbPromise
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(SETTINGS_STORE, 'readwrite')
+    if (token) {
+      tx.objectStore(SETTINGS_STORE).put({ key: STRAVA_TOKEN_KEY, value: token })
+    } else {
+      tx.objectStore(SETTINGS_STORE).delete(STRAVA_TOKEN_KEY)
+    }
+    tx.oncomplete = () => resolve(token)
+    tx.onerror = () => reject(tx.error)
+  })
+}
+
+// ============================================================
+// Capture ?token=… from the OAuth callback URL before Elm boots.
+// Cadence's callback redirects to FRONTEND_URL_TRAIL?token=… so
+// we have to handle the query string at the JS layer; trail's
+// hash router doesn't see ?query.
+// ============================================================
+
+const callbackUrl = new URL(window.location.href)
+const incomingStravaToken = callbackUrl.searchParams.get('token')
+if (incomingStravaToken) {
+  callbackUrl.searchParams.delete('token')
+  history.replaceState({}, '', callbackUrl.toString())
+}
+
 // ============================================================
 // Elm boot + port wiring
 // ============================================================
@@ -86,6 +127,8 @@ const app = Elm.Main.init({
   flags: {
     width: window.innerWidth,
     now: Date.now(),
+    incomingStravaToken: incomingStravaToken,
+    backendUrl: BACKEND_URL,
   },
 })
 
@@ -131,6 +174,24 @@ app.ports.storageSaveProfile.subscribe(async (profile) => {
     app.ports.storageProfileLoaded.send(profile)
   } catch (e) {
     app.ports.storageError.send(`saveProfile: ${e?.message || e}`)
+  }
+})
+
+app.ports.storageLoadStravaToken.subscribe(async () => {
+  try {
+    const token = await loadStravaToken()
+    app.ports.storageStravaTokenLoaded.send(token)
+  } catch (e) {
+    app.ports.storageError.send(`loadStravaToken: ${e?.message || e}`)
+  }
+})
+
+app.ports.storageSaveStravaToken.subscribe(async (token) => {
+  try {
+    await saveStravaToken(token)
+    app.ports.storageStravaTokenLoaded.send(token)
+  } catch (e) {
+    app.ports.storageError.send(`saveStravaToken: ${e?.message || e}`)
   }
 })
 

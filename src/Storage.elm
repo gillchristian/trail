@@ -5,10 +5,13 @@ port module Storage exposing
     , gotRace
     , gotRaceDeleted
     , gotRaces
+    , gotStravaToken
     , loadAll
     , loadProfile
+    , loadStravaToken
     , saveProfile
     , saveRace
+    , saveStravaToken
     )
 
 {-| IndexedDB facade. Ports talk to a vanilla JS wrapper in
@@ -54,6 +57,15 @@ port storageSaveProfile : Value -> Cmd msg
 port storageProfileLoaded : (Value -> msg) -> Sub msg
 
 
+port storageLoadStravaToken : () -> Cmd msg
+
+
+port storageSaveStravaToken : Value -> Cmd msg
+
+
+port storageStravaTokenLoaded : (Value -> msg) -> Sub msg
+
+
 loadAll : Cmd msg
 loadAll =
     storageLoadAll ()
@@ -72,6 +84,21 @@ saveProfile =
 gotProfile : (Value -> msg) -> Sub msg
 gotProfile =
     storageProfileLoaded
+
+
+loadStravaToken : Cmd msg
+loadStravaToken =
+    storageLoadStravaToken ()
+
+
+saveStravaToken : Value -> Cmd msg
+saveStravaToken =
+    storageSaveStravaToken
+
+
+gotStravaToken : (Value -> msg) -> Sub msg
+gotStravaToken =
+    storageStravaTokenLoaded
 
 
 saveRace : Value -> Cmd msg
