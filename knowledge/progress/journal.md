@@ -632,3 +632,53 @@ Wrote `knowledge/reference/cadence-backend-spec-addendum-1-profile-scope.md` —
 - `E.stopPropagationOn "click"` on the inner modal card is the standard way to make a backdrop-close-on-click modal in Elm — clicks inside bubble would otherwise trigger the backdrop's onClick.
 - Bundle now ~100 KB gzipped. Still well within reasonable bounds for a SPA, but `elm/http` is a real weight — worth flagging if size becomes a concern.
 **Next:** Predictor+slider+actual arc is closed, both file and Strava paths land actual splits. TASK-022 (calibration from past activities) is the remaining piece on the roadmap. Stopping here — calibration involves real curve-fitting (Riegel exponent, vmh decay, fatigue slope) that deserves a fresh session not a tail-end push. The cadence addendum-1 work (broaden OAuth scope to `profile:read_all` for max_heartrate / weight / ftp) is also still pending on the cadence side — the user is handling that separately.
+
+---
+## 2026-05-15 23:05 — session closeout
+
+**Task:** end-of-session sweep.
+**What I did:** Ten PRs shipped in this session, closing the pace-prediction roadmap arc end-to-end **except** TASK-022 (calibration). Summary:
+
+| PR | Task | Summary |
+|---|---|---|
+| #15 | docs | Roadmap + cadence-backend-spec, exploration entries. |
+| #16 | TASK-014 | Course summary card additions (density bucket + flat-eq). |
+| #17 | docs | Cadence-spec addendum 1 (broaden OAuth scope to `profile:read_all`). |
+| #18 | TASK-015 | Per-km grade classification chip. |
+| #19 | TASK-016 | Planned-vs-actual upload (manual GPX). |
+| #20 | TASK-017 | Athlete profile + IDB v2 + settings page. |
+| #21 | TASK-018 | Predictor.predict — Layer B time model (pure module). |
+| #22 | TASK-019 | Bidirectional aggressiveness slider. |
+| #23 | TASK-020 | Predictor confidence indicator. |
+| #24 | TASK-021 | Strava streams parser (pure module). |
+| #25 | TASK-024 v1 | Strava OAuth round-trip + Connect/Disconnect. |
+| #26 | TASK-024b | Strava activity picker + streams fetch + persist. |
+
+Bundle progression: 286 kB → 322 kB JS / 90 kB → 100 kB gzip. New modules: `AthleteProfile`, `ActualGpx`, `Predictor`, `StravaStreams`, `StravaApi`. New IDB store: `settings` (carries `activeProfile` and `stravaSessionToken`). New routes: `#/profile`.
+
+**What I verified across the session:**
+- Every PR: `npm run build` exit 0, bundle string check for user-visible labels.
+- No in-browser visual checks (no GUI in this session). Every PR description and journal entry flags this explicitly.
+- Arithmetic spot-checks for the math (ISO 8601 → epoch, split interpolation, predictor signs, bisection direction).
+
+**What's pending (NOT done):**
+- **TASK-022** — Calibration from past activities. Real work: throttled multi-activity streams fetch, climb-segment identification, vmh / fatigue slope / HR-curve fitting, "what changed and why" UX. Deserves a fresh session; curve-fitting is error-prone enough that doing it as a 13th sequential PR risks subtle bugs.
+- **Cadence addendum 1** — One-line scope change in cadence. User is handling.
+- **TASK-022 dep on addendum 1** — Calibration *can* run without `max_heartrate` (it'd fit vmh + fatigue without HR-derived zones); the scope change unlocks the HR side. Either order works.
+
+**What I learned across the session:**
+- Per-PR scope discipline (`one logical unit`) survived even at the tail. Splitting TASK-024 into v1 (auth) + b (picker) saved real complexity.
+- Elm-side: shadowing `Html.p` with `let p = ...`, 4-tuple rejection, `Maybe ActualSplits` requires extending every encoder/decoder/buildDraftRace site. Each gotcha caught by the compiler on first build — the trail Elm setup pays for itself.
+- "Source-agnostic" architecture: `ActualGpx.ActualTrack` shared between the file-picker path (TASK-016) and the Strava-streams path (TASK-024b) meant the diff column code wrote itself the second time.
+- Build-only verification is honest but limited. Every PR description includes the "in-browser visual check not performed" line; the user knows where the gap is.
+
+**Working-tree state at session close:**
+- Master synced to `0d1109f` (PR #26 merge).
+- `package.json` still carries the user's local `vite --port 5174` change — uncommitted, left alone per the one-PR-one-logical-unit rule.
+- `trail_race_planner_spec.md` (the user's exploration artefact) is still untracked at the repo root; user's call whether to commit/move/delete.
+
+**Next session priorities (if/when picked up):**
+1. User visual-smoke each shipped feature; file bugs as PRs.
+2. TASK-022 — calibration — design pass + implementation. Probably a 90-min focused session.
+3. (Optional) Cadence-side addendum 1 if not already shipped by the cadence agent.
+4. Polish items in the parking lot (descent-aggressiveness slider, per-km gain/loss for slope-factor, etc.).
