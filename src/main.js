@@ -7,8 +7,10 @@ import { Elm } from './Main.elm'
 // ============================================================
 
 const DB_NAME = 'trail'
-const DB_VERSION = 1
+const DB_VERSION = 2
 const RACES_STORE = 'races'
+const SETTINGS_STORE = 'settings'
+const ACTIVE_PROFILE_KEY = 'activeProfile'
 
 const dbPromise = new Promise((resolve, reject) => {
   const req = indexedDB.open(DB_NAME, DB_VERSION)
@@ -16,6 +18,9 @@ const dbPromise = new Promise((resolve, reject) => {
     const db = req.result
     if (!db.objectStoreNames.contains(RACES_STORE)) {
       db.createObjectStore(RACES_STORE, { keyPath: 'id' })
+    }
+    if (!db.objectStoreNames.contains(SETTINGS_STORE)) {
+      db.createObjectStore(SETTINGS_STORE, { keyPath: 'key' })
     }
   }
   req.onsuccess = () => resolve(req.result)
@@ -49,6 +54,26 @@ async function deleteRace(id) {
     const tx = db.transaction(RACES_STORE, 'readwrite')
     tx.objectStore(RACES_STORE).delete(id)
     tx.oncomplete = () => resolve(id)
+    tx.onerror = () => reject(tx.error)
+  })
+}
+
+async function loadProfile() {
+  const db = await dbPromise
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(SETTINGS_STORE, 'readonly')
+    const req = tx.objectStore(SETTINGS_STORE).get(ACTIVE_PROFILE_KEY)
+    req.onsuccess = () => resolve(req.result ? req.result.value : null)
+    req.onerror = () => reject(req.error)
+  })
+}
+
+async function saveProfile(value) {
+  const db = await dbPromise
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(SETTINGS_STORE, 'readwrite')
+    tx.objectStore(SETTINGS_STORE).put({ key: ACTIVE_PROFILE_KEY, value })
+    tx.oncomplete = () => resolve(value)
     tx.onerror = () => reject(tx.error)
   })
 }
@@ -88,6 +113,24 @@ app.ports.storageDelete.subscribe(async (id) => {
     app.ports.storageRaceDeleted.send(id)
   } catch (e) {
     app.ports.storageError.send(`delete: ${e?.message || e}`)
+  }
+})
+
+app.ports.storageLoadProfile.subscribe(async () => {
+  try {
+    const profile = await loadProfile()
+    app.ports.storageProfileLoaded.send(profile)
+  } catch (e) {
+    app.ports.storageError.send(`loadProfile: ${e?.message || e}`)
+  }
+})
+
+app.ports.storageSaveProfile.subscribe(async (profile) => {
+  try {
+    await saveProfile(profile)
+    app.ports.storageProfileLoaded.send(profile)
+  } catch (e) {
+    app.ports.storageError.send(`saveProfile: ${e?.message || e}`)
   }
 })
 

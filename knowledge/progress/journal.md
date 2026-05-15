@@ -537,3 +537,18 @@ Wrote `knowledge/reference/cadence-backend-spec-addendum-1-profile-scope.md` —
 - Adding a Maybe field to a long record-shaped value requires touching the encoder, the decoder, the core builder, `buildDraftRace`, and the model. The Elm compiler caught every site; nothing slipped.
 - Splits are computed against *actual* track distance, not the planned course. v2/TASK-021 can snap to planned km boundaries via Haversine when we want "where on the planned course was I at each plan-km" semantics. For now "how fast did each km of my actual trace go" is the right answer.
 **Next:** TASK-017 (profile data model + IDB + settings page) — foundation for the predictor arc (TASK-018, TASK-019, TASK-020). No Strava deps; ~60-90 min of UI + storage shape work.
+
+---
+## 2026-05-15 21:00 — TASK-017: athlete profile + IDB v2 + settings page
+
+**Task:** TASK-017.
+**What I did:** New `AthleteProfile.elm` module: `Profile` record + 4 presets + `DescentSkill`/`TechSkill`/`AidStyle` enums with both labels and predictor-side multipliers + stable-key JSON codecs. JS-side `main.js` bumped `DB_VERSION` to 2 and adds a `settings` object store (key-value, single row at `activeProfile`); existing `races` store untouched. `Storage.elm` adds three new ports. `Route.elm` adds `ProfileSettings` variant at `#/profile`. `Main.elm` gets `profile : Profile` (default `midPack`) and `profileSaved : Bool` on Model, loads via `Storage.loadProfile` alongside races on boot, subscribes to `Storage.gotProfile`, adds 11 Msg variants + handlers (preset pick, 9 field edits with clamping, Save). Settings page renders preset-row + 9-field form using stacked `profileFieldRow` helper.
+**What I verified:** `npm run build` exit 0, JS 296.31 → 305.84 kB (+9.5 KB); gzip 92.89 → 95.45 kB. Bundle string check: all 4 preset names + 9 field labels + "Profile · settings" present. No new warnings.
+**What changed in the repo:** PR #20. New `src/AthleteProfile.elm` (~360 lines). Modified `src/main.js` (IDB v2, helpers, port subscribes), `src/Storage.elm` (ports + wrappers), `src/Route.elm` (route + URL parsing + toString), `src/Main.elm` (import + Model field + Msg variants + handlers + viewProfileSettings + header link + title case).
+**What I learned:**
+- `Profile` was the obvious module name but already taken by the elevation renderer. Renamed to `AthleteProfile`. The naming-collision check should be the first thing to verify when adding a module.
+- Shadowing imports with locals is a real risk: `let p = model.profile` inside a view shadowed the `Html.p` function imported via `exposing`. Compiler caught it immediately; renamed local to `prof`. Future code: avoid single-letter locals in views.
+- The settings page deliberately omits a form-draft layer. Edits clamp + commit directly into `model.profile`; "Save" is the only IDB write. Simpler than the MetaForm pattern; appropriate for a single-record settings surface.
+- The JSON codec uses **stable string keys** for variant types (`"cautious"` etc.) so future renames of the Elm variant constructors don't break stored profiles. Decoders fall back to `Average` defaults on unknown keys.
+- IDB upgrade path is one `createObjectStore` call inside the existing `onupgradeneeded`. The guard `!db.objectStoreNames.contains(SETTINGS_STORE)` makes the migration idempotent — running v2 against an already-v2 DB is a no-op.
+**Next:** TASK-018 (Predictor.predict — Layer B time prediction). The profile is now available; the predictor takes course + profile + intensity, returns predicted total time + per-component breakdown. Pure module, no UI in this slice (TASK-019 wires the slider).

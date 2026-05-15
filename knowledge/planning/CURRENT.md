@@ -4,7 +4,7 @@
 
 ## Active
 
-_(none — TASK-016 shipped; TASK-017 next)_
+_(none — TASK-017 shipped; TASK-018 next)_
 
 ## Template for a task entry
 

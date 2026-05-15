@@ -26,6 +26,7 @@ type Route
     | PlanTable RaceId
     | PlanKm RaceId Int
     | PlanSection RaceId Int
+    | ProfileSettings
     | NotFound
 
 
@@ -49,6 +50,9 @@ fromUrl url =
 
         "/index" ->
             Index
+
+        "/profile" ->
+            ProfileSettings
 
         path ->
             case splitPath path of
@@ -141,6 +145,9 @@ toString route =
 
         PlanSection id sec ->
             "#/race/" ++ raceIdToString id ++ "/plan/section/" ++ String.fromInt sec
+
+        ProfileSettings ->
+            "#/profile"
 
         NotFound ->
             "#/404"

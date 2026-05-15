@@ -1,10 +1,13 @@
 port module Storage exposing
     ( deleteRace
     , gotError
+    , gotProfile
     , gotRace
     , gotRaceDeleted
     , gotRaces
     , loadAll
+    , loadProfile
+    , saveProfile
     , saveRace
     )
 
@@ -42,9 +45,33 @@ port storageRaceDeleted : (String -> msg) -> Sub msg
 port storageError : (String -> msg) -> Sub msg
 
 
+port storageLoadProfile : () -> Cmd msg
+
+
+port storageSaveProfile : Value -> Cmd msg
+
+
+port storageProfileLoaded : (Value -> msg) -> Sub msg
+
+
 loadAll : Cmd msg
 loadAll =
     storageLoadAll ()
+
+
+loadProfile : Cmd msg
+loadProfile =
+    storageLoadProfile ()
+
+
+saveProfile : Value -> Cmd msg
+saveProfile =
+    storageSaveProfile
+
+
+gotProfile : (Value -> msg) -> Sub msg
+gotProfile =
+    storageProfileLoaded
 
 
 saveRace : Value -> Cmd msg
