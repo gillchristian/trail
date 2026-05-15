@@ -363,3 +363,34 @@ Append-only. Newest at the bottom. Each entry is a snapshot for future-me with n
 - OSM tile caching is essentially free with the SW pattern I already had — the only nuance is the FIFO eviction so the cache doesn't grow unbounded across multiple races.
 
 **Next:** Final wrap-up. Backlog is empty. Time for an end-of-night summary in the journal so the user can pick up cleanly tomorrow.
+
+---
+## 2026-05-15 07:30 — Feedback pass after the user's morning review
+
+**Task:** address the issues the user listed at 7am (in samples/f-*.png). Headline: #7 and #9 were the same critical bug.
+
+**What I did:**
+- **Critical: `currentRace` was only matching `Route.RaceDetail`.** Every save flow from the plan view (`CommitTargetTime`, `CommitKmTimeForKm`, `CommitKmNotesForKm`, `ResetKmToAuto`, `ExportCsvKms/Sections`, `ExportGpxForCoros`, `ExportProjectFile`) silently no-op'd because the helper returned `Nothing` on `PlanTable` / `PlanKm` / `RaceMap`. Fixed by widening the match to all four race-bearing routes. This single change unlocked target-time auto-distribution, manual-km locking, notes persistence, AND every export-from-plan-view button.
+- **Plan rows fully clickable** (#5): each `<tr>` now carries `onClick (NavigateTo (Route.PlanKm …))`, plus `role="link"` and `tabindex="0"` for keyboard nav. Dropped the inner anchor on the km # cell since the whole row is the click target. Added a `NavigateTo Route` `Msg` for consistency.
+- **Race card without picture** (#3): replaced the empty band with a category-coloured decorative panel — a tinted gradient + a faint dual-layer mountain SVG silhouette + the category letter as a small watermark in the top-right. Cards in a grid now have visually equal heights whether or not they carry a cover image. Also added `flex flex-col` so the card uses `items-stretch` semantics inside the grid.
+- **Contrast fix** (#4): the light horizontal band the user saw was a `color-scheme` mismatch. Belt-and-braces fix: `<html lang="en" style="background:#020617;color-scheme:dark;">`, `<meta name="color-scheme" content="dark">`, body inline `style="background:#020617;"`, `:root { color-scheme: dark; background: #020617 }` in `app.css`, and the `#app` wrapper explicitly gets `bg-slate-950`. Removed the unused `--color-bg` / `--color-bg-elevated` theme tokens (they could shadow Tailwind's color generation in v4).
+- **Profile axis label overlap** (`f-profile-01.png`): tick counts now derive from available pixel space. `distanceTicks` reserves ~70 px per "X km" label; `elevationGridLines` reserves ~28 px per row. `niceStep` still snaps to 1/2/5 × 10^k so the labels remain readable.
+- **Km card uniform size** (`f-km-cards-*.png`): `viewKmCard` now takes `raceMaxRange` (max elevation range across every km in the race). The chart height = `raceMaxRange / mPerPx`, so every card in a race has the *same* shape regardless of which km you're looking at. Flatter kms get visual headroom above the silhouette — the right 1:1 story (flat km feels flat in the frame; climby km fills the frame). Card is `flex flex-col` so the chart + footer occupy the rest of a tall card cleanly. Prev/Next buttons sit in a fixed-width 360 px row below the card and don't move.
+- **Map polish** (#8): aid-station markers now include `kind`, `distanceKm`, `restSeconds`, and `services` in the JSON. The leaflet element renders popups with emoji service chips (💧🍌⛑🚻🎒), distance from start, and planned rest. Added start (green ▶) + finish (🏁) markers at the ends of the track.
+- **Service worker on dev** (#1): clarified in `MORNING.md` that the SW is gated on `import.meta.env.PROD`. Offline test goes through `npm run build && npm run preview`. Hand-rolled wrap; if the user wants HMR-safe dev SW, that's a one-line gate flip.
+
+**What I verified:**
+- `npm run build` → exit 0 after each change. Final bundle `280 kB JS / gzip 88.6 kB`, CSS `55.8 kB / gzip 13.9 kB`.
+- `npm run smoke` → still passes.
+- `currentRace` fix reviewed: every save flow that uses `currentRace` (5 plan messages + 3 export messages + meta edit) now works on `RaceMap`, `PlanTable`, `PlanKm` — these were the exact routes the user was testing on.
+- Profile tick-count math verified with a few cases: a 14 km chart at 600 px wide → 600/70 ≈ 8 ticks, niceStep snaps to 2 km → labels every 2 km, no overlap. Same chart at 200 px wide → 200/70 ≈ 2 ticks → labels every ~7 km (niceStep snaps to 10 km), still readable.
+- Km card uniform size: a route with max km range 200 m and chart width 328 px → mPerPx = 3.05, chartHeight = 65 px. A UTMB-style route with max km range 500 m → chartHeight = 164 px. Cards stay consistent within a race.
+
+**What changed in the repo:** PR #12 (URL after push). Modified: `src/Main.elm` (currentRace, NavigateTo, viewKmCard, viewRaceCard, viewRaceMap markers), `src/Profile.elm` (width-aware tick counts), `src/leaflet-element.js` (kind-aware icons + popups), `src/styles/app.css` (color-scheme + background pinning), `index.html` (inline styles + color-scheme meta), `MORNING.md` (feedback-pass section at the top).
+
+**What I learned:**
+- The `currentRace` bug is the kind of single-line mistake that hides behind otherwise-correct code: `case model.route of Route.RaceDetail rid -> ... _ -> Nothing` reads fine until you realise the *plan* view also has a current race. Lesson: helpers that hinge on the route should enumerate every route-with-id variant explicitly, not via `_ -> Nothing`.
+- The Tailwind v4 `bg-slate-950` utility *should* render dark even without `color-scheme: dark`, but in practice OS-level auto-tinting (especially in macOS' Big Sur+ "Increase Contrast" or Safari's reduced color modes) can soften background utilities. Inline-styling `background:#020617` on `<html>` is the smallest robust fix.
+- For "fixed card shape with 1:1 elevation", the right move is to use the *race*'s max-range, not the current km's. That keeps the shape consistent and lets the user read flatness/steepness visually by how much headroom the silhouette leaves.
+
+**Next:** Per-section card view (the deferred part of feedback item #6). Then "more gamification" pass if the user comes back with more.

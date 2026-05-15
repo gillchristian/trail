@@ -201,6 +201,7 @@ init flags url key =
 type Msg
     = LinkClicked Browser.UrlRequest
     | UrlChanged Url
+    | NavigateTo Route
     | WindowResized Int Int
     | SetScaleMode ScaleMode
       -- upload
@@ -281,6 +282,9 @@ update msg model =
                         }
             in
             ( hydrated, Cmd.none )
+
+        NavigateTo route ->
+            ( model, Nav.pushUrl model.key (Route.toString route) )
 
         WindowResized w _ ->
             ( { model | viewportWidth = toFloat w }, Cmd.none )
@@ -937,11 +941,24 @@ currentRaces model =
 
 currentRace : Model -> Maybe Race
 currentRace model =
-    case model.route of
-        Route.RaceDetail rid ->
+    let
+        lookup rid =
             currentRaces model
                 |> List.filter (\r -> raceIdToString r.id == raceIdToString rid)
                 |> List.head
+    in
+    case model.route of
+        Route.RaceDetail rid ->
+            lookup rid
+
+        Route.RaceMap rid ->
+            lookup rid
+
+        Route.PlanTable rid ->
+            lookup rid
+
+        Route.PlanKm rid _ ->
+            lookup rid
 
         _ ->
             Nothing
@@ -1500,7 +1517,7 @@ viewRaceCard race =
             distanceCategory race.distance
     in
     div
-        [ class "trail-card-in group relative bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden hover:border-rose-500/60 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-rose-500/10 transition-all duration-200" ]
+        [ class "trail-card-in group relative bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden hover:border-rose-500/60 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-rose-500/10 transition-all duration-200 flex flex-col" ]
         [ case race.coverImage of
             Just dataUrl ->
                 div
@@ -1514,7 +1531,7 @@ viewRaceCard race =
                     ]
 
             Nothing ->
-                div [ class ("h-1.5 w-full " ++ catColor) ] []
+                viewCoverPlaceholder catColor catLetter
         , a
             [ Route.href (Route.RaceDetail race.id)
             , class "block p-5 space-y-4"
@@ -1585,6 +1602,47 @@ distanceCategory meters =
 
     else
         ( "XL", "bg-rose-600", "Ultra" )
+
+
+{-| Decorative banner shown when a race has no cover image. A
+diagonal-gradient strip in the category color with a faint mountain
+silhouette SVG, so the card stays the same shape as cover-bearing
+ones (grid rows stay even) but feels intentional instead of empty.
+-}
+viewCoverPlaceholder : String -> String -> Html msg
+viewCoverPlaceholder catColor catLetter =
+    div
+        [ class
+            ("relative h-28 border-b border-slate-800 overflow-hidden "
+                ++ catColor
+                ++ "/30"
+            )
+        ]
+        [ div [ class ("absolute inset-0 " ++ catColor ++ "/15") ] []
+        , div [ class "absolute inset-0 bg-gradient-to-br from-slate-950/60 via-slate-900/40 to-slate-900/80" ] []
+        , Svg.svg
+            [ SA.viewBox "0 0 320 96"
+            , SA.preserveAspectRatio "xMidYMid slice"
+            , SA.class "absolute inset-0 w-full h-full opacity-25"
+            ]
+            [ Svg.path
+                [ SA.d "M0 80 L40 60 L70 75 L110 30 L150 65 L190 40 L230 70 L270 35 L320 70 L320 96 L0 96 Z"
+                , SA.fill "currentColor"
+                , SA.class "text-white"
+                ]
+                []
+            , Svg.path
+                [ SA.d "M0 88 L60 70 L100 80 L160 50 L210 75 L260 60 L320 80 L320 96 L0 96 Z"
+                , SA.fill "currentColor"
+                , SA.fillOpacity "0.65"
+                , SA.class "text-slate-950"
+                ]
+                []
+            ]
+        , div [ class "absolute top-3 right-3 text-[10px] font-bold uppercase tracking-widest text-white/70" ]
+            [ text catLetter ]
+        , div [ class ("absolute top-0 left-0 right-0 h-1.5 " ++ catColor) ] []
+        ]
 
 
 raceSubtitle : Race -> String
@@ -1760,25 +1818,31 @@ viewRaceMap model race =
         sortedAids =
             sortAidStations race.aidStations
 
-        markers =
+        aidMarkers =
             case track of
                 Just t ->
                     sortedAids
                         |> List.indexedMap
                             (\i a ->
-                                let
-                                    coord =
-                                        findCoordAt a.distance t
-                                in
-                                case coord of
+                                case findCoordAt a.distance t of
                                     Just ( lat, lon ) ->
                                         Just
                                             (Encode.object
-                                                [ ( "lat", Encode.float lat )
+                                                [ ( "kind", Encode.string "aid" )
+                                                , ( "lat", Encode.float lat )
                                                 , ( "lon", Encode.float lon )
                                                 , ( "label", Encode.string (String.fromInt (i + 1)) )
                                                 , ( "name", Encode.string a.name )
                                                 , ( "index", Encode.int (i + 1) )
+                                                , ( "distanceKm", Encode.float (a.distance / 1000) )
+                                                , ( "restSeconds", Encode.int a.restSeconds )
+                                                , ( "services"
+                                                  , Encode.list
+                                                        (\s ->
+                                                            Encode.string (Types.serviceToString s)
+                                                        )
+                                                        a.services
+                                                  )
                                                 ]
                                             )
 
@@ -1789,6 +1853,47 @@ viewRaceMap model race =
 
                 Nothing ->
                     []
+
+        startFinishMarkers =
+            case track of
+                Just t ->
+                    let
+                        first =
+                            List.head t.points
+
+                        last =
+                            t.points |> List.reverse |> List.head
+                    in
+                    [ first
+                        |> Maybe.map
+                            (\p ->
+                                Encode.object
+                                    [ ( "kind", Encode.string "start" )
+                                    , ( "lat", Encode.float p.lat )
+                                    , ( "lon", Encode.float p.lon )
+                                    , ( "label", Encode.string "S" )
+                                    , ( "name", Encode.string "Start" )
+                                    ]
+                            )
+                    , last
+                        |> Maybe.map
+                            (\p ->
+                                Encode.object
+                                    [ ( "kind", Encode.string "finish" )
+                                    , ( "lat", Encode.float p.lat )
+                                    , ( "lon", Encode.float p.lon )
+                                    , ( "label", Encode.string "F" )
+                                    , ( "name", Encode.string ("Finish · " ++ formatFloat 1 (race.distance / 1000) ++ " km") )
+                                    ]
+                            )
+                    ]
+                        |> List.filterMap identity
+
+                Nothing ->
+                    []
+
+        markers =
+            startFinishMarkers ++ aidMarkers
 
         trackJson =
             Encode.encode 0 (Encode.list (Encode.list Encode.float) coords)
@@ -2664,14 +2769,14 @@ viewKmRow race km result stops notes cumulative =
                     ]
                 ]
     in
-    Html.tr [ class "border-t border-slate-800 hover:bg-slate-950/60 transition-colors" ]
-        [ Html.td [ class "px-4 py-3 align-top tabular-nums text-slate-300" ]
-            [ a
-                [ Route.href (Route.PlanKm race.id km.index)
-                , class "hover:text-rose-300"
-                ]
-                [ text (String.fromInt (km.index + 1)) ]
-            ]
+    Html.tr
+        [ class "border-t border-slate-800 hover:bg-slate-950/60 transition-colors cursor-pointer"
+        , onClick (NavigateTo (Route.PlanKm race.id km.index))
+        , A.attribute "role" "link"
+        , A.attribute "tabindex" "0"
+        ]
+        [ Html.td [ class "px-4 py-3 align-top tabular-nums text-slate-300 font-medium" ]
+            [ text (String.fromInt (km.index + 1)) ]
         , Html.td [ class "px-4 py-3 align-top text-slate-400 tabular-nums whitespace-nowrap" ]
             [ text
                 (formatFloat 2 (km.distStart / 1000)
@@ -2874,12 +2979,12 @@ viewPlanKm model race kmIndex =
                     [ text "This km doesn't exist in this race." ]
 
             Just km ->
-                viewKmCardAndForm model race km results aidRest prevIndex nextIndex
+                viewKmCardAndForm model race km kms results aidRest prevIndex nextIndex
         ]
 
 
-viewKmCardAndForm : Model -> Race -> Km -> Dict Int KmResult -> Int -> Maybe Int -> Maybe Int -> Html Msg
-viewKmCardAndForm model race km results _ prevIndex nextIndex =
+viewKmCardAndForm : Model -> Race -> Km -> List Km -> Dict Int KmResult -> Int -> Maybe Int -> Maybe Int -> Html Msg
+viewKmCardAndForm model race km allKms results _ prevIndex nextIndex =
     let
         result =
             Dict.get km.index results |> Maybe.withDefault { seconds = 0, source = AutoComputed }
@@ -2891,24 +2996,34 @@ viewKmCardAndForm model race km results _ prevIndex nextIndex =
             race.aidStations
                 |> List.filter (\a -> a.distance >= km.distStart && a.distance <= km.distEnd)
 
+        -- Uniform chart height across every km in this race, so the card
+        -- shape doesn't change as we navigate and the prev/next buttons
+        -- stay in a predictable spot. Computed from the steepest km's
+        -- elevation range at the same m/px we draw at.
+        raceMaxRange =
+            allKms
+                |> List.map (\k -> max 1 (k.maxEle - k.minEle))
+                |> List.maximum
+                |> Maybe.withDefault 100
+
         navLink labelText maybeIdx =
             case maybeIdx of
                 Just idx ->
                     a
                         [ Route.href (Route.PlanKm race.id idx)
-                        , class "px-3 py-2 text-sm border border-slate-700 rounded-md hover:bg-slate-800 text-slate-200"
+                        , class "px-4 py-2 text-sm border border-slate-700 rounded-md hover:bg-slate-800 hover:border-slate-600 text-slate-200 w-[170px] text-center"
                         ]
                         [ text labelText ]
 
                 Nothing ->
                     span
-                        [ class "px-3 py-2 text-sm border border-slate-800 rounded-md text-slate-600 cursor-not-allowed" ]
+                        [ class "px-4 py-2 text-sm border border-slate-800 rounded-md text-slate-600 cursor-not-allowed w-[170px] text-center" ]
                         [ text labelText ]
     in
     div [ class "grid grid-cols-1 lg:grid-cols-2 gap-6 items-start" ]
-        [ div [ class "space-y-4" ]
-            [ viewKmCard km stopsInKm
-            , div [ class "flex gap-2 justify-between" ]
+        [ div [ class "flex flex-col items-center gap-4 lg:sticky lg:top-24" ]
+            [ viewKmCard km stopsInKm raceMaxRange
+            , div [ class "flex gap-3 w-[360px] justify-between" ]
                 [ navLink "← Prev km" prevIndex
                 , navLink "Next km →" nextIndex
                 ]
@@ -2917,50 +3032,50 @@ viewKmCardAndForm model race km results _ prevIndex nextIndex =
         ]
 
 
-viewKmCard : Km -> List AidStation -> Html Msg
-viewKmCard km stopsInKm =
+viewKmCard : Km -> List AidStation -> Float -> Html Msg
+viewKmCard km stopsInKm raceMaxRange =
     let
         cardWidth =
             360.0
 
-        cardHeight =
-            260.0
-
-        padding =
+        chartHorizontalPadding =
             16.0
 
-        chartLeft =
-            padding
-
-        chartTop =
-            padding
-
         chartWidth =
-            cardWidth - padding * 2
+            cardWidth - chartHorizontalPadding * 2
 
-        chartHeight =
-            cardHeight - padding * 2 - 28
-        -- room for the label band at the bottom
-
-        eleRange =
-            max 10 (km.maxEle - km.minEle)
-
-        -- 1:1 scale within the card. m/px is the same on both axes.
+        -- True 1:1: 1 km horizontally = chartWidth px → m/px = 1000 / chartWidth.
         mPerPx =
-            max (km.distance / chartWidth) (eleRange / chartHeight)
+            1000 / chartWidth
 
-        -- Recompute chart geometry now that we know the actual ratio.
-        actualChartHeight =
-            eleRange / mPerPx
+        -- The race-wide max range × m/px → uniform chart height for every
+        -- km in this race. Flatter kms get headroom above the silhouette,
+        -- which is the right visual story (a flat km feels flat in this
+        -- frame; the climb km fills the frame).
+        chartHeight =
+            max 80 (raceMaxRange / mPerPx)
+
+        chartTopPad =
+            14
+
+        chartBottomPad =
+            22
+
+        chartTotalHeight =
+            chartTopPad + chartHeight + chartBottomPad
 
         elevBaseline =
-            chartTop + actualChartHeight
+            chartTopPad + chartHeight
 
+        -- Y axis is anchored to maxEle (not raceMaxEle) so each km's
+        -- silhouette sits on the bottom of its frame. Empty headroom
+        -- above is the visual signal that this km is flatter than the
+        -- race's steepest.
         toX d =
-            chartLeft + d / mPerPx
+            chartHorizontalPadding + d / mPerPx
 
         toY ele =
-            chartTop + (km.maxEle - ele) / mPerPx
+            elevBaseline - (ele - km.minEle) / mPerPx
 
         coords =
             List.map2 (\d p -> ( toX d, toY p.ele )) km.cumDist km.points
@@ -2972,9 +3087,15 @@ viewKmCard km stopsInKm =
             buildStrokePathLocal coords
 
         stopMarkers =
-            List.map (viewKmCardStop chartTop elevBaseline km.distStart toX) stopsInKm
+            List.map (viewKmCardStop chartTopPad elevBaseline km.distStart toX) stopsInKm
+
+        deltaEle =
+            km.eleEnd - km.eleStart
     in
-    div [ class "relative bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden", A.style "width" (String.fromFloat cardWidth ++ "px") ]
+    div
+        [ class "relative bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden flex flex-col"
+        , A.style "width" (String.fromFloat cardWidth ++ "px")
+        ]
         [ div [ class "px-5 pt-4 pb-3 border-b border-slate-800" ]
             [ p [ class "text-xs uppercase tracking-wider text-slate-500" ]
                 [ text
@@ -2986,7 +3107,7 @@ viewKmCard km stopsInKm =
                     )
                 ]
             , div [ class "mt-1 flex items-baseline justify-between" ]
-                [ p [ class "text-2xl font-semibold text-slate-100 tabular-nums" ]
+                [ p [ class "text-2xl font-semibold text-white tabular-nums" ]
                     [ text
                         (formatFloat 2 (km.distStart / 1000)
                             ++ " → "
@@ -2994,56 +3115,67 @@ viewKmCard km stopsInKm =
                             ++ " km"
                         )
                     ]
-                , p [ class "text-sm text-slate-400 tabular-nums" ]
+                , p
+                    [ classList
+                        [ ( "text-sm tabular-nums font-medium", True )
+                        , ( "text-rose-300", deltaEle > 1 )
+                        , ( "text-emerald-300", deltaEle < -1 )
+                        , ( "text-slate-400", deltaEle >= -1 && deltaEle <= 1 )
+                        ]
+                    ]
                     [ text
-                        ((if km.eleEnd - km.eleStart >= 0 then
+                        ((if deltaEle >= 0 then
                             "+"
 
                           else
                             ""
                          )
-                            ++ formatInt (km.eleEnd - km.eleStart)
+                            ++ formatInt deltaEle
                             ++ " m"
                         )
                     ]
                 ]
             ]
-        , Svg.svg
-            [ SA.width (String.fromFloat cardWidth)
-            , SA.height (String.fromFloat (chartTop + actualChartHeight + 24))
-            , SA.viewBox ("0 0 " ++ String.fromFloat cardWidth ++ " " ++ String.fromFloat (chartTop + actualChartHeight + 24))
-            ]
-            [ Svg.defs []
-                [ Svg.linearGradient
-                    [ SA.id ("km-fill-" ++ String.fromInt km.index)
-                    , SA.x1 "0"
-                    , SA.y1 "0"
-                    , SA.x2 "0"
-                    , SA.y2 "1"
+        , div [ class "flex-1" ]
+            [ Svg.svg
+                [ SA.width (String.fromFloat cardWidth)
+                , SA.height (String.fromFloat chartTotalHeight)
+                , SA.viewBox ("0 0 " ++ String.fromFloat cardWidth ++ " " ++ String.fromFloat chartTotalHeight)
+                , A.style "display" "block"
+                ]
+                [ Svg.defs []
+                    [ Svg.linearGradient
+                        [ SA.id ("km-fill-" ++ String.fromInt km.index)
+                        , SA.x1 "0"
+                        , SA.y1 "0"
+                        , SA.x2 "0"
+                        , SA.y2 "1"
+                        ]
+                        [ Svg.stop [ SA.offset "0%", SA.stopColor "#E52E3A", SA.stopOpacity "0.7" ] []
+                        , Svg.stop [ SA.offset "100%", SA.stopColor "#E52E3A", SA.stopOpacity "0.05" ] []
+                        ]
                     ]
-                    [ Svg.stop [ SA.offset "0%", SA.stopColor "#E52E3A", SA.stopOpacity "0.65" ] []
-                    , Svg.stop [ SA.offset "100%", SA.stopColor "#E52E3A", SA.stopOpacity "0.1" ] []
+                , Svg.path
+                    [ SA.d pathD
+                    , SA.fill ("url(#km-fill-" ++ String.fromInt km.index ++ ")")
+                    , SA.stroke "none"
                     ]
+                    []
+                , Svg.path
+                    [ SA.d strokeD
+                    , SA.fill "none"
+                    , SA.stroke "#ff5f6a"
+                    , SA.strokeWidth "1.8"
+                    , SA.strokeLinejoin "round"
+                    , SA.strokeLinecap "round"
+                    ]
+                    []
+                , Svg.g [] stopMarkers
                 ]
-            , Svg.path
-                [ SA.d pathD
-                , SA.fill ("url(#km-fill-" ++ String.fromInt km.index ++ ")")
-                , SA.stroke "none"
-                ]
-                []
-            , Svg.path
-                [ SA.d strokeD
-                , SA.fill "none"
-                , SA.stroke "#ff5f6a"
-                , SA.strokeWidth "1.5"
-                , SA.strokeLinejoin "round"
-                ]
-                []
-            , Svg.g [] stopMarkers
             ]
-        , div [ class "px-5 pb-4 -mt-1 flex items-baseline justify-between text-xs text-slate-500 tabular-nums" ]
+        , div [ class "px-5 py-3 border-t border-slate-800 flex items-baseline justify-between text-xs text-slate-400 tabular-nums" ]
             [ span [] [ text (formatInt km.eleStart ++ " m") ]
-            , span [] [ text (formatInt km.maxEle ++ " m max") ]
+            , span [ class "text-amber-400" ] [ text ("⤒ " ++ formatInt km.maxEle ++ " m") ]
             , span [] [ text (formatInt km.eleEnd ++ " m") ]
             ]
         ]

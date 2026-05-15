@@ -2,7 +2,23 @@
 
 End-of-night summary. Read this first.
 
-## What shipped
+## Feedback pass (after your morning notes)
+
+You left a list of issues at 07:00 — addressed in a follow-up PR. Headline: **#7 and #9 ("auto planning and per-km don't save") were the same bug** — `currentRace` only matched the `RaceDetail` route, so every save attempt from the plan view silently dropped. Fixed. The rest:
+
+- **Offline on dev**: by design — the service worker is gated on `import.meta.env.PROD`, so `npm run dev` (which runs Vite's HMR) never registers it. Test offline via `npm run build && npm run preview` instead. (If you'd rather a dev-time SW for parity, say the word and I'll wire one with HMR-safe path skipping.)
+- **Storage works** ✓
+- **Race card without picture**: replaced the dead-space band with a category-coloured decorative panel (gradient + faint mountain silhouette + category letter watermark). Cards across the grid now stay the same shape regardless of which ones have covers.
+- **Contrast**: pinned the page to `color-scheme: dark` and added explicit `background:#020617` to `<html>` and `<body>` (inline + CSS), so OS-level auto-tinting or any FOUC can't push a light cast.
+- **Whole row clickable in the plan view**: yes; rows now navigate to the per-km view on click, with `role="link"` + `tabindex` for keyboard nav.
+- **Section view cards**: not in this pass — earmarked for the next PR (per-section card layout with auto-time = sum of contained kms).
+- **Km cards changing size**: fixed. Card width stays 360 px, chart height is now computed from the *steepest* km of the whole race, so every km in a given race uses the same card shape and the Prev/Next buttons stay anchored. Flatter kms get visual headroom above the silhouette — that's the right 1:1 story.
+- **Profile axis labels overlapping**: tick count is now width/height-aware (~70 px per distance label, ~28 px per elevation label). FitWidth on a narrow viewport no longer stacks labels on top of each other.
+- **Map polish**: aid-station popups show service emojis (💧🍌⛑🚻🎒) + distance from start + planned rest. Start gets a green ▶ marker, finish gets a black 🏁 marker.
+
+After the fix-pass PR lands, the workflow you couldn't actually use last night (target time → auto-distributed kms → manual overrides → notes → CSV download) works end-to-end.
+
+## What shipped (original overnight build)
 
 Full backlog done. 10 PRs, all squash-merged into `master`, all authored as `gillchristian` (no Claude credit, per your rule). Build is clean (`npm run build` ✓), smoke test is clean (`npm run smoke` ✓).
 
