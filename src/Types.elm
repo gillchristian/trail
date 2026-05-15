@@ -1,5 +1,6 @@
 module Types exposing
-    ( AidStation
+    ( ActualSplits
+    , AidStation
     , KmPlan
     , KmTime(..)
     , Plan
@@ -196,6 +197,21 @@ type alias Race =
     , aidStations : List AidStation
     , aidStationSeq : Int
     , plan : Plan
+    , actualSplits : Maybe ActualSplits
+    }
+
+
+{-| Per-km actual times after the user uploads a completed run's GPX.
+`splits` keys match `Planning.Km.index` (0-based); values are seconds.
+`totalDistance` is the actual track distance (may differ from
+`Race.distance` if the user ran off-route or DNF'd). `uploadedAt` is
+ms since epoch.
+-}
+type alias ActualSplits =
+    { splits : Dict Int Int
+    , totalSeconds : Int
+    , totalDistance : Float
+    , uploadedAt : Int
     }
 
 
@@ -271,7 +287,52 @@ encodeRace r =
         , ( "aidStations", E.list encodeAidStation r.aidStations )
         , ( "aidStationSeq", E.int r.aidStationSeq )
         , ( "plan", planToValue r.plan )
+        , ( "actualSplits"
+          , case r.actualSplits of
+                Just a ->
+                    encodeActualSplits a
+
+                Nothing ->
+                    E.null
+          )
         ]
+
+
+encodeActualSplits : ActualSplits -> Value
+encodeActualSplits a =
+    E.object
+        [ ( "splits"
+          , a.splits
+                |> Dict.toList
+                |> E.list
+                    (\( idx, secs ) ->
+                        E.object
+                            [ ( "index", E.int idx )
+                            , ( "seconds", E.int secs )
+                            ]
+                    )
+          )
+        , ( "totalSeconds", E.int a.totalSeconds )
+        , ( "totalDistance", E.float a.totalDistance )
+        , ( "uploadedAt", E.int a.uploadedAt )
+        ]
+
+
+decodeActualSplits : Decoder ActualSplits
+decodeActualSplits =
+    D.map4 ActualSplits
+        (D.field "splits"
+            (D.list
+                (D.map2 Tuple.pair
+                    (D.field "index" D.int)
+                    (D.field "seconds" D.int)
+                )
+            )
+            |> D.map Dict.fromList
+        )
+        (D.field "totalSeconds" D.int)
+        (D.field "totalDistance" D.float)
+        (D.field "uploadedAt" D.int)
 
 
 planToValue : Plan -> Value
@@ -381,7 +442,7 @@ decodeRace =
     coreDecoder
         |> D.andThen
             (\partial ->
-                D.map7 partial
+                D.map8 partial
                     (D.field "gain" D.float)
                     (D.field "loss" D.float)
                     (D.field "gpxText" D.string)
@@ -401,6 +462,11 @@ decodeRace =
                         , D.succeed defaultPlan
                         ]
                     )
+                    (D.oneOf
+                        [ D.field "actualSplits" (D.nullable decodeActualSplits)
+                        , D.succeed Nothing
+                        ]
+                    )
             )
 
 
@@ -413,9 +479,9 @@ coreBuilder :
     -> String
     -> Maybe String
     -> Float
-    -> (Float -> Float -> String -> Int -> List AidStation -> Int -> Plan -> Race)
+    -> (Float -> Float -> String -> Int -> List AidStation -> Int -> Plan -> Maybe ActualSplits -> Race)
 coreBuilder id name date location url notes cover dist =
-    \gain loss gpx ts aids seq plan ->
+    \gain loss gpx ts aids seq plan actual ->
         { id = id
         , name = name
         , date = date
@@ -431,6 +497,7 @@ coreBuilder id name date location url notes cover dist =
         , aidStations = aids
         , aidStationSeq = seq
         , plan = plan
+        , actualSplits = actual
         }
 
 
