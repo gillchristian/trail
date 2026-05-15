@@ -2,6 +2,7 @@ module StravaApi exposing
     ( Activity
     , fetchActivities
     , fetchStreams
+    , searchActivities
     )
 
 {-| Thin HTTP wrapper for cadence's trail-facing endpoints.
@@ -67,6 +68,54 @@ fetchStreams backendUrl token activityId toMsg =
         , timeout = Just 30000
         , tracker = Nothing
         }
+
+
+{-| Full-history search across cadence's FTS5-indexed activities
+table. Unlike `fetchActivities` (60-day window), this hits the
+entire backfilled history. Use it when the user types a query;
+fall back to `fetchActivities` when the query is empty.
+-}
+searchActivities : String -> String -> String -> (Result Http.Error (List Activity) -> msg) -> Cmd msg
+searchActivities backendUrl token query toMsg =
+    Http.request
+        { method = "GET"
+        , headers = [ Http.header "Authorization" ("Bearer " ++ token) ]
+        , url =
+            backendUrl
+                ++ "/api/activities/search?limit=50&q="
+                ++ percentEncode query
+        , body = Http.emptyBody
+        , expect = Http.expectJson toMsg searchResultsDecoder
+        , timeout = Just 15000
+        , tracker = Nothing
+        }
+
+
+{-| Search responses are wrapped in
+`{activities: [...], total, limit, offset}`. We only care about the
+inner array; total/limit/offset can be surfaced later if the UI
+adds pagination.
+-}
+searchResultsDecoder : Decoder (List Activity)
+searchResultsDecoder =
+    D.field "activities" (D.list activityDecoder)
+
+
+{-| Minimal URL component encoder. We only need to escape characters
+that would break the `q=…` query parameter; the FTS5 query syntax
+itself is permissive (trigram tokenizer). Spaces, `&`, `#`, `?`,
+and `+` are the practical hazards.
+-}
+percentEncode : String -> String
+percentEncode s =
+    s
+        |> String.replace "%" "%25"
+        |> String.replace " " "%20"
+        |> String.replace "&" "%26"
+        |> String.replace "#" "%23"
+        |> String.replace "?" "%3F"
+        |> String.replace "+" "%2B"
+        |> String.replace "\"" "%22"
 
 
 
