@@ -579,3 +579,15 @@ Wrote `knowledge/reference/cadence-backend-spec-addendum-1-profile-scope.md` —
 - Dragging the slider saves the race on every step — every value-change generates a Storage.saveRace. For UTMB-sized races this is ~1 MB JSON per save. Acceptable per the offline-first / single-user constraint; the IDB write is async and doesn't block the UI.
 - Native `<input type="range">` with `accent-rose-500` is dark-theme friendly without custom CSS; matches the existing form aesthetic.
 **Next:** TASK-020 — confidence indicator. Surface the prediction's confidence based on profile source (hand-tuned vs fitted-from-N-activities). Currently profile.source isn't tracked; this task may need to extend the profile model or a tiny "metadata" sidecar in IDB.
+
+---
+## 2026-05-15 22:00 — TASK-020: confidence indicator
+
+**Task:** TASK-020.
+**What I did:** Predictor strip's "Predicted finish" column gained a `± hh:mm` margin and a confidence band label. `confidenceFromProfile : Model -> Race -> (label, tone, margin)` returns `("Low · profile from presets", "text-slate-400", 0.20)` by default; if the race has linked actualSplits, narrows to `("Medium-low · 1 actual linked", "text-sky-400", 0.15)`. Component-breakdown text de-emphasized to `text-[10px] text-slate-600` so the margin gets visual priority.
+**What I verified:** `npm run build` exit 0, JS 309.49 → 309.82 kB (+330 B, basically just the new strings); bundle string check: "Low · profile", "Medium-low", "actual linked" present.
+**What changed in the repo:** PR #23. Modified `src/Main.elm` (confidenceFromProfile fn + view tweak).
+**What I learned:**
+- The confidence rubric in roadmap §11.D references "fitted from N activities" semantics that don't exist until TASK-022. Going with the data we have today: presence/absence of actualSplits on *this* race. That's a thin proxy but it's honest — the user sees "no actuals, so wide band" or "one actual, slightly narrower." Future TASK-022 can refine to use the count of actuals across all races + an explicit `profile.source` field.
+- Putting the margin near the predicted finish (not on the slider) makes "the slider position is exact; the predicted time is approximate" clear visually. The component breakdown moved to a smaller font so the margin reads as the primary qualifier.
+**Next:** TASK-021 — Strava streams parser. Mirrors `ActualGpx` but consumes the keyed-object stream JSON cadence's endpoint returns. Pure module, no UI in this slice; TASK-024 (when it lands) plugs it into the actual-run upload flow.
