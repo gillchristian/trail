@@ -604,3 +604,17 @@ Wrote `knowledge/reference/cadence-backend-spec-addendum-1-profile-scope.md` —
 - The keyed-object shape (`{ "time": { "data": [...] } }`) is what cadence's TASK-004 returns when it forwards `key_by_type=true` to Strava. Decoder uses `D.oneOf [field, succeed default]` so missing streams (e.g. an activity without heartrate) decode to empty lists rather than failing.
 - `zip3` for `(time, latlng, altitude)` triples: 4-arity zips don't exist in Elm stdlib, and a 5th-tuple wouldn't compile anyway. Three's the natural cap.
 **Next:** TASK-022 (calibration from past activities) — large, depends on the OAuth integration which is TASK-024. I'll do TASK-024 first so the data flow is complete before calibration logic.
+
+---
+## 2026-05-15 22:35 — TASK-024 v1: Strava OAuth round-trip + Connect/Disconnect
+
+**Task:** TASK-024 v1 (intentionally scoped tight; activity picker split off as 024b).
+**What I did:** JS-side captures `?token=...` from the OAuth callback URL before Elm boots, strips it from the address bar via `history.replaceState`, and hands it to Elm via flags. Added `VITE_BACKEND_URL` env-var fallback (defaults `http://localhost:3001`). Three new IDB-port pairs persist the session token under `settings.stravaSessionToken`. `Model` gains `stravaToken : Maybe String` and `backendUrl : String`. On init: if incoming token, save it; otherwise load whatever's in IDB. Settings page Strava section renders "Connect Strava" → `${backendUrl}/auth/strava?origin=trail` when no token; "Connected" pill + Disconnect button when present.
+**What I verified:** `npm run build` exit 0, JS 309.82 → 312.56 kB (+2.7 KB); gzip 96.72 → 97.41 kB. Bundle string check: all 5 new labels (Strava integration, Connect Strava, Disconnect, App works fully offline, Backend:) present.
+**What changed in the repo:** PR #25. Modified `src/main.js` (`STRAVA_TOKEN_KEY`, `BACKEND_URL`, `loadStravaToken`/`saveStravaToken`, `incomingStravaToken` capture, port subscribes), `src/Storage.elm` (3 new ports + wrappers), `src/Main.elm` (Flags + Model fields, init Cmd, Msg variants, update handlers, subscription, settings-page Strava section).
+**What I learned:**
+- The OAuth callback redirects with `?token=...` in the **query string** (before any `#hash`). Trail's hash router doesn't see queries, so the capture has to happen at the JS layer before Elm boots. Otherwise Elm initializes with the URL still containing the token in the address bar — visible, leakable.
+- Elm's `Maybe String` decoder for flags accepts `null | string` natively. The JS-side `incomingStravaToken` variable is either the string from the query param or `null`; types align without a custom decoder.
+- `Storage.saveStravaToken Encode.null` is how Disconnect clears the IDB row (the JS-side handler deletes the row when the value is falsy). Symmetric with `Just t → put`.
+- Scope discipline saved this PR: the activity picker is ~200 more lines of Elm UI + `elm/http` + a state machine for "loading activities" / "loading streams" / "error." Splitting it off as TASK-024b keeps THIS PR honest about what it ships.
+**Next:** Three remaining items: TASK-024b (activity picker + streams fetch + persist), TASK-022 (calibration from past activities), and the cadence addendum-1 work (user is handling that separately). All three are L-sized; deferring to a follow-up session unless the user wants to push further now.

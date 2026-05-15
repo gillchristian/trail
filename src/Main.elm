@@ -87,6 +87,8 @@ main =
 type alias Flags =
     { width : Float
     , now : Int
+    , incomingStravaToken : Maybe String
+    , backendUrl : String
     }
 
 
@@ -171,6 +173,8 @@ type alias Model =
     , actualRunError : Maybe String
     , profile : Profile
     , profileSaved : Bool
+    , stravaToken : Maybe String
+    , backendUrl : String
     }
 
 
@@ -197,8 +201,19 @@ init flags url key =
       , actualRunError = Nothing
       , profile = AthleteProfile.midPack
       , profileSaved = False
+      , stravaToken = flags.incomingStravaToken
+      , backendUrl = flags.backendUrl
       }
-    , Cmd.batch [ Storage.loadAll, Storage.loadProfile ]
+    , Cmd.batch
+        [ Storage.loadAll
+        , Storage.loadProfile
+        , case flags.incomingStravaToken of
+            Just t ->
+                Storage.saveStravaToken (Encode.string t)
+
+            Nothing ->
+                Storage.loadStravaToken
+        ]
     )
 
 
@@ -288,6 +303,9 @@ type Msg
     | ProfileSave
       -- predictor slider
     | SliderChanged String
+      -- strava integration
+    | StravaTokenLoaded Encode.Value
+    | StravaDisconnect
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -1107,6 +1125,19 @@ update msg model =
             , Storage.saveProfile (AthleteProfile.encode model.profile)
             )
 
+        StravaTokenLoaded value ->
+            case D.decodeValue (D.nullable D.string) value of
+                Ok (Just t) ->
+                    ( { model | stravaToken = Just t }, Cmd.none )
+
+                _ ->
+                    ( { model | stravaToken = Nothing }, Cmd.none )
+
+        StravaDisconnect ->
+            ( { model | stravaToken = Nothing }
+            , Storage.saveStravaToken Encode.null
+            )
+
         SliderChanged str ->
             case ( String.toFloat str, currentRace model ) of
                 ( Just i, Just race ) ->
@@ -1497,6 +1528,7 @@ subscriptions _ =
         , Storage.gotRaceDeleted RaceDeleted
         , Storage.gotError StorageError
         , Storage.gotProfile ProfileLoaded
+        , Storage.gotStravaToken StravaTokenLoaded
         , Download.imagePicked MetaCoverPicked
         , Browser.Events.onResize WindowResized
         ]
@@ -1873,6 +1905,40 @@ viewProfileSettings model =
                 ]
                 [ text "Save profile" ]
             ]
+        , viewStravaSection model
+        ]
+
+
+viewStravaSection : Model -> Html Msg
+viewStravaSection model =
+    div [ class "rounded-2xl bg-slate-900 border border-slate-800 p-5 space-y-3" ]
+        [ div [ class "flex items-center justify-between gap-4 flex-wrap" ]
+            [ div []
+                [ p [ class "text-sm font-medium text-slate-100" ] [ text "Strava integration" ]
+                , p [ class "text-xs text-slate-500 mt-0.5" ]
+                    [ text "Optional. Lets you link a completed race directly from Strava and (later) calibrate the profile from past activities. App works fully offline without it." ]
+                ]
+            , case model.stravaToken of
+                Just _ ->
+                    div [ class "flex items-center gap-2" ]
+                        [ span [ class "px-2 py-1 text-xs rounded bg-emerald-500/15 text-emerald-300 ring-1 ring-inset ring-emerald-500/30" ]
+                            [ text "Connected" ]
+                        , button
+                            [ onClick StravaDisconnect
+                            , class "px-3 py-1.5 text-sm border border-slate-700 rounded-md hover:bg-slate-800 text-slate-400 hover:text-rose-400"
+                            ]
+                            [ text "Disconnect" ]
+                        ]
+
+                Nothing ->
+                    a
+                        [ A.href (model.backendUrl ++ "/auth/strava?origin=trail")
+                        , class "px-4 py-2 bg-orange-500 text-white rounded-md hover:bg-orange-400 text-sm font-medium"
+                        ]
+                        [ text "Connect Strava" ]
+            ]
+        , p [ class "text-xs text-slate-600" ]
+            [ text ("Backend: " ++ model.backendUrl) ]
         ]
 
 
