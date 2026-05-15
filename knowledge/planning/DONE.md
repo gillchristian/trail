@@ -10,5 +10,6 @@ Each entry: the TASK-NNN id, title, the date completed, and a one-line summary o
 
 ## Completed
 
+- TASK-003 — OAuth state-based origin routing — 2026-05-15 — `?origin=trail|cadence` on `/auth/strava` (default cadence), `state=base64url(JSON{n,o})`, in-memory nonce store (sync.Map + 5-min TTL + 1-min sweep), callback validates one-shot Take + matches encoded vs stored origin BEFORE Strava code exchange, per-origin redirect via `FRONTEND_URL_{CADENCE,TRAIL}`. PR #4, merged `a68896e`. See journal 2026-05-15 16:35.
 - TASK-002 — Multi-origin CORS — 2026-05-15 — `FRONTEND_URLS` comma-separated env var feeds `cors.Options.AllowedOrigins`; falls back to legacy `FRONTEND_URL`. PR #3, merged `1788389`. See journal 2026-05-15 16:10.
 - TASK-001 — Split `tokens` into `tokens` + `sessions` — 2026-05-15 — migrations 013-016, transactional `SetTokens(t, sessionToken, origin)`, `GetTokensBySession` joins + bumps `last_seen_at`, `ClearTokensBySession` removes session only. PR #2, merged `3e85f86`. See journal 2026-05-15 15:50.

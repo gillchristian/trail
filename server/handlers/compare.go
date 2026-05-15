@@ -110,7 +110,7 @@ func (h *CompareHandler) fetchAndCacheActivity(accessToken string, activityID in
 	if splitsHaveHR {
 		log.Printf("Activity %d: using HR from splits_metric", activityID)
 	} else {
-		streams, err := h.Strava.FetchActivityStreams(accessToken, activityID)
+		streams, err := h.Strava.FetchActivityStreams(accessToken, activityID, []string{"distance", "heartrate"})
 		if err != nil {
 			log.Printf("Activity %d: streams fetch error (non-fatal): %v", activityID, err)
 		} else {

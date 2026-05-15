@@ -79,3 +79,25 @@ Append-only. Newest at the bottom. Each entry is a snapshot for future-me with n
 - The PR convention I've adopted (carry the prior task's retro into the next PR) trades a slight body-line bump for keeping master clean and avoiding direct-push exceptions to the workflow.
 **Next:** TASK-003 — OAuth state-based origin routing. Wire `?origin=trail|cadence`, base64url-encoded `{nonce, origin}` state, `sync.Map` with 5-min TTL, callback decode+validate, per-origin redirect targets.
 
+---
+## 2026-05-15 16:35 — TASK-003 shipped: OAuth state-based origin routing
+
+**Task:** TASK-003 (PR #4, merge sha `a68896e`, https://github.com/gillchristian/strava/pull/4).
+**What I did:** New `handlers/oauth_state.go` — `OAuthStateStore` (sync.Map of nonce→{origin, expiresAt}, 1-min background sweep, 5-min TTL), `Put`/`Take` (one-shot via `LoadAndDelete`), `encodeOAuthState`/`decodeOAuthState` (base64url over `{"n":..., "o":...}` JSON), `newOAuthNonce` (16 random bytes b64url), `IsAllowedOrigin`. Rewrote `StravaRedirect` to accept `?origin` (default `cadence`, 400 on unknown), mint + store a nonce, append `&state=…` to the Strava authorize URL. Rewrote `Callback` to validate state — decode → `Take` → match encoded vs stored origin — BEFORE calling Strava's token exchange, so a malformed/replayed state can never burn the code. Wired `FrontendURLs` from `FRONTEND_URL_{CADENCE,TRAIL}` in `main.go` (each falling back to legacy `FRONTEND_URL`); on success, `Callback` redirects via the per-origin URL and passes the validated `origin` into `SetTokens` (lands in `sessions.origin`). Added 7 unit tests covering codec round-trip, garbage decode, one-shot Take, unknown nonce, expired nonce (fake clock), per-origin redirect routing + empty-string fallback, and the allow-list.
+**What I verified:**
+- `go build -tags fts5 .` + `go vet -tags fts5 ./...` clean.
+- `go test -tags fts5 ./handlers` → 7/7 PASS.
+- Live HTTP smoke (`FRONTEND_URL_TRAIL=http://localhost:6000`, `STRAVA_CLIENT_ID=test_client_id`):
+  - `/auth/strava` → 302 with state `eyJuIjoiRnlqZ28zdndzQmpxQ2JGREFDcjVLQSIsIm8iOiJjYWRlbmNlIn0` → decodes to `{"n":"Fyjgo3vwsBjqCbFDACr5KA","o":"cadence"}` (default).
+  - `/auth/strava?origin=trail` → state `{"n":"...","o":"trail"}`.
+  - `/auth/strava?origin=bogus` → `400 Unknown origin`.
+  - `/auth/callback` no code → 400; with code, no state → 400; garbage state → 400.
+  - Well-formed JSON state with unknown nonce → 400 (logged `OAuth nonce verification failed: unknown or already-consumed OAuth state`).
+  - **Nonce one-shot round-trip**: extracted a real state from `/auth/strava?origin=trail`, called `/auth/callback?code=fake_code_123&state=<that>` → 500 (logged `OAuth callback error: token exchange failed: 400 ... "field":"client_id","code":"invalid"`). Confirms state validation passed and the request reached Strava. Replaying the SAME state → 400 (nonce already consumed).
+**What changed in the repo:** `server/handlers/oauth_state.go` (new, ~110 LoC), `server/handlers/oauth_state_test.go` (new, ~120 LoC), `server/handlers/auth.go` (rewrote `StravaRedirect`/`Callback`, added `FrontendURLs` + `OAuthState` fields + `redirectURLFor` helper), `server/main.go` (wired the new fields).
+**What I learned:**
+- State validation must run before the Strava code exchange, both for security (no code burning) and efficiency (no wasted Strava API call on every bad state).
+- "TTL eviction" in the spec implied active cleanup, so I added a 1-min background sweep on top of the passive `Take`-time check.
+- Tested expiry by injecting a fake clock (`now func() time.Time` on the struct) — lets me verify TTL without a real `time.Sleep` in tests.
+**Next:** TASK-004 — `GET /api/activities/{id}/streams`. Generalise `strava.Client.FetchActivityStreams(keys []string)`, add allowlist-validated handler, no caching, log rate-limit at >80 %.
+

@@ -180,32 +180,56 @@ type ActivityStreams struct {
 	Heartrate []float64
 }
 
-func (c *Client) FetchActivityStreams(accessToken string, activityID int64) (*ActivityStreams, error) {
+// doStreamsRequest issues GET /activities/{id}/streams to Strava with the
+// given keys. When keyByType is true the response is a JSON object keyed
+// by stream type; when false it's an array of {type, data} entries. The
+// caller decides which shape it wants and decodes accordingly.
+func (c *Client) doStreamsRequest(accessToken string, activityID int64, keys []string, keyByType bool) ([]byte, http.Header, error) {
 	params := url.Values{
-		"keys":        {"distance,heartrate"},
-		"key_by_type": {"true"},
+		"keys": {strings.Join(keys, ",")},
+	}
+	if keyByType {
+		params.Set("key_by_type", "true")
 	}
 	reqURL := fmt.Sprintf("%s/activities/%d/streams?%s", stravaAPI, activityID, params.Encode())
 
 	req, err := http.NewRequest("GET", reqURL, nil)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("strava streams request failed: %w", err)
+		return nil, nil, fmt.Errorf("strava streams request failed: %w", err)
 	}
 	defer resp.Body.Close()
 
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, resp.Header, fmt.Errorf("strava streams read failed: %w", err)
+	}
+
+	LogRateLimit(resp.Header)
+
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("strava streams error: %d %s", resp.StatusCode, body)
+		return nil, resp.Header, fmt.Errorf("strava streams error: %d %s", resp.StatusCode, body)
+	}
+
+	return body, resp.Header, nil
+}
+
+// FetchActivityStreams returns the requested streams in cadence's typed
+// shape (Distance / Heartrate slices). Used by compare.go for per-km HR
+// computation. Keys outside Distance/Heartrate are tolerated but ignored.
+func (c *Client) FetchActivityStreams(accessToken string, activityID int64, keys []string) (*ActivityStreams, error) {
+	body, _, err := c.doStreamsRequest(accessToken, activityID, keys, false)
+	if err != nil {
+		return nil, err
 	}
 
 	var entries []streamEntry
-	if err := json.NewDecoder(resp.Body).Decode(&entries); err != nil {
+	if err := json.Unmarshal(body, &entries); err != nil {
 		return nil, fmt.Errorf("streams decode failed: %w", err)
 	}
 
@@ -220,6 +244,13 @@ func (c *Client) FetchActivityStreams(accessToken string, activityID int64) (*Ac
 	}
 
 	return streams, nil
+}
+
+// FetchActivityStreamsRaw fetches the streams in Strava's key_by_type=true
+// shape and returns the response bytes unchanged. The accompanying http
+// headers are returned so callers can inspect rate-limit state.
+func (c *Client) FetchActivityStreamsRaw(accessToken string, activityID int64, keys []string) ([]byte, http.Header, error) {
+	return c.doStreamsRequest(accessToken, activityID, keys, true)
 }
 
 // FetchActivitiesPage fetches a single page of activities with configurable pagination.
