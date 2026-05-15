@@ -33,6 +33,7 @@ import Html.Lazy
 import Json.Decode as D
 import Json.Encode as Encode
 import Planning exposing (Km, KmResult, KmSource(..))
+import Predictor
 import ProjectFile
 import Profile exposing (Marker, ScaleMode(..))
 import Route exposing (Route)
@@ -285,6 +286,8 @@ type Msg
     | ProfileSetLthr String
     | ProfileSetMaxHr String
     | ProfileSave
+      -- predictor slider
+    | SliderChanged String
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -1103,6 +1106,33 @@ update msg model =
             ( { model | profileSaved = True }
             , Storage.saveProfile (AthleteProfile.encode model.profile)
             )
+
+        SliderChanged str ->
+            case ( String.toFloat str, currentRace model ) of
+                ( Just i, Just race ) ->
+                    let
+                        kms =
+                            Dict.get (raceIdToString race.id) model.kmsCache
+                                |> Maybe.withDefault []
+                    in
+                    if List.isEmpty kms then
+                        ( model, Cmd.none )
+
+                    else
+                        let
+                            prediction =
+                                Predictor.predict model.profile race kms i
+
+                            newPlan =
+                                Types.withTargetSeconds (Just prediction.totalS) race.plan
+
+                            newRace =
+                                { race | plan = newPlan }
+                        in
+                        ( model, Storage.saveRace (encodeRace newRace) )
+
+                _ ->
+                    ( model, Cmd.none )
 
 
 updateMetaForm : (MetaForm -> MetaForm) -> Model -> Model
@@ -3208,6 +3238,7 @@ viewPlanTable model race =
         [ viewPlanCrumb race
         , viewPlanHeader race
         , viewPlanTargetPanel race aidRest currentSum model.targetTimeText
+        , viewPredictorStrip model race kms
         , viewActualRunStrip model race
         , viewPlanTabs race model.planTableMode
         , case model.planTableMode of
@@ -3217,6 +3248,129 @@ viewPlanTable model race =
             BySection ->
                 viewSectionTable race kms results
         ]
+
+
+viewPredictorStrip : Model -> Race -> List Km -> Html Msg
+viewPredictorStrip model race kms =
+    let
+        i =
+            currentIntensity model race kms
+
+        prediction =
+            Predictor.predict model.profile race kms i
+
+        ( bandLabel, bandTone ) =
+            intensityBand i
+    in
+    if List.isEmpty kms then
+        text ""
+
+    else
+        div [ class "rounded-2xl bg-slate-900 border border-slate-800 p-5 space-y-4" ]
+            [ div [ class "flex items-baseline justify-between gap-4 flex-wrap" ]
+                [ div []
+                    [ p [ class "text-xs text-slate-500 uppercase tracking-wider" ] [ text "Effort" ]
+                    , p [ class ("text-2xl font-semibold tabular-nums " ++ bandTone) ]
+                        [ text bandLabel ]
+                    , p [ class "text-xs text-slate-500 mt-0.5" ]
+                        [ text ("Profile: " ++ profileBriefLabel model.profile) ]
+                    ]
+                , div [ class "text-right" ]
+                    [ p [ class "text-xs text-slate-500 uppercase tracking-wider" ] [ text "Predicted finish" ]
+                    , p [ class "text-2xl font-semibold text-slate-100 tabular-nums" ]
+                        [ text (formatHhmm prediction.totalS) ]
+                    , p [ class "text-xs text-slate-500 mt-0.5" ]
+                        [ text (predictionBreakdown prediction) ]
+                    ]
+                ]
+            , div [ class "space-y-2" ]
+                [ input
+                    [ A.type_ "range"
+                    , A.min "0.80"
+                    , A.max "1.25"
+                    , A.attribute "step" "0.01"
+                    , A.value (formatFloat 2 i)
+                    , onInput SliderChanged
+                    , class "w-full accent-rose-500"
+                    ]
+                    []
+                , div [ class "flex items-center justify-between text-[10px] uppercase tracking-wider text-slate-500" ]
+                    [ span [] [ text "Conservative" ]
+                    , span [] [ text "Goal" ]
+                    , span [] [ text "Push" ]
+                    , span [] [ text "All-in" ]
+                    ]
+                ]
+            , div [ class "text-xs text-slate-500" ]
+                [ text
+                    (case race.plan.targetSeconds of
+                        Just _ ->
+                            "Drag the slider to dial effort up or down — the target time updates to match."
+
+                        Nothing ->
+                            "No target set yet. Drag the slider to lock one in, or type a target above."
+                    )
+                ]
+            ]
+
+
+currentIntensity : Model -> Race -> List Km -> Float
+currentIntensity model race kms =
+    case race.plan.targetSeconds of
+        Just t ->
+            Predictor.solveForIntensity model.profile race kms t
+
+        Nothing ->
+            1.0
+
+
+intensityBand : Float -> ( String, String )
+intensityBand i =
+    if i < 0.83 then
+        ( "Below conservative", "text-slate-300" )
+
+    else if i < 0.97 then
+        ( "Conservative", "text-sky-400" )
+
+    else if i < 1.03 then
+        ( "Goal", "text-emerald-400" )
+
+    else if i < 1.12 then
+        ( "Push", "text-amber-400" )
+
+    else if i <= 1.22 then
+        ( "All-in", "text-rose-400" )
+
+    else
+        ( "Beyond all-in", "text-rose-500" )
+
+
+profileBriefLabel : Profile -> String
+profileBriefLabel profile =
+    formatInt profile.verticalRateVmh
+        ++ " vm/h · "
+        ++ formatMmss profile.flatTrailPaceSecPerKm
+        ++ "/km"
+
+
+predictionBreakdown : Predictor.Prediction -> String
+predictionBreakdown p =
+    let
+        pieces =
+            [ ( "climb", p.climbS )
+            , ( "descent", p.descentS )
+            , ( "runnable", p.runnableS )
+            , ( "aid", p.aidS )
+            ]
+                |> List.filter (\( _, s ) -> s > 0)
+                |> List.map (\( name, s ) -> formatHhmm s ++ " " ++ name)
+                |> String.join " · "
+    in
+    if String.isEmpty pieces then
+        "—"
+
+    else
+        pieces
 
 
 viewActualRunStrip : Model -> Race -> Html Msg
