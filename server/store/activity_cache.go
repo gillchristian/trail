@@ -45,3 +45,17 @@ func (s *ActivityCacheStore) Set(activityID int64, responseJSON []byte) error {
 	)
 	return err
 }
+
+// athleteCacheKey maps an athleteID into the activity_cache key space
+// without colliding with real activity ids (which are positive). Using
+// the same table avoids a dedicated migration for a single per-athlete
+// JSON blob.
+func athleteCacheKey(athleteID int64) int64 { return -athleteID }
+
+func (s *ActivityCacheStore) GetAthlete(athleteID int64) (*CacheEntry, error) {
+	return s.Get(athleteCacheKey(athleteID))
+}
+
+func (s *ActivityCacheStore) SetAthlete(athleteID int64, responseJSON []byte) error {
+	return s.Set(athleteCacheKey(athleteID), responseJSON)
+}

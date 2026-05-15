@@ -4,47 +4,38 @@
 
 ## Active
 
-## TASK-004: Streams endpoint
+## TASK-005: Athlete pass-through
 
-**Pulled from backlog:** 2026-05-15 16:50
-**Why this now:** Fourth PR of the trail-integration backlog. Trail needs full stream payloads (time/distance/latlng/altitude/heartrate/...) to reconstruct planned-vs-actual tracks and to calibrate profile coefficients. The handler is independent of TASK-001..003 but depends on the existing session-resolver to gate access.
-**Spec reference:** `/Users/bb8/dev/trail/knowledge/reference/cadence-backend-spec.md` §4.4
+**Pulled from backlog:** 2026-05-15 17:10
+**Why this now:** Last PR of the trail-integration backlog. Trail's calibration UX wants `max_heartrate`/`weight`/`ftp` to seed a profile; the spec calls this optional but small enough to close out the arc in the same session.
+**Spec reference:** `/Users/bb8/dev/trail/knowledge/reference/cadence-backend-spec.md` §4.5
 
 ### Acceptance criteria
-- [ ] `strava.Client.FetchActivityStreams(accessToken, activityID, keys []string)` accepts a variable key list (compare.go callers updated to pass `[]string{"distance","heartrate"}`).
-- [ ] New `strava.Client.FetchActivityStreamsRaw(accessToken, activityID, keys []string) ([]byte, http.Header, error)` returns the Strava response bytes unchanged (with `key_by_type=true`) plus headers, for pass-through.
-- [ ] New `GET /api/activities/{id}/streams?keys=...` handler:
-  - 401 when `Authorization: Bearer …` is missing or unknown.
-  - 400 with `{"error":"unknown stream key: X"}` when any requested key isn't in the Strava-documented allow-list (`time, distance, latlng, altitude, heartrate, cadence, watts, velocity_smooth, grade_smooth, temp, moving, grade_adjusted_speed`).
-  - 400 when `keys` is missing/empty.
-  - 200 with the Strava keyed-object response forwarded verbatim when allowed keys are passed against a real activity.
-  - Bad activity id (non-numeric) → 400.
-  - Streams are not cached (no `activity_cache` writes; no `tokens.db` writes).
-- [ ] Rate-limit observation: when `X-Ratelimit-Usage` exceeds 80 % of `X-Ratelimit-Limit` for the 15-min bucket, the server logs a warning.
-- [ ] `go build -tags fts5` + `go vet -tags fts5 ./...` pass. Handler-side validation unit-tested where it earns its keep (the allow-list check + the rate-limit threshold).
+- [ ] New `GET /api/athlete` — pass-through of Strava `/athlete`. Auth required (401 on missing/unknown bearer).
+- [ ] Response is the Strava athlete JSON forwarded verbatim, including `max_heartrate`, `weight`, `ftp`, etc.
+- [ ] Cached for 24h. Second call within the window returns the cached payload with `X-Data-Source: cache`. First call (or post-expiry) returns `X-Data-Source: strava` and writes to the cache.
+- [ ] Smallest reasonable code-diff for storage — reuse `activity_cache` keyed by `-athleteID` (negative-id sentinel; Strava activity ids are positive) rather than introduce a new table + migration.
+- [ ] `go build -tags fts5` + `go vet -tags fts5 ./...` + `go test -tags fts5 ./...` pass.
+- [ ] Existing endpoints (`/api/activities`, `/api/activities/{id}/streams`, `/api/activities/{id}/detail`) unchanged.
 
 ### Plan
-1. Refactor `server/strava/client.go`: add internal `doStreamsRequest(accessToken, activityID, keys, keyByType) ([]byte, http.Header, error)` that handles HTTP setup + auth + non-200 wrapping. Generalise `FetchActivityStreams` to accept `keys []string` and decode the array shape (compare.go's current expectation; keeps `key_by_type=false`). Add `FetchActivityStreamsRaw(keys []string) ([]byte, http.Header, error)` that calls the helper with `key_by_type=true`.
-2. Add `strava.LogRateLimit(h http.Header)` that parses `X-Ratelimit-Limit` / `X-Ratelimit-Usage` and `log.Printf`s a warning if either bucket is ≥80 %. Call from both the typed and raw paths.
-3. Update `server/handlers/compare.go` to pass `[]string{"distance", "heartrate"}` to the generalised typed method.
-4. New file `server/handlers/streams.go`: `StreamsHandler{Store, Strava}`, `Get(w, r)`. Allow-list constant, `validateStreamKeys` helper. Auth + token-refresh + Strava call + 200 pass-through.
-5. `main.go` wires `streamsHandler` and `r.Get("/api/activities/{id}/streams", streamsHandler.Get)`.
-6. `server/handlers/streams_test.go`: validate the allow-list (positive + negative), and `strava.LogRateLimit` threshold (table test). Skip mocking Strava — the HTTP wrapper is small and tested via live curl.
-7. Manual smoke: build/vet/test. Curl the new endpoint with no Authorization (401), with a bogus key (400), with mixed valid/invalid (still 400 on the invalid), and the missing-id / bad-id paths.
+1. `strava/client.go`: add `FetchAthlete(accessToken string) ([]byte, http.Header, error)` — single GET to `/athlete`, returns body+headers verbatim. Calls `LogRateLimit`.
+2. `store/activity_cache.go`: add thin `GetAthlete(athleteID int64)` / `SetAthlete(athleteID int64, json []byte)` wrappers that call the existing `Get`/`Set` with the `-athleteID` sentinel; document the rationale in a short comment.
+3. New `handlers/athlete.go`: `AthleteHandler{Store, Strava, Cache}`. `Get` handles auth + cache lookup (24h TTL) + Strava call + cache write. Sets `X-Data-Source` per source.
+4. `main.go` wires `AthleteHandler` + `r.Get("/api/athlete", athleteHandler.Get)`.
+5. `handlers/athlete_test.go`: TTL boundary table and cache-source decision logic via an injectable clock or by parameterising the freshness check.
+6. Live smoke: cold call returns `X-Data-Source: strava` (with fake token → 502 from Strava 401, expected); seed a cache row directly via sqlite and re-call to confirm `X-Data-Source: cache`; manually expire the cache and confirm the next call goes back to Strava.
 
 ### Verification plan
-- `cd server && go build -tags fts5 .` — exit 0.
-- `cd server && go vet -tags fts5 ./...` — exit 0.
-- `go test -tags fts5 ./...` — all pass.
+- Build/vet/tests as above.
 - Curl matrix (quoted in journal):
-  - No auth: `curl -i /api/activities/123/streams?keys=distance` → 401.
-  - Bogus key: `curl -i -H 'Authorization: Bearer X' /api/activities/123/streams?keys=distance,bogus` → 400 `{"error":"unknown stream key: bogus"}`.
-  - Bad id: `curl -i /api/activities/notanumber/streams?keys=distance` → 400.
-  - Missing keys: `curl -i -H 'Authorization: Bearer X' /api/activities/123/streams` → 400.
-  - Auth happy-path against a real activity (requires Strava session) is documented as performed by trail when ready; locally I'll exercise the auth+validation paths and the typed compare.go-flow regression.
+  - No auth → 401 `{"error":"Not authenticated"}`.
+  - Bogus session → 401.
+  - With a seeded session + a seeded `activity_cache` row at sentinel `-athleteID` cached within 24h → 200 + cached body + `X-Data-Source: cache`.
+  - Manually expire the cache row (`UPDATE activity_cache SET cached_at = 0`) → next call goes to Strava (fake creds → 502).
+- Confirm `/api/activities` and friends still work (route table inspection + existing test pass).
 
 ### Notes during execution
-- The existing `FetchActivityStreams` currently sends `key_by_type=true` but decodes an array — a latent shape mismatch. I'm splitting the API: the typed path drops `key_by_type` (matches the array decoding it already does); the raw path keeps `key_by_type=true` per the trail spec. compare.go's behaviour is unchanged.
 
 ### Done
 

@@ -108,6 +108,12 @@ func main() {
 		Strava: stravaClient,
 	}
 
+	athleteHandler := &handlers.AthleteHandler{
+		Store:  tokenStore,
+		Strava: stravaClient,
+		Cache:  activityCache,
+	}
+
 	r := chi.NewRouter()
 
 	r.Use(cors.Handler(cors.Options{
@@ -125,6 +131,7 @@ func main() {
 	r.Get("/api/activities/search", activitiesHandler.SearchActivities)
 	r.Get("/api/activities/{id}/detail", compareHandler.GetActivityDetail)
 	r.Get("/api/activities/{id}/streams", streamsHandler.Get)
+	r.Get("/api/athlete", athleteHandler.Get)
 	r.Get("/api/resolve-link", compareHandler.ResolveShortLink)
 	r.Get("/api/backfill/status", backfillHandler.GetBackfillStatus)
 

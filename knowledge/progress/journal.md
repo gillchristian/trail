@@ -101,3 +101,26 @@ Append-only. Newest at the bottom. Each entry is a snapshot for future-me with n
 - Tested expiry by injecting a fake clock (`now func() time.Time` on the struct) — lets me verify TTL without a real `time.Sleep` in tests.
 **Next:** TASK-004 — `GET /api/activities/{id}/streams`. Generalise `strava.Client.FetchActivityStreams(keys []string)`, add allowlist-validated handler, no caching, log rate-limit at >80 %.
 
+---
+## 2026-05-15 17:00 — TASK-004 shipped: streams endpoint
+
+**Task:** TASK-004 (PR #5, merge sha `590c52c`, https://github.com/gillchristian/strava/pull/5).
+**What I did:** Factored `strava.Client.doStreamsRequest(...)` so both the typed (`FetchActivityStreams(keys []string)`) and raw (`FetchActivityStreamsRaw`) paths share HTTP setup, auth header, status handling, and rate-limit observation. The typed path drops `key_by_type=true` (fixes a latent shape mismatch with its array decode); the raw path keeps it per the trail spec and returns Strava's body verbatim. Added `strava.LogRateLimit(h)` that warns at >=80 % usage on either the 15-min or daily bucket of `X-Ratelimit-{Limit,Usage}`. New `handlers/streams.go` validates `keys` against a 12-entry allow-list (matching Strava's documented set), 401s on missing/unknown bearer, 400s with the offending key named on rejection, 502s on Strava failure, and writes the Strava JSON to the response with no caching. Updated `compare.go` to pass `[]string{"distance","heartrate"}`. Wired route + handler in `main.go`. Added tests: `streams_test.go` covers the allow-list (positive/negative/mixed/whitespace/case-sensitive); `ratelimit_test.go` covers the threshold (no headers, well-under, exactly 80 %, above-short-only, above-both, garbage).
+**What I verified:**
+- `go build -tags fts5 .` + `go vet -tags fts5 ./...` clean.
+- `go test -tags fts5 ./...` — handlers + strava packages PASS.
+- Live HTTP smoke against a seeded `tokens`/`sessions` row (fake creds):
+  - No auth → 401; bogus session → 401.
+  - `id=notanumber` → 400 `Invalid activity ID`.
+  - Missing/empty `keys` → 400 `missing required parameter: keys`.
+  - `keys=bogus` → 400 `{"error":"unknown stream key: bogus"}`.
+  - `keys=distance,bogus,heartrate` → 400 `{"error":"unknown stream key: bogus"}` (first invalid wins).
+  - `keys=Distance` → 400 `{"error":"unknown stream key: Distance"}` (allow-list is case-sensitive).
+  - `keys=time,distance,latlng,altitude,heartrate` → request reaches Strava; fake access_token rejected; logged `Streams fetch error (activity 123): strava streams error: 401 ... "field":"","code":"invalid"`; server returns 502. Confirms the happy path actually hits Strava with the requested keys.
+- Side-effect audit: `SELECT count(*) FROM activity_cache` = 0 after the smoke; tokens row unmodified. Streams stay un-cached per the caching policy.
+**What changed in the repo:** `server/strava/client.go` (factored helper + generalised + raw method), `server/strava/ratelimit.go` (new), `server/strava/ratelimit_test.go` (new), `server/handlers/streams.go` (new), `server/handlers/streams_test.go` (new), `server/handlers/compare.go` (1-line callsite), `server/main.go` (handler + route).
+**What I learned:**
+- The previous `FetchActivityStreams` was sending `key_by_type=true` AND decoding into `[]streamEntry` — Strava returns an object with `key_by_type=true` and an array without it, so either the request was silently parsed as something usable (Strava ignoring the flag?) or the decode was failing and the per-km HR fallback in compare.go masked the bug. Splitting into two methods (array decode for typed, raw bytes for pass-through) removes the ambiguity.
+- For the rate-limit logger, kept the parsing tolerant: if the headers aren't a strict `int,int` pair we just don't log anything. Production traffic shouldn't depend on Strava header shape.
+**Next:** TASK-005 — `GET /api/athlete` pass-through with 24h cache. Reuse `activity_cache` with `-athleteID` sentinel to avoid a fresh migration.
+

@@ -253,6 +253,35 @@ func (c *Client) FetchActivityStreamsRaw(accessToken string, activityID int64, k
 	return c.doStreamsRequest(accessToken, activityID, keys, true)
 }
 
+// FetchAthlete returns Strava's GET /athlete response bytes verbatim
+// along with the response headers.
+func (c *Client) FetchAthlete(accessToken string) ([]byte, http.Header, error) {
+	req, err := http.NewRequest("GET", stravaAPI+"/athlete", nil)
+	if err != nil {
+		return nil, nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, nil, fmt.Errorf("strava athlete request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, resp.Header, fmt.Errorf("strava athlete read failed: %w", err)
+	}
+
+	LogRateLimit(resp.Header)
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, resp.Header, fmt.Errorf("strava athlete error: %d %s", resp.StatusCode, body)
+	}
+
+	return body, resp.Header, nil
+}
+
 // FetchActivitiesPage fetches a single page of activities with configurable pagination.
 func (c *Client) FetchActivitiesPage(accessToken string, page, perPage int) ([]json.RawMessage, error) {
 	params := url.Values{
