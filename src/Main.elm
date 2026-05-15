@@ -15,6 +15,7 @@ a page passes ~250 lines on its own.
 -}
 
 import ActualGpx
+import AthleteProfile exposing (AidStyle(..), DescentSkill(..), Preset(..), Profile, TechSkill(..))
 import Browser
 import Browser.Events
 import Browser.Navigation as Nav
@@ -167,6 +168,8 @@ type alias Model =
     , kmTimeText : String
     , kmNotesText : String
     , actualRunError : Maybe String
+    , profile : Profile
+    , profileSaved : Bool
     }
 
 
@@ -191,8 +194,10 @@ init flags url key =
       , kmTimeText = ""
       , kmNotesText = ""
       , actualRunError = Nothing
+      , profile = AthleteProfile.midPack
+      , profileSaved = False
       }
-    , Storage.loadAll
+    , Cmd.batch [ Storage.loadAll, Storage.loadProfile ]
     )
 
 
@@ -267,6 +272,19 @@ type Msg
     | GotActualGpxContent RaceId Int String
     | ClearActualRun RaceId
     | ActualGpxFailed String
+      -- profile
+    | ProfileLoaded Encode.Value
+    | ProfilePickPreset Preset
+    | ProfileSetVmh String
+    | ProfileSetPace String
+    | ProfileSetFatigueThreshold String
+    | ProfileSetFatigueSlope String
+    | ProfileSetDescentSkill String
+    | ProfileSetTechSkill String
+    | ProfileSetAidStyle String
+    | ProfileSetLthr String
+    | ProfileSetMaxHr String
+    | ProfileSave
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -907,6 +925,185 @@ update msg model =
         ActualGpxFailed err ->
             ( { model | actualRunError = Just err }, Cmd.none )
 
+        ProfileLoaded value ->
+            case D.decodeValue (D.nullable AthleteProfile.decode) value of
+                Ok (Just p) ->
+                    ( { model | profile = p }, Cmd.none )
+
+                _ ->
+                    ( model, Cmd.none )
+
+        ProfilePickPreset preset ->
+            ( { model | profile = AthleteProfile.presetProfile preset, profileSaved = False }
+            , Cmd.none
+            )
+
+        ProfileSetVmh s ->
+            let
+                next =
+                    case String.toFloat s of
+                        Just v ->
+                            { profile_ | verticalRateVmh = max 50 (min 2000 v) }
+
+                        Nothing ->
+                            profile_
+
+                profile_ =
+                    model.profile
+            in
+            ( { model | profile = next, profileSaved = False }, Cmd.none )
+
+        ProfileSetPace s ->
+            let
+                profile_ =
+                    model.profile
+
+                next =
+                    case parseMmss s of
+                        Just secs ->
+                            { profile_ | flatTrailPaceSecPerKm = max 120 (min 1200 secs) }
+
+                        Nothing ->
+                            profile_
+            in
+            ( { model | profile = next, profileSaved = False }, Cmd.none )
+
+        ProfileSetFatigueThreshold s ->
+            let
+                profile_ =
+                    model.profile
+
+                next =
+                    case String.toFloat s of
+                        Just v ->
+                            { profile_ | fatigueThresholdH = max 0 (min 24 v) }
+
+                        Nothing ->
+                            profile_
+            in
+            ( { model | profile = next, profileSaved = False }, Cmd.none )
+
+        ProfileSetFatigueSlope s ->
+            let
+                profile_ =
+                    model.profile
+
+                next =
+                    case String.toFloat s of
+                        Just v ->
+                            { profile_ | fatigueSlopePerH = max 0 (min 0.5 (v / 100)) }
+
+                        Nothing ->
+                            profile_
+            in
+            ( { model | profile = next, profileSaved = False }, Cmd.none )
+
+        ProfileSetDescentSkill key ->
+            let
+                profile_ =
+                    model.profile
+
+                next =
+                    case key of
+                        "cautious" ->
+                            { profile_ | descentSkill = DescCautious }
+
+                        "confident" ->
+                            { profile_ | descentSkill = DescConfident }
+
+                        "expert" ->
+                            { profile_ | descentSkill = DescExpert }
+
+                        _ ->
+                            { profile_ | descentSkill = DescAverage }
+            in
+            ( { model | profile = next, profileSaved = False }, Cmd.none )
+
+        ProfileSetTechSkill key ->
+            let
+                profile_ =
+                    model.profile
+
+                next =
+                    case key of
+                        "novice" ->
+                            { profile_ | technicalitySkill = TechNovice }
+
+                        "experienced" ->
+                            { profile_ | technicalitySkill = TechExperienced }
+
+                        "expert" ->
+                            { profile_ | technicalitySkill = TechExpert }
+
+                        _ ->
+                            { profile_ | technicalitySkill = TechAverage }
+            in
+            ( { model | profile = next, profileSaved = False }, Cmd.none )
+
+        ProfileSetAidStyle key ->
+            let
+                profile_ =
+                    model.profile
+
+                next =
+                    case key of
+                        "elite" ->
+                            { profile_ | aidStyle = AidElite }
+
+                        "standard" ->
+                            { profile_ | aidStyle = AidStandard }
+
+                        "relaxed" ->
+                            { profile_ | aidStyle = AidRelaxed }
+
+                        _ ->
+                            { profile_ | aidStyle = AidLean }
+            in
+            ( { model | profile = next, profileSaved = False }, Cmd.none )
+
+        ProfileSetLthr s ->
+            let
+                profile_ =
+                    model.profile
+
+                next =
+                    if String.isEmpty (String.trim s) then
+                        { profile_ | lthrBpm = Nothing }
+
+                    else
+                        case String.toInt s of
+                            Just v ->
+                                { profile_ | lthrBpm = Just (max 80 (min 220 v)) }
+
+                            Nothing ->
+                                profile_
+            in
+            ( { model | profile = next, profileSaved = False }, Cmd.none )
+
+        ProfileSetMaxHr s ->
+            let
+                profile_ =
+                    model.profile
+
+                next =
+                    if String.isEmpty (String.trim s) then
+                        { profile_ | maxHrBpm = Nothing }
+
+                    else
+                        case String.toInt s of
+                            Just v ->
+                                { profile_ | maxHrBpm = Just (max 80 (min 240 v)) }
+
+                            Nothing ->
+                                profile_
+            in
+            ( { model | profile = next, profileSaved = False }, Cmd.none )
+
+        ProfileSave ->
+            ( { model | profileSaved = True }
+            , Storage.saveProfile (AthleteProfile.encode model.profile)
+            )
+
 
 updateMetaForm : (MetaForm -> MetaForm) -> Model -> Model
 updateMetaForm f model =
@@ -1269,6 +1466,7 @@ subscriptions _ =
         , Storage.gotRace RaceSaved
         , Storage.gotRaceDeleted RaceDeleted
         , Storage.gotError StorageError
+        , Storage.gotProfile ProfileLoaded
         , Download.imagePicked MetaCoverPicked
         , Browser.Events.onResize WindowResized
         ]
@@ -1316,6 +1514,9 @@ title route =
         Route.PlanSection _ _ ->
             "Trail — plan section"
 
+        Route.ProfileSettings ->
+            "Trail — profile"
+
         Route.NotFound ->
             "Trail — not found"
 
@@ -1354,10 +1555,22 @@ viewHeader route =
                         Route.PlanSection _ _ ->
                             "Plan · section."
 
+                        Route.ProfileSettings ->
+                            "Profile · settings."
+
                         Route.NotFound ->
                             "Lost?"
                     )
                 ]
+            , div [ class "flex-1" ] []
+            , a
+                [ Route.href Route.ProfileSettings
+                , classList
+                    [ ( "text-sm text-slate-400 hover:text-slate-100", True )
+                    , ( "text-slate-100", route == Route.ProfileSettings )
+                    ]
+                ]
+                [ text "Profile" ]
             ]
         ]
 
@@ -1412,6 +1625,9 @@ viewFooter =
 viewContent : Model -> Html Msg
 viewContent model =
     case ( model.route, model.races ) of
+        ( Route.ProfileSettings, _ ) ->
+            viewProfileSettings model
+
         ( _, LoadingRaces ) ->
             viewLoading
 
@@ -1489,6 +1705,204 @@ viewRaceNotFound =
         , a [ Route.href Route.Index, class "inline-block px-4 py-2 border border-slate-700 rounded-md hover:bg-slate-800 text-slate-200" ]
             [ text "Back to races" ]
         ]
+
+
+
+-- ============================================================
+-- PROFILE SETTINGS
+-- ============================================================
+
+
+viewProfileSettings : Model -> Html Msg
+viewProfileSettings model =
+    let
+        prof =
+            model.profile
+
+        paceText =
+            formatMmss prof.flatTrailPaceSecPerKm
+
+        fatigueSlopePctText =
+            formatFloat 1 (prof.fatigueSlopePerH * 100)
+
+        thresholdText =
+            formatFloat 1 prof.fatigueThresholdH
+    in
+    div [ class "max-w-screen-md mx-auto mt-8 space-y-6 px-6 pb-12" ]
+        [ a [ Route.href Route.Index, class "inline-flex items-center gap-2 text-sm text-slate-400 hover:text-slate-100" ]
+            [ text "← Back to races" ]
+        , div []
+            [ h1 [ class "text-3xl font-bold tracking-tight text-slate-100" ] [ text "Profile" ]
+            , p2 "Population-tier defaults seed the predictor. Tweak any field; values stick on save."
+            ]
+        , profilePresetsRow
+        , div [ class "rounded-2xl bg-slate-900 border border-slate-800 p-5 space-y-5" ]
+            [ profileFieldRow "Vertical rate"
+                "m / h on moderate climbs (~10-20% grade). Strong mid-pack ≈ 850."
+                (input
+                    [ A.type_ "number"
+                    , A.value (formatInt prof.verticalRateVmh)
+                    , A.attribute "inputmode" "numeric"
+                    , onInput ProfileSetVmh
+                    , inputClass
+                    ]
+                    []
+                )
+                "vm/h"
+            , profileFieldRow "Flat trail pace"
+                "On moderate trail at sustainable effort. Add 30-60 s/km vs road pace."
+                (input
+                    [ A.type_ "text"
+                    , A.value paceText
+                    , A.placeholder "6:00"
+                    , onInput ProfileSetPace
+                    , inputClass
+                    ]
+                    []
+                )
+                "/km"
+            , profileFieldRow "Fatigue threshold"
+                "Hours of effort before pace inflation starts."
+                (input
+                    [ A.type_ "number"
+                    , A.attribute "step" "0.1"
+                    , A.value thresholdText
+                    , onInput ProfileSetFatigueThreshold
+                    , inputClass
+                    ]
+                    []
+                )
+                "hours"
+            , profileFieldRow "Fatigue slope"
+                "Pace inflation per hour after the threshold."
+                (input
+                    [ A.type_ "number"
+                    , A.attribute "step" "0.1"
+                    , A.value fatigueSlopePctText
+                    , onInput ProfileSetFatigueSlope
+                    , inputClass
+                    ]
+                    []
+                )
+                "% / h"
+            , profileFieldRow "Descent skill"
+                "Faster descenders run technical downhill closer to runnable pace."
+                (profileSelect ProfileSetDescentSkill
+                    (List.map (\d -> ( AthleteProfile.descentSkillLabel d, AthleteProfile.descentSkillLabel d == AthleteProfile.descentSkillLabel prof.descentSkill )) AthleteProfile.allDescentSkills)
+                )
+                ""
+            , profileFieldRow "Technicality"
+                "Slows flat pace on rooty / rocky terrain."
+                (profileSelect ProfileSetTechSkill
+                    (List.map (\t -> ( AthleteProfile.techSkillLabel t, AthleteProfile.techSkillLabel t == AthleteProfile.techSkillLabel prof.technicalitySkill )) AthleteProfile.allTechSkills)
+                )
+                ""
+            , profileFieldRow "Aid stops"
+                "Default time per aid station. Override per race later."
+                (profileSelect ProfileSetAidStyle
+                    (List.map (\a -> ( AthleteProfile.aidStyleLabel a, AthleteProfile.aidStyleLabel a == AthleteProfile.aidStyleLabel prof.aidStyle )) AthleteProfile.allAidStyles)
+                )
+                ""
+            , div [ class "border-t border-slate-800 pt-5 space-y-5" ]
+                [ p2 "Optional — used by future HR-based calibration. Leave empty if you don't have the numbers."
+                , profileFieldRow "Lactate threshold HR"
+                    "Approx 95% of max HR for trained runners."
+                    (input
+                        [ A.type_ "number"
+                        , A.value (Maybe.map String.fromInt prof.lthrBpm |> Maybe.withDefault "")
+                        , A.placeholder "—"
+                        , onInput ProfileSetLthr
+                        , inputClass
+                        ]
+                        []
+                    )
+                    "bpm"
+                , profileFieldRow "Max HR"
+                    "Highest sustained beat-rate you've actually hit."
+                    (input
+                        [ A.type_ "number"
+                        , A.value (Maybe.map String.fromInt prof.maxHrBpm |> Maybe.withDefault "")
+                        , A.placeholder "—"
+                        , onInput ProfileSetMaxHr
+                        , inputClass
+                        ]
+                        []
+                    )
+                    "bpm"
+                ]
+            ]
+        , div [ class "flex items-center justify-end gap-3" ]
+            [ if model.profileSaved then
+                p [ class "text-sm text-emerald-400" ] [ text "Saved ✓" ]
+
+              else
+                text ""
+            , button
+                [ onClick ProfileSave
+                , class "px-4 py-2 bg-rose-600 text-white rounded-md hover:bg-rose-500 text-sm font-medium"
+                ]
+                [ text "Save profile" ]
+            ]
+        ]
+
+
+profilePresetsRow : Html Msg
+profilePresetsRow =
+    div [ class "rounded-2xl bg-slate-900 border border-slate-800 p-4 flex items-center gap-3 flex-wrap" ]
+        [ p [ class "text-xs text-slate-500 uppercase tracking-wider mr-2" ] [ text "Reset to preset" ]
+        , div [ class "flex items-center gap-2 flex-wrap" ]
+            (List.map presetButton AthleteProfile.allPresets)
+        ]
+
+
+presetButton : Preset -> Html Msg
+presetButton preset =
+    button
+        [ onClick (ProfilePickPreset preset)
+        , class "px-3 py-1.5 text-sm border border-slate-700 rounded-md hover:bg-slate-800 text-slate-200"
+        ]
+        [ text (AthleteProfile.presetLabel preset) ]
+
+
+profileFieldRow : String -> String -> Html Msg -> String -> Html Msg
+profileFieldRow lbl hint control suffix =
+    div [ class "grid grid-cols-1 sm:grid-cols-2 gap-4 items-center" ]
+        [ div []
+            [ p [ class "text-sm font-medium text-slate-100" ] [ text lbl ]
+            , p [ class "text-xs text-slate-500 mt-0.5" ] [ text hint ]
+            ]
+        , div [ class "flex items-center gap-2" ]
+            [ control
+            , if String.isEmpty suffix then
+                text ""
+
+              else
+                span [ class "text-xs text-slate-500 whitespace-nowrap" ] [ text suffix ]
+            ]
+        ]
+
+
+profileSelect : (String -> Msg) -> List ( String, Bool ) -> Html Msg
+profileSelect toMsg options =
+    Html.select
+        [ onInput toMsg
+        , class "w-full bg-slate-950 border border-slate-800 rounded-md px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-rose-500/60"
+        ]
+        (List.map
+            (\( lbl, selected ) ->
+                Html.option
+                    [ A.value (String.toLower (String.split " " lbl |> List.head |> Maybe.withDefault lbl))
+                    , A.selected selected
+                    ]
+                    [ text lbl ]
+            )
+            options
+        )
+
+
+p2 : String -> Html msg
+p2 s =
+    p [ class "text-sm text-slate-400 mt-1" ] [ text s ]
 
 
 
