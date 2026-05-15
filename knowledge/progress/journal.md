@@ -698,3 +698,24 @@ Bundle progression: 286 kB → 322 kB JS / 90 kB → 100 kB gzip. New modules: `
 - An uncaught exception in the Elm runtime is silent-fatal: no error banner, the DOM stays as last-rendered, all subsequent ports + subscriptions stop firing. Reload is the only recovery. Worth remembering when debugging "frozen UI" reports.
 - The bug was latent until streams hit a real Strava activity. The build verified types but never exercised the 6 000-point path. **Visual-smoke catches what build-only-verification cannot** — exactly the constraint flagged in every PR description this session.
 **Next:** Resume the previous closeout — TASK-022 still deferred for fresh-session work.
+
+---
+## 2026-05-15 23:50 — perf: slider lag + sparkline render cost
+
+**Task:** perf bugfix (user-reported after first visual-smoke).
+**What I did:** Two related performance fixes.
+
+1. **Slider lag (drag-time IDB writes).** Each `oninput` event on the predictor slider triggered `Storage.saveRace`, which serialises the full race JSON — including the gpxText field which is up to ~3 MB for UTMB. Dragging the slider produced 30+ input events per second × 3 MB per save = the laggy feel even on 20 k races. Fix: separate `SliderInput` (live, no IDB) from `SliderCommit` (on `change` event, one IDB write). New `sliderDraft : Maybe Float` on Model carries the in-flight value; the predictor strip reads `sliderDraft` if `Just`, otherwise derives from saved target via `solveForIntensity`. Slider HTML wires `E.onInput SliderInput` + `E.on "change" (D.map SliderCommit E.targetValue)`.
+
+2. **Index page slow (sparkline re-downsampling).** Every navigation to `/` ran `raceSparkline` for each cover-less race, which walked the full track (~26 k points for UTMB) through 4 list passes to downsample to 240 coords. ~100 ms per UTMB card per render on average hardware. Fix: cache the downsampled `(x, y)` coords keyed by raceId in a new `sparklineCoords : Dict String (List (Float, Float))` on Model. Computed once at parse time (`sparklineCoordsForTrack` uses a single tail-recursive `List.foldl` over `track.cumDist` + `track.points` with a stride-and-keep predicate). `viewRaceCard` / `viewCoverSparkline` / `raceSparkline` now take the cached coords directly; per-render work is just building a 240-point SVG path string (~1 ms).
+
+**What I verified:**
+- `npm run build` exit 0. JS 322.02 → 322.61 kB (+580 B for the cache machinery + slider draft). Gzip 100.38 → 100.62 kB.
+- Hooked the new cache into all three lifecycle paths: `RacesLoaded` (initial build), `RaceSaved` (incremental insert), `RaceDeleted` (`Dict.remove`).
+- The slider's `value` attribute now reflects `sliderDraft` during drag — Elm doesn't fight the native drag because the model tracks the user's position in real-time.
+**What changed in the repo:** PR #29. Modified `src/Main.elm` only — added `sliderDraft` + `sparklineCoords` model fields, the `sparklineCoordsForTrack` helper, the `buildSparklineCache` + `cacheSparkline` updaters, split `SliderChanged` into `SliderInput` + `SliderCommit`, refactored `viewRaceCard` / `viewCoverSparkline` / `raceSparkline` to read from the cache.
+**What I learned:**
+- The slider lag root cause was not the math (predict on UTMB is < 2 ms); it was the JSON-serialise-then-IDB-write of the gpxText field. Future refactor: separate gpxText into its own IDB row so plan-only saves don't re-ship the GPX. Out of scope here; flagging for the parking lot.
+- Caching computed-once values is much cheaper than reaching for `Html.Lazy` when the inputs aren't referentially stable (Dict.get returns a fresh `Maybe` every call). Cache the data; let the view be small and cheap on each render.
+- The cumulative-distance + point stride loop is now a single foldl pass — was four passes previously. Even uncached it'd be ~4× faster, but caching makes the re-render free.
+**Next:** Still the same as the closeout — TASK-022 deferred, visual smoke pending on the remaining shipped features. The gpxText-as-separate-row refactor is a tracked follow-up.

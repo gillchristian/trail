@@ -179,6 +179,8 @@ type alias Model =
     , stravaToken : Maybe String
     , backendUrl : String
     , stravaPicker : StravaPicker
+    , sliderDraft : Maybe Float
+    , sparklineCoords : Dict String (List ( Float, Float ))
     }
 
 
@@ -216,6 +218,8 @@ init flags url key =
       , stravaToken = flags.incomingStravaToken
       , backendUrl = flags.backendUrl
       , stravaPicker = PickerClosed
+      , sliderDraft = Nothing
+      , sparklineCoords = Dict.empty
       }
     , Cmd.batch
         [ Storage.loadAll
@@ -315,7 +319,8 @@ type Msg
     | ProfileSetMaxHr String
     | ProfileSave
       -- predictor slider
-    | SliderChanged String
+    | SliderInput String
+    | SliderCommit String
       -- strava integration
     | StravaTokenLoaded Encode.Value
     | StravaDisconnect
@@ -432,11 +437,15 @@ update msg model =
                         kms =
                             buildKmsCache sorted tracks Dict.empty
 
+                        sparklines =
+                            buildSparklineCache tracks Dict.empty
+
                         modelWithRaces =
                             { model
                                 | races = LoadedRaces sorted
                                 , parsedTracks = tracks
                                 , kmsCache = kms
+                                , sparklineCoords = sparklines
                             }
                     in
                     ( hydratePlanInputs modelWithRaces, Cmd.none )
@@ -468,6 +477,9 @@ update msg model =
                         nextKms =
                             cacheKms race nextTracks model.kmsCache
 
+                        nextSparklines =
+                            cacheSparkline (raceIdToString race.id) nextTracks model.sparklineCoords
+
                         navCmd =
                             case model.route of
                                 Route.RaceDetail rid ->
@@ -490,6 +502,7 @@ update msg model =
                         | races = LoadedRaces nextRaces
                         , parsedTracks = nextTracks
                         , kmsCache = nextKms
+                        , sparklineCoords = nextSparklines
                         , upload = NotUploading
                         , aidEditor = AidClosed
                         , metaEditor = MetaClosed
@@ -517,6 +530,7 @@ update msg model =
                 | races = LoadedRaces kept
                 , parsedTracks = Dict.remove idStr model.parsedTracks
                 , kmsCache = Dict.remove idStr model.kmsCache
+                , sparklineCoords = Dict.remove idStr model.sparklineCoords
                 , pendingDelete = Nothing
               }
             , if currentRouteIs (Route.RaceDetail rid) model.route then
@@ -1241,7 +1255,19 @@ update msg model =
         ModalNoOp ->
             ( model, Cmd.none )
 
-        SliderChanged str ->
+        SliderInput str ->
+            -- Live update only — no IDB write. UTMB-sized races
+            -- carry a ~3 MB gpxText field; serialising it on every
+            -- input event makes the drag laggy. The actual save
+            -- happens on SliderCommit (the 'change' event).
+            case String.toFloat str of
+                Just i ->
+                    ( { model | sliderDraft = Just i }, Cmd.none )
+
+                Nothing ->
+                    ( model, Cmd.none )
+
+        SliderCommit str ->
             case ( String.toFloat str, currentRace model ) of
                 ( Just i, Just race ) ->
                     let
@@ -1250,7 +1276,7 @@ update msg model =
                                 |> Maybe.withDefault []
                     in
                     if List.isEmpty kms then
-                        ( model, Cmd.none )
+                        ( { model | sliderDraft = Nothing }, Cmd.none )
 
                     else
                         let
@@ -1263,10 +1289,12 @@ update msg model =
                             newRace =
                                 { race | plan = newPlan }
                         in
-                        ( model, Storage.saveRace (encodeRace newRace) )
+                        ( { model | sliderDraft = Nothing }
+                        , Storage.saveRace (encodeRace newRace)
+                        )
 
                 _ ->
-                    ( model, Cmd.none )
+                    ( { model | sliderDraft = Nothing }, Cmd.none )
 
 
 updateMetaForm : (MetaForm -> MetaForm) -> Model -> Model
@@ -1431,6 +1459,93 @@ cacheTrack race cache =
 
                 Err _ ->
                     cache
+
+
+buildSparklineCache : Dict String Track -> Dict String (List ( Float, Float )) -> Dict String (List ( Float, Float ))
+buildSparklineCache tracks existing =
+    Dict.foldl
+        (\key track acc ->
+            if Dict.member key acc then
+                acc
+
+            else
+                Dict.insert key (sparklineCoordsForTrack track) acc
+        )
+        existing
+        tracks
+
+
+cacheSparkline : String -> Dict String Track -> Dict String (List ( Float, Float )) -> Dict String (List ( Float, Float ))
+cacheSparkline key tracks cache =
+    case Dict.get key tracks of
+        Just track ->
+            Dict.insert key (sparklineCoordsForTrack track) cache
+
+        Nothing ->
+            cache
+
+
+{-| Downsample a track to ~240 (x, y) coordinates sized for the
+race-card cover sparkline (320 × 112 px). Computed once when the
+track is parsed; the result is referentially cached so every
+index render is a constant-time Dict lookup.
+
+Without this, every navigation to the index walked the full
+~26 k UTMB points through four list passes — ~100 ms per render
+on slow machines.
+
+-}
+sparklineCoordsForTrack : Track -> List ( Float, Float )
+sparklineCoordsForTrack track =
+    let
+        width =
+            320.0
+
+        height =
+            112.0
+
+        pad =
+            8.0
+
+        chartH =
+            height - pad * 2
+
+        n =
+            List.length track.points
+
+        stride =
+            max 1 (n // 240)
+
+        eleRange =
+            max 1 (track.maxEle - track.minEle)
+
+        mPerPxX =
+            max 0.01 (track.totalDist / width)
+
+        yScale =
+            chartH / eleRange
+
+        maxEle =
+            track.maxEle
+
+        zipped =
+            List.map2 Tuple.pair track.cumDist track.points
+
+        go ( d, p ) ( acc, idx ) =
+            let
+                kept =
+                    if modBy stride idx == 0 then
+                        ( d / mPerPxX, pad + (maxEle - p.ele) * yScale ) :: acc
+
+                    else
+                        acc
+            in
+            ( kept, idx + 1 )
+
+        ( revCoords, _ ) =
+            List.foldl go ( [], 0 ) zipped
+    in
+    List.reverse revCoords
 
 
 cacheKms : Race -> Dict String Track -> Dict String (List Km) -> Dict String (List Km)
@@ -2204,11 +2319,11 @@ viewEmptyState =
 viewRaceGrid : Model -> List Race -> Html Msg
 viewRaceGrid model races =
     div [ class "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5" ]
-        (List.map (\r -> viewRaceCard (Dict.get (raceIdToString r.id) model.parsedTracks) r) races)
+        (List.map (\r -> viewRaceCard (Dict.get (raceIdToString r.id) model.sparklineCoords) r) races)
 
 
-viewRaceCard : Maybe Track -> Race -> Html Msg
-viewRaceCard maybeTrack race =
+viewRaceCard : Maybe (List ( Float, Float )) -> Race -> Html Msg
+viewRaceCard maybeCoords race =
     let
         ( catLetter, catColor, catLabel ) =
             distanceCategory race.distance
@@ -2228,7 +2343,7 @@ viewRaceCard maybeTrack race =
                     ]
 
             Nothing ->
-                viewCoverSparkline catColor maybeTrack
+                viewCoverSparkline catColor maybeCoords
         , a
             [ Route.href (Route.RaceDetail race.id)
             , class "block p-5 space-y-4"
@@ -2388,8 +2503,8 @@ track isn't available yet (shouldn't happen post-RacesLoaded), we
 fall back to a generic stylised silhouette so the card stays the
 same shape.
 -}
-viewCoverSparkline : String -> Maybe Track -> Html msg
-viewCoverSparkline catColor maybeTrack =
+viewCoverSparkline : String -> Maybe (List ( Float, Float )) -> Html msg
+viewCoverSparkline catColor maybeCoords =
     let
         bandHeight =
             112
@@ -2398,9 +2513,9 @@ viewCoverSparkline catColor maybeTrack =
         [ class "relative h-28 border-b border-slate-800 overflow-hidden bg-slate-950"
         ]
         [ div [ class ("absolute top-0 left-0 right-0 h-1.5 " ++ catColor) ] []
-        , case maybeTrack of
-            Just t ->
-                raceSparkline t bandHeight
+        , case maybeCoords of
+            Just coords ->
+                raceSparkline coords bandHeight
 
             Nothing ->
                 Svg.svg
@@ -2418,8 +2533,8 @@ viewCoverSparkline catColor maybeTrack =
         ]
 
 
-raceSparkline : Track -> Int -> Html msg
-raceSparkline track bandHeight =
+raceSparkline : List ( Float, Float ) -> Int -> Html msg
+raceSparkline coords bandHeight =
     let
         width =
             320.0
@@ -2429,32 +2544,6 @@ raceSparkline track bandHeight =
 
         pad =
             8.0
-
-        chartW =
-            width
-
-        chartH =
-            height - pad * 2
-
-        eleRange =
-            max 1 (track.maxEle - track.minEle)
-
-        mPerPxX =
-            track.totalDist / chartW
-
-        -- The card's silhouette is read for shape, not strict 1:1.
-        -- We scale the elevation to fill the band's height with
-        -- some breathing room so flat routes don't render as a line.
-        yScale =
-            chartH / eleRange
-
-        coords =
-            List.map2 (\d p -> ( d / mPerPxX, pad + (track.maxEle - p.ele) * yScale ))
-                track.cumDist
-                track.points
-                |> List.indexedMap Tuple.pair
-                |> List.filter (\( i, _ ) -> modBy (max 1 (List.length track.points // 240)) i == 0)
-                |> List.map Tuple.second
 
         pathD =
             buildAreaForSparkline coords (height - pad)
@@ -3555,7 +3644,12 @@ viewPredictorStrip : Model -> Race -> List Km -> Html Msg
 viewPredictorStrip model race kms =
     let
         i =
-            currentIntensity model race kms
+            case model.sliderDraft of
+                Just draft ->
+                    draft
+
+                Nothing ->
+                    currentIntensity model race kms
 
         prediction =
             Predictor.predict model.profile race kms i
@@ -3599,7 +3693,8 @@ viewPredictorStrip model race kms =
                     , A.max "1.25"
                     , A.attribute "step" "0.01"
                     , A.value (formatFloat 2 i)
-                    , onInput SliderChanged
+                    , onInput SliderInput
+                    , E.on "change" (D.map SliderCommit E.targetValue)
                     , class "w-full accent-rose-500"
                     ]
                     []
