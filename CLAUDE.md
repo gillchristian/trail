@@ -1,5 +1,28 @@
 # CLAUDE.md
 
+**Before doing anything else, read `knowledge/README.md`.** That document defines the working system for this project — how tasks are pulled, branched, verified, shipped, and logged. The summary below is just the headline rules so you can't accidentally violate them while still loading the rest.
+
+## Non-negotiables
+
+1. **One task at a time.** Pull from `knowledge/planning/CURRENT.md`. If empty, promote the top of `knowledge/planning/BACKLOG.md`. Write acceptance criteria before touching code.
+2. **Work on branches, ship via PRs.** No direct pushes to `master`. Every change goes through branch → PR → squash-merge. Full workflow in `knowledge/philosophy/pr-workflow.md`.
+3. **Commits and PRs are authored by the user only.** No `Co-Authored-By: Claude ...` trailer. No "🤖 Generated with Claude Code" footer. Git config is already correct — just don't add Claude attribution.
+4. **Verify before declaring done.** Hard gates in `knowledge/philosophy/verification.md`. `go build -tags fts5`, `go vet`, manual `curl` smoke, and the existing cadence frontend exercised against the change.
+5. **Journal everything.** Append to `knowledge/progress/journal.md` after every task. Future-you has no memory of this session.
+6. **When stuck, follow `knowledge/philosophy/when-stuck.md`.** Do not ask the user; do log to `knowledge/progress/blockers.md` when a real blocker exists, then pivot.
+7. **Trail drives the current backlog.** The canonical spec for the in-flight work is `/Users/bb8/dev/trail/knowledge/reference/cadence-backend-spec.md`. Don't reinterpret it silently; file a blocker if a section seems wrong.
+
+## Quick map
+
+- `knowledge/README.md` — the loop, end-to-end.
+- `knowledge/philosophy/` — principles, verification gates, when-stuck playbook, working style, PR workflow.
+- `knowledge/planning/` — `CURRENT.md` (one active task), `BACKLOG.md` (queue), `DONE.md` (archive).
+- `knowledge/progress/` — `journal.md` (append-only log), `blockers.md` (things needing the user).
+- `knowledge/decisions/` — ADRs.
+- `knowledge/reference/` — `project-brief.md` (what cadence is), `trail-integration.md` (current initiative pointer), `glossary.md`.
+
+---
+
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Commands
