@@ -731,3 +731,19 @@ Bundle progression: 286 kB → 322 kB JS / 90 kB → 100 kB gzip. New modules: `
 - Two displays of the same derived value (target time number + slider position) need to update in lockstep or focus events on either one will surface the desynchronisation. The slider-as-derived approach (intensity ↔ target via `solveForIntensity`) is right; the bug was forgetting that `targetTimeText` is a *third* display of the same value.
 - Predict is cheap enough to run per input event. Save is what was expensive. Keep that split clear when sketching event handlers.
 **Next:** Same as before — TASK-022 deferred, visual smoke pending.
+
+---
+## 2026-05-16 00:30 — feat: Strava picker search over full backfilled history
+
+**Task:** UX follow-up — user wanted to link a November-2025 activity but the picker only showed the past 60 days.
+**What I did:** Added a search input at the top of the Strava picker modal. When the field is empty, the picker uses the existing `fetchActivities` (60-day recent list). When the user types, the picker switches to cadence's `/api/activities/search?q=...` endpoint, which is the FTS5-trigram-indexed search over the *full* backfilled activity history (cadence had 431 activities cached, 388 of them runs — the user's full library is there). New `StravaApi.searchActivities` decodes the search-response envelope (`{activities: [...], total, ...}`). New `StravaPickerSetSearch RaceId String` Msg updates the search field and fires the appropriate fetch on every keystroke. The picker heading flips to "Search Strava activities" while a query is active; empty-result text adapts ("No activities match this search" vs "Try searching"). Search field uses a small `⌕` icon and the existing dark-input style.
+**What I verified:**
+- Probed `/api/activities/search` first: 388 runs in the cache, backfill complete, the same response shape as `/api/activities` wrapped in `{activities, total, limit, offset}`. "morning" returned 28 hits going back to August 2025 — confirms the user's November activity is reachable.
+- `npm run build` exit 0. JS 322.81 → 324.03 kB (+1.2 KB); gzip 100.65 → 100.95 kB. Bundle string check: 4 new labels present.
+- Picker state machine unchanged; the search field is held at the top level of Model (`stravaPickerSearch : String`) so it survives the loading-state transitions. Cleared on `OpenStravaPicker` and `StravaPickerClose`.
+**What changed in the repo:** PR #31. `src/StravaApi.elm` gained `searchActivities` + a tiny `percentEncode` (covers the practical hazards: `%`, space, `&`, `#`, `?`, `+`, `"`). `src/Main.elm` gained the Msg variant, the update handler, the Model field, and the new search-input view helper.
+**What I learned:**
+- No debounce on keystroke-fires-HTTP. For typical typing the responses arrive between keystrokes; if cadence ever got slow, an out-of-order race could briefly show the wrong query's results. Mitigation (tag-the-request) deferred until it actually bites.
+- Cadence's FTS5 endpoint is exactly the same shape as the recent endpoint inside an envelope — the existing `activityDecoder` works against the inner array unchanged. Wrapping the decoder is one line.
+- The picker UX has two coexisting modes (recent / search) but they share the same state machine, just with different fetch sources. Holding the search string at the top level of Model keeps the state variants clean.
+**Next:** Visual smoke remains pending. TASK-022 (calibration) still deferred.

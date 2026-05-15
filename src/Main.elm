@@ -179,6 +179,7 @@ type alias Model =
     , stravaToken : Maybe String
     , backendUrl : String
     , stravaPicker : StravaPicker
+    , stravaPickerSearch : String
     , sliderDraft : Maybe Float
     , sparklineCoords : Dict String (List ( Float, Float ))
     }
@@ -218,6 +219,7 @@ init flags url key =
       , stravaToken = flags.incomingStravaToken
       , backendUrl = flags.backendUrl
       , stravaPicker = PickerClosed
+      , stravaPickerSearch = ""
       , sliderDraft = Nothing
       , sparklineCoords = Dict.empty
       }
@@ -329,6 +331,7 @@ type Msg
     | StravaPickerSelect RaceId Int
     | InternalStartStreamFetch RaceId Int Int String
     | StravaStreamsLoaded RaceId Int Int (Result Http.Error Encode.Value)
+    | StravaPickerSetSearch RaceId String
     | StravaPickerClose
     | ModalNoOp
 
@@ -1175,7 +1178,10 @@ update msg model =
         OpenStravaPicker rid ->
             case model.stravaToken of
                 Just token ->
-                    ( { model | stravaPicker = PickerLoadingActivities rid }
+                    ( { model
+                        | stravaPicker = PickerLoadingActivities rid
+                        , stravaPickerSearch = ""
+                      }
                     , StravaApi.fetchActivities model.backendUrl token 60 (StravaActivitiesLoaded rid)
                     )
 
@@ -1249,8 +1255,33 @@ update msg model =
                                     , Storage.saveRace (encodeRace updatedRace)
                                     )
 
+        StravaPickerSetSearch rid query ->
+            let
+                trimmed =
+                    String.trim query
+            in
+            case model.stravaToken of
+                Just token ->
+                    let
+                        nextCmd =
+                            if String.isEmpty trimmed then
+                                StravaApi.fetchActivities model.backendUrl token 60 (StravaActivitiesLoaded rid)
+
+                            else
+                                StravaApi.searchActivities model.backendUrl token trimmed (StravaActivitiesLoaded rid)
+                    in
+                    ( { model
+                        | stravaPicker = PickerLoadingActivities rid
+                        , stravaPickerSearch = query
+                      }
+                    , nextCmd
+                    )
+
+                Nothing ->
+                    ( model, Cmd.none )
+
         StravaPickerClose ->
-            ( { model | stravaPicker = PickerClosed }, Cmd.none )
+            ( { model | stravaPicker = PickerClosed, stravaPickerSearch = "" }, Cmd.none )
 
         ModalNoOp ->
             ( model, Cmd.none )
@@ -3542,6 +3573,16 @@ viewStravaPickerModal model raceId =
     let
         sameRace pickerRid =
             raceIdToString pickerRid == raceIdToString raceId
+
+        isSearching =
+            not (String.isEmpty (String.trim model.stravaPickerSearch))
+
+        heading =
+            if isSearching then
+                "Search Strava activities"
+
+            else
+                "Recent Strava activities (60 days)"
     in
     case model.stravaPicker of
         PickerClosed ->
@@ -3549,7 +3590,20 @@ viewStravaPickerModal model raceId =
 
         PickerLoadingActivities pickerRid ->
             if sameRace pickerRid then
-                modalShell "Loading recent activities…" (text "")
+                modalShell heading
+                    (div [ class "space-y-3" ]
+                        [ viewStravaPickerSearch pickerRid model.stravaPickerSearch
+                        , p [ class "text-sm text-slate-500 py-6 text-center" ]
+                            [ text
+                                (if isSearching then
+                                    "Searching…"
+
+                                 else
+                                    "Loading recent activities…"
+                                )
+                            ]
+                        ]
+                    )
 
             else
                 text ""
@@ -3579,20 +3633,46 @@ viewStravaPickerModal model raceId =
 
         PickerShowing pickerRid acts ->
             if sameRace pickerRid then
-                modalShell "Recent Strava activities (60 days)"
-                    (div [ class "space-y-2 max-h-[60vh] overflow-y-auto" ]
-                        (if List.isEmpty acts then
-                            [ p [ class "text-sm text-slate-400" ]
-                                [ text "No activities found in the past 60 days." ]
-                            ]
+                modalShell heading
+                    (div [ class "space-y-3" ]
+                        [ viewStravaPickerSearch pickerRid model.stravaPickerSearch
+                        , div [ class "space-y-2 max-h-[60vh] overflow-y-auto" ]
+                            (if List.isEmpty acts then
+                                [ p [ class "text-sm text-slate-400 py-6 text-center" ]
+                                    [ text
+                                        (if isSearching then
+                                            "No activities match this search."
 
-                         else
-                            List.map (viewStravaActivityRow pickerRid) acts
-                        )
+                                         else
+                                            "No activities found in the past 60 days. Try searching."
+                                        )
+                                    ]
+                                ]
+
+                             else
+                                List.map (viewStravaActivityRow pickerRid) acts
+                            )
+                        ]
                     )
 
             else
                 text ""
+
+
+viewStravaPickerSearch : RaceId -> String -> Html Msg
+viewStravaPickerSearch rid current =
+    div [ class "relative" ]
+        [ input
+            [ A.type_ "text"
+            , A.value current
+            , A.placeholder "Search activity names · full history"
+            , onInput (StravaPickerSetSearch rid)
+            , class "w-full bg-slate-950 border border-slate-800 rounded-md pl-9 pr-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-rose-500/60"
+            ]
+            []
+        , span [ class "absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm" ]
+            [ text "⌕" ]
+        ]
 
 
 modalShell : String -> Html Msg -> Html Msg
