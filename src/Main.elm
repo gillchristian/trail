@@ -37,7 +37,10 @@ import Predictor
 import ProjectFile
 import Profile exposing (Marker, ScaleMode(..))
 import Route exposing (Route)
+import Http
 import Storage
+import StravaApi
+import StravaStreams
 import Svg
 import Svg.Attributes as SA
 import Task
@@ -175,7 +178,16 @@ type alias Model =
     , profileSaved : Bool
     , stravaToken : Maybe String
     , backendUrl : String
+    , stravaPicker : StravaPicker
     }
+
+
+type StravaPicker
+    = PickerClosed
+    | PickerLoadingActivities RaceId
+    | PickerShowing RaceId (List StravaApi.Activity)
+    | PickerLoadingStreams RaceId Int
+    | PickerError RaceId String
 
 
 init : Flags -> Url -> Nav.Key -> ( Model, Cmd Msg )
@@ -203,6 +215,7 @@ init flags url key =
       , profileSaved = False
       , stravaToken = flags.incomingStravaToken
       , backendUrl = flags.backendUrl
+      , stravaPicker = PickerClosed
       }
     , Cmd.batch
         [ Storage.loadAll
@@ -306,6 +319,13 @@ type Msg
       -- strava integration
     | StravaTokenLoaded Encode.Value
     | StravaDisconnect
+    | OpenStravaPicker RaceId
+    | StravaActivitiesLoaded RaceId (Result Http.Error (List StravaApi.Activity))
+    | StravaPickerSelect RaceId Int
+    | InternalStartStreamFetch RaceId Int Int String
+    | StravaStreamsLoaded RaceId Int Int (Result Http.Error Encode.Value)
+    | StravaPickerClose
+    | ModalNoOp
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -1134,9 +1154,92 @@ update msg model =
                     ( { model | stravaToken = Nothing }, Cmd.none )
 
         StravaDisconnect ->
-            ( { model | stravaToken = Nothing }
+            ( { model | stravaToken = Nothing, stravaPicker = PickerClosed }
             , Storage.saveStravaToken Encode.null
             )
+
+        OpenStravaPicker rid ->
+            case model.stravaToken of
+                Just token ->
+                    ( { model | stravaPicker = PickerLoadingActivities rid }
+                    , StravaApi.fetchActivities model.backendUrl token 60 (StravaActivitiesLoaded rid)
+                    )
+
+                Nothing ->
+                    ( model, Cmd.none )
+
+        StravaActivitiesLoaded rid result ->
+            case result of
+                Ok acts ->
+                    ( { model | stravaPicker = PickerShowing rid acts }, Cmd.none )
+
+                Err err ->
+                    ( { model | stravaPicker = PickerError rid (httpErrorString err) }, Cmd.none )
+
+        StravaPickerSelect rid actId ->
+            case model.stravaToken of
+                Just token ->
+                    ( { model | stravaPicker = PickerLoadingStreams rid actId }
+                    , Task.perform identity
+                        (Time.now
+                            |> Task.map Time.posixToMillis
+                            |> Task.map
+                                (\ms ->
+                                    -- We need to pass the timestamp to StravaStreamsLoaded but Http
+                                    -- doesn't compose with Task in the same chain. Trigger the fetch
+                                    -- separately by emitting a Msg that does the fetch.
+                                    InternalStartStreamFetch rid actId ms token
+                                )
+                        )
+                    )
+
+                Nothing ->
+                    ( model, Cmd.none )
+
+        InternalStartStreamFetch rid actId ms token ->
+            ( model
+            , StravaApi.fetchStreams model.backendUrl token actId (StravaStreamsLoaded rid actId ms)
+            )
+
+        StravaStreamsLoaded rid actId uploadedAtMs result ->
+            case result of
+                Err err ->
+                    ( { model | stravaPicker = PickerError rid (httpErrorString err) }, Cmd.none )
+
+                Ok value ->
+                    case StravaStreams.parse value of
+                        Err parseErr ->
+                            ( { model | stravaPicker = PickerError rid parseErr }, Cmd.none )
+
+                        Ok track ->
+                            case findRace rid (currentRaces model) of
+                                Nothing ->
+                                    ( { model | stravaPicker = PickerClosed }, Cmd.none )
+
+                                Just race ->
+                                    let
+                                        splits =
+                                            ActualGpx.computeSplits track |> Dict.fromList
+
+                                        actual =
+                                            { splits = splits
+                                            , totalSeconds = track.totalElapsedS
+                                            , totalDistance = track.totalDist
+                                            , uploadedAt = uploadedAtMs
+                                            }
+
+                                        updatedRace =
+                                            { race | actualSplits = Just actual }
+                                    in
+                                    ( { model | stravaPicker = PickerClosed, actualRunError = Nothing }
+                                    , Storage.saveRace (encodeRace updatedRace)
+                                    )
+
+        StravaPickerClose ->
+            ( { model | stravaPicker = PickerClosed }, Cmd.none )
+
+        ModalNoOp ->
+            ( model, Cmd.none )
 
         SliderChanged str ->
             case ( String.toFloat str, currentRace model ) of
@@ -3316,6 +3419,138 @@ viewPlanTable model race =
         ]
 
 
+viewStravaPickerModal : Model -> RaceId -> Html Msg
+viewStravaPickerModal model raceId =
+    let
+        sameRace pickerRid =
+            raceIdToString pickerRid == raceIdToString raceId
+    in
+    case model.stravaPicker of
+        PickerClosed ->
+            text ""
+
+        PickerLoadingActivities pickerRid ->
+            if sameRace pickerRid then
+                modalShell "Loading recent activities…" (text "")
+
+            else
+                text ""
+
+        PickerLoadingStreams pickerRid actId ->
+            if sameRace pickerRid then
+                modalShell ("Fetching streams for activity " ++ String.fromInt actId ++ "…") (text "")
+
+            else
+                text ""
+
+        PickerError pickerRid err ->
+            if sameRace pickerRid then
+                modalShell "Strava error"
+                    (div [ class "space-y-3" ]
+                        [ p [ class "text-sm text-rose-400" ] [ text err ]
+                        , button
+                            [ onClick StravaPickerClose
+                            , class "px-4 py-2 text-sm border border-slate-700 rounded-md hover:bg-slate-800 text-slate-100"
+                            ]
+                            [ text "Close" ]
+                        ]
+                    )
+
+            else
+                text ""
+
+        PickerShowing pickerRid acts ->
+            if sameRace pickerRid then
+                modalShell "Recent Strava activities (60 days)"
+                    (div [ class "space-y-2 max-h-[60vh] overflow-y-auto" ]
+                        (if List.isEmpty acts then
+                            [ p [ class "text-sm text-slate-400" ]
+                                [ text "No activities found in the past 60 days." ]
+                            ]
+
+                         else
+                            List.map (viewStravaActivityRow pickerRid) acts
+                        )
+                    )
+
+            else
+                text ""
+
+
+modalShell : String -> Html Msg -> Html Msg
+modalShell heading body =
+    div
+        [ class "fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm"
+        , onClick StravaPickerClose
+        ]
+        [ div
+            [ class "max-w-xl w-full bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4 shadow-2xl"
+            , stopPropagation
+            ]
+            [ div [ class "flex items-center justify-between gap-3" ]
+                [ h2 [ class "text-lg font-semibold text-slate-100" ] [ text heading ]
+                , button
+                    [ onClick StravaPickerClose
+                    , class "w-8 h-8 rounded-full bg-slate-950 text-slate-500 hover:text-rose-400 hover:bg-slate-950 flex items-center justify-center text-sm"
+                    ]
+                    [ text "✕" ]
+                ]
+            , body
+            ]
+        ]
+
+
+stopPropagation : Html.Attribute Msg
+stopPropagation =
+    E.stopPropagationOn "click" (D.succeed ( ModalNoOp, True ))
+
+
+viewStravaActivityRow : RaceId -> StravaApi.Activity -> Html Msg
+viewStravaActivityRow rid act =
+    button
+        [ onClick (StravaPickerSelect rid act.id)
+        , class "w-full text-left px-4 py-3 rounded-lg bg-slate-950 hover:bg-slate-800 border border-slate-800 hover:border-rose-500/60 transition-colors"
+        ]
+        [ div [ class "flex items-baseline justify-between gap-3" ]
+            [ p [ class "font-medium text-slate-100 truncate" ] [ text act.name ]
+            , p [ class "text-xs text-slate-500 whitespace-nowrap tabular-nums" ]
+                [ text (String.left 10 act.startDateLocal) ]
+            ]
+        , p [ class "text-xs text-slate-500 mt-1 tabular-nums" ]
+            [ text
+                (formatFloat 2 (act.distance / 1000)
+                    ++ " km · "
+                    ++ formatHhmm act.movingTime
+                    ++ " · "
+                    ++ act.sportType
+                )
+            ]
+        ]
+
+
+httpErrorString : Http.Error -> String
+httpErrorString err =
+    case err of
+        Http.BadUrl u ->
+            "Bad URL: " ++ u
+
+        Http.Timeout ->
+            "Request timed out."
+
+        Http.NetworkError ->
+            "Network error — is cadence running and reachable?"
+
+        Http.BadStatus s ->
+            if s == 401 then
+                "Unauthorized — reconnect Strava in settings."
+
+            else
+                "Server returned status " ++ String.fromInt s ++ "."
+
+        Http.BadBody msg ->
+            "Couldn't parse the response: " ++ msg
+
+
 viewPredictorStrip : Model -> Race -> List Km -> Html Msg
 viewPredictorStrip model race kms =
     let
@@ -3486,21 +3721,39 @@ viewActualRunStrip model race =
 
                 Nothing ->
                     text ""
+
+        stravaButton =
+            case model.stravaToken of
+                Just _ ->
+                    button
+                        [ onClick (OpenStravaPicker race.id)
+                        , class "px-4 py-2 text-sm bg-orange-500 text-white rounded-md hover:bg-orange-400 font-medium whitespace-nowrap"
+                        ]
+                        [ text "Link from Strava" ]
+
+                Nothing ->
+                    text ""
     in
     case race.actualSplits of
         Nothing ->
-            div [ class "rounded-2xl bg-slate-900 border border-slate-800 p-4 flex items-center justify-between gap-4 flex-wrap" ]
-                [ div [ class "min-w-0" ]
-                    [ p [ class "font-medium text-slate-100" ] [ text "Link actual run" ]
-                    , p [ class "text-sm text-slate-400 mt-0.5" ]
-                        [ text "Upload the .gpx of your completed run to compare per-km splits against the plan." ]
-                    , errorBanner
+            div []
+                [ div [ class "rounded-2xl bg-slate-900 border border-slate-800 p-4 flex items-center justify-between gap-4 flex-wrap" ]
+                    [ div [ class "min-w-0" ]
+                        [ p [ class "font-medium text-slate-100" ] [ text "Link actual run" ]
+                        , p [ class "text-sm text-slate-400 mt-0.5" ]
+                            [ text "Upload the .gpx of your completed run to compare per-km splits against the plan." ]
+                        , errorBanner
+                        ]
+                    , div [ class "flex items-center gap-2" ]
+                        [ stravaButton
+                        , button
+                            [ onClick (OpenActualGpxPicker race.id)
+                            , class "px-4 py-2 text-sm border border-slate-700 rounded-md hover:bg-slate-800 text-slate-100 whitespace-nowrap"
+                            ]
+                            [ text "Upload .gpx" ]
+                        ]
                     ]
-                , button
-                    [ onClick (OpenActualGpxPicker race.id)
-                    , class "px-4 py-2 text-sm border border-slate-700 rounded-md hover:bg-slate-800 text-slate-100 whitespace-nowrap"
-                    ]
-                    [ text "Upload .gpx" ]
+                , viewStravaPickerModal model race.id
                 ]
 
         Just actual ->
