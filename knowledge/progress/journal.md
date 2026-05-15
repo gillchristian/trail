@@ -422,3 +422,45 @@ Append-only. Newest at the bottom. Each entry is a snapshot for future-me with n
 - Routes-with-id helpers (like `currentRace`) need to enumerate every variant explicitly. Burned by this twice in two PRs; that's the lesson confirmed.
 
 **Next:** "More gamification" pass — small polish (section-count badges on race cards, animated reveal on section card, refined cluster icons on map) if the user comes back with more. Otherwise idle.
+
+---
+## 2026-05-15 13:32 — exploration: pace prediction & Strava roadmap
+
+**Task:** exploration (not a TASK-NNN — user explicitly asked for planning only).
+**What I did:** Read `trail_race_planner_spec.md` (the user's exploration with another agent), cross-referenced against ADR-0003, `src/Planning.elm`, `project-brief.md`, and the two adjacent projects (`../strava-mcp` for the Strava API surface, `../cadence` for an existing OAuth + backfill loop). Wrote `knowledge/reference/pace-prediction-roadmap.md` — a single roadmap doc covering: which spec pieces are worth using when, the predictor-vs-distributor split, profile data model, bidirectional aggressiveness slider mechanics, UI surfaces, three-phase Strava integration, calibration fits, the local-first tension, open questions, and a 11-task candidate breakdown. Added TASK-014 through TASK-024 to BACKLOG.md under a new **Proposals** heading (explicitly *not* Active — they need user go-ahead before promotion).
+**What I verified:** No code changed. Roadmap doc renders cleanly (markdown sanity-checked by eye). BACKLOG entries cross-reference the roadmap by section.
+**What changed in the repo:** `knowledge/reference/pace-prediction-roadmap.md` (new), `knowledge/planning/BACKLOG.md` (added Proposals section).
+**What I learned:**
+- Strava API does **not** expose direct GPX download. The streams endpoint (`/activities/{id}/streams`) is the actual data path; you reconstruct a GPX (and get HR + cadence as a bonus). This shifts the Phase-1-manual story from "user clicks Strava export GPX" to either "user clicks Strava export GPX in the browser UI (which *does* work, just not via API)" or "we parse a JSON streams dump."
+- The bidirectional slider only works smoothly if intensity is continuous (analytic or bisection invert). Stepped presets break the inverse map.
+- `project-brief.md`'s "no backend, ever" is a real constraint, not aspirational. The roadmap proposes a deliberate softening (Strava sync as opt-in helper) rather than ignoring it.
+- The actual-vs-planned upload (TASK-016) is high-leverage and *fully local* — it can ship without any of the predictor / profile / Strava work and is independently useful.
+**Next:** Wait for user feedback on the roadmap and the open questions in §9. When they pick chunks to promote, those become real TASK-NNN entries with acceptance criteria.
+
+---
+## 2026-05-15 13:55 — exploration: cadence-backend-spec for trail integration
+
+**Task:** exploration (continued).
+**What I did:** Read all of `~/dev/cadence/server/` (main.go, all handlers, all store, strava/client.go) to understand what extending it for trail would actually require. Wrote `knowledge/reference/cadence-backend-spec.md` — a five-PR plan + copy-pasteable hand-off brief for an agent working in `~/dev/cadence/`. Cross-linked from the roadmap doc §6.
+**What I verified:** No code changed. Spec maps every claim to a concrete file in cadence (`main.go` for CORS, `auth_handler.go` for state-routing, `store/token.go` + new migrations 013–016 for the sessions split, new `compare.go`-adjacent handler for streams).
+**What changed in the repo:** `knowledge/reference/cadence-backend-spec.md` (new), `knowledge/reference/pace-prediction-roadmap.md` (one paragraph added pointing at the spec).
+**What I learned:**
+- cadence's `tokens` table is keyed by `athlete_id` with a unique `session_token` column. Two frontends authenticating the same athlete would clobber each other's sessions. **A schema split (tokens + sessions) is required**, not just CORS and routing. This was the non-obvious surprise.
+- cadence's `FetchActivityStreams` only requests `distance,heartrate`. Generalising it to accept arbitrary keys is a small change, but it's the change that makes trail's actual-vs-planned + calibration flows possible.
+- OAuth `state` carries two responsibilities: anti-CSRF nonce and origin-routing. Encoding both as base64-url JSON in `state` is the cleanest approach; an in-memory nonce map with 5-min TTL is fine on cadence's single-machine deployment.
+- Streams responses are not cached (per cadence's existing policy, correctly — they're large + immutable + rarely re-read). trail's calibration flow has to throttle client-side (~1 req/2 s) to stay under Strava's 100/15min.
+- No new tables for trail-domain state are needed on the backend. Races, plans, profiles, and `race ↔ stravaActivityId` links all stay in trail's IDB. The backend is purely a thin Strava proxy with the existing token-refresh machinery.
+**Next:** Same as before — wait for user feedback. The cadence-backend-spec.md §12 brief is the artefact they'd hand to an agent in `~/dev/cadence/` if they choose to proceed.
+
+---
+## 2026-05-15 14:15 — port working system to cadence
+
+**Task:** scaffolding (cross-project).
+**What I did:** Ported trail's `knowledge/` system into `~/dev/cadence/knowledge/` so a cadence agent can do the trail-integration work in the same self-directed style. Adapted philosophy docs for Go/chi/SQLite specifics (verification commands, when-stuck table, working-style). Seeded `cadence/knowledge/planning/BACKLOG.md` with TASK-001–TASK-005 (the five PRs from this repo's `cadence-backend-spec.md`), each with explicit acceptance criteria and a spec-section pointer. Created `cadence/knowledge/reference/trail-integration.md` containing the §12 hand-off brief verbatim and the explicit rule that trail owns the spec (cadence files blockers rather than reinterpreting). Updated cadence's `CLAUDE.md` to make `knowledge/README.md` the entry point. Moved pre-existing `cadence/knowledge/caching.md` into `reference/` and cross-linked it from `project-brief.md`.
+**What I verified:** No code changed in either repo. `find ~/dev/cadence/knowledge -type f` shows 16 files in the expected layout. `git status` in cadence shows the renames + new files only — no accidental edits to `server/` or `client/`. Pointers from cadence back to trail use absolute paths so they're stable regardless of which repo the agent is sitting in.
+**What changed in the repo:** Only this journal entry in trail's repo. The cadence-side changes are: new `knowledge/` tree (~14 files), `CLAUDE.md` gained the non-negotiables header, `caching.md` moved into `reference/`.
+**What I learned:**
+- Cadence already had a `.claude/` directory and a top-level `knowledge/caching.md` from prior agent work. The port absorbed it cleanly by relocating into `reference/`.
+- The spec pointer pattern (absolute path to `trail/knowledge/reference/cadence-backend-spec.md`) works because both repos sit under `~/dev/`. If we ever rename or move repos, those references need updating in cadence's knowledge/.
+- Cadence's existing commit history is loose (short subject lines, no bodies). The new PR workflow tightens this from now on; I added explicit "don't backfill old commits" guidance in `working-style.md` so the cadence agent doesn't try to clean history.
+**Next:** Hand-off ready. The user can now: open a Claude Code session in `~/dev/cadence/`, ask it to read `knowledge/README.md`, and start TASK-001. The trail spec at `~/dev/trail/knowledge/reference/cadence-backend-spec.md` remains the canonical contract.

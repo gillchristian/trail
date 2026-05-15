@@ -27,3 +27,21 @@ Ordered. Top item is next. Promote into `CURRENT.md` when started.
 - Light / dark mode toggle (dark default).
 - Multi-language UI ("tramos" → "sections" toggle).
 - Comparing planned vs actual after the race (post-MVP, would need an .fit upload).
+
+## Proposals (not yet promoted — see `knowledge/reference/pace-prediction-roadmap.md`)
+
+The roadmap doc covers the why and the trade-offs. These entries are the *chunks* that would come out of it if approved. Do not promote into Active without an explicit go-ahead from the user.
+
+- **TASK-014 — Course summary card additions.** Equivalent flat distance + elevation density label, shown on race index/overview. (S, no Strava needed.)
+- **TASK-015 — Per-km segment classification by grade.** Colour tag in the planning table derived from `Km.slope`. (S.)
+- **TASK-016 — Planned-vs-actual upload (manual `.gpx`).** Snap to course, compute actual splits at planned km boundaries, render diff column. **High-leverage, fully local.** (M.)
+- **TASK-017 — Profile data model + IDB store + settings page.** Hand-set fields, preset picker (Mid-pack / Strong mid-pack / Sub-elite), one global active profile. (M.)
+- **TASK-018 — `Predictor.predict` module (Layer B).** Pure function; climb + descent + runnable + aid; takes profile + intensity. Unit-tested. Depends on TASK-017. (M.)
+- **TASK-019 — Bidirectional aggressiveness slider on the planning page.** Intensity ↔ target time, inverse via bisection of the predictor. Depends on TASK-018. (M.)
+- **TASK-020 — Confidence indicator surfacing on predictor output.** Annotated by profile source. (S.)
+- **TASK-021 — Strava streams parser.** Reconstruct a usable `Gpx.Track`-shaped value from cadence's streams response (keyed-object form, see spec §4.4). Pure Elm decoder + transform; takes JSON, produces `{ points, cumDist, totalDist }`. Local-only — works on any streams JSON, whether from cadence or a manual dump. (M.)
+- **TASK-022 — Calibration from past activities.** Fit `vmh`, fatigue slope, optional HR bands. Surface "what changed and why." Depends on TASK-021 (streams parser) + TASK-024 (auth wiring). (L — split when picked up.)
+- ~~**TASK-023 — Decision: OAuth helper or stay manual.**~~ **Resolved 2026-05-15.** Decision: extend `cadence`'s backend. Spec at `knowledge/reference/cadence-backend-spec.md`; cadence is implementing as 5 PRs.
+- **TASK-024 — Strava OAuth integration in trail.** Now unblocked. Recent-activity browser (`GET /api/activities` from cadence), multi-select link-to-race, refresh-token flow (just storing the session token; cadence handles refresh). Starts as soon as cadence ships their TASK-003 (state-routing). (L.)
+
+Open questions to resolve before promoting any of the above: see roadmap §9.
