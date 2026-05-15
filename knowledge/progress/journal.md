@@ -682,3 +682,19 @@ Bundle progression: 286 kB → 322 kB JS / 90 kB → 100 kB gzip. New modules: `
 2. TASK-022 — calibration — design pass + implementation. Probably a 90-min focused session.
 3. (Optional) Cadence-side addendum 1 if not already shipped by the cadence agent.
 4. Polish items in the parking lot (descent-aggressiveness slider, per-km gain/loss for slope-factor, etc.).
+
+---
+## 2026-05-15 23:25 — hotfix: stack overflow in StravaStreams.zip3
+
+**Task:** bugfix (visual-smoke from user found it).
+**What I did:** User reported `RangeError: Maximum call stack size exceeded` during the streams parse on an ~18 km activity (Strava streams come back with ~6 000 sample points). Followed by "Loading recent activities also gets stuck" — the zombie symptom after an uncaught Elm-runtime exception. Root cause: `zip3` in `StravaStreams.elm` was the classic non-TCE recursive cons pattern `(x, y, z) :: zip3 xs ys zs` — Elm's TCE only kicks in when the recursive call is the *last* expression returned, and with a leading cons it isn't. Fix: accumulator-and-reverse so the recursive call IS tail-position. **Both reported bugs resolve from this one fix** — the streams crash killed the Elm runtime mid-frame; subsequent Msgs (including the activity-list response) were dropped, so the picker stayed at "Loading recent activities" indefinitely. Page reload would have unstuck it; the real fix is no crash.
+**What I verified:**
+- `npm run build` exit 0. JS 321.94 → 322.02 kB (+80 B for the helper).
+- Audited other new modules for the same anti-pattern: `cumulativeDistances` and `computeSplits` use `List.foldl` (safe), `crossBoundaries` is tail-recursive (recursive call is the last expression in the if-branch), `bisect` is tail-recursive. No other recursive-cons builders.
+- Server-side curl already verified `/api/activities?days=60` returns 29 decode-clean activities in ~450 ms; the picker bug was purely client-side.
+**What changed in the repo:** PR #28. Modified `src/StravaStreams.elm` only — `zip3` now delegates to `zip3Help xs ys zs []` which accumulates then reverses.
+**What I learned:**
+- Elm TCE is precise: it works on **self-recursive functions in tail position only**. `f x :: g rest` is not tail position because the cons happens after `g` returns. The trail rule for hot-path list builders: accumulator + final `List.reverse`, always.
+- An uncaught exception in the Elm runtime is silent-fatal: no error banner, the DOM stays as last-rendered, all subsequent ports + subscriptions stop firing. Reload is the only recovery. Worth remembering when debugging "frozen UI" reports.
+- The bug was latent until streams hit a real Strava activity. The build verified types but never exercised the 6 000-point path. **Visual-smoke catches what build-only-verification cannot** — exactly the constraint flagged in every PR description this session.
+**Next:** Resume the previous closeout — TASK-022 still deferred for fresh-session work.
