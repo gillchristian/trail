@@ -1677,6 +1677,30 @@ equivalentFlatKm distanceMeters gainMeters lossMeters =
     distanceMeters / 1000 + gainMeters / 100 + lossMeters / 1000
 
 
+{-| Five grade buckets for per-km classification. `slope` is the
+end-to-end Δele / Δdist ratio already stored on `Planning.Km`.
+Cutoffs at ±0.04 and ±0.10 from spec §3.2. Tone intensifies at
+the extremes; the runnable band stays neutral so the table doesn't
+shout when nothing notable is happening.
+-}
+gradeClass : Float -> ( String, String )
+gradeClass slope =
+    if slope >= 0.1 then
+        ( "Steep climb", "text-rose-300 bg-rose-500/15 ring-rose-500/30" )
+
+    else if slope >= 0.04 then
+        ( "Climb", "text-rose-400 bg-rose-500/10 ring-rose-500/20" )
+
+    else if slope > -0.04 then
+        ( "Runnable", "text-slate-400 bg-slate-500/10 ring-slate-500/20" )
+
+    else if slope > -0.1 then
+        ( "Descent", "text-emerald-400 bg-emerald-500/10 ring-emerald-500/20" )
+
+    else
+        ( "Steep descent", "text-emerald-300 bg-emerald-500/15 ring-emerald-500/30" )
+
+
 {-| Race-card "cover" when there's no user image: a real silhouette
 of the race's elevation profile drawn at the card width. Each race
 becomes visually recognisable by its profile shape. If the parsed
@@ -2888,6 +2912,7 @@ viewKmTable race kms results =
                     [ Html.th [ class "px-4 py-3 text-left" ] [ text "Km" ]
                     , Html.th [ class "px-4 py-3 text-left" ] [ text "Span" ]
                     , Html.th [ class "px-4 py-3 text-right" ] [ text "Δ ele" ]
+                    , Html.th [ class "px-4 py-3 text-left" ] [ text "Grade" ]
                     , Html.th [ class "px-4 py-3 text-right" ] [ text "Pace" ]
                     , Html.th [ class "px-4 py-3 text-right" ] [ text "Time" ]
                     , Html.th [ class "px-4 py-3 text-right" ] [ text "Cum" ]
@@ -2998,6 +3023,19 @@ viewKmRow race km result stops notes cumulative =
                         ++ " m"
                     )
                 ]
+            ]
+        , Html.td [ class "px-4 py-3 align-top" ]
+            [ let
+                ( gLabel, gTone ) =
+                    gradeClass km.slope
+              in
+              span
+                [ class
+                    ("inline-flex items-center px-2 py-0.5 rounded text-[10px] uppercase tracking-wider whitespace-nowrap ring-1 ring-inset "
+                        ++ gTone
+                    )
+                ]
+                [ text gLabel ]
             ]
         , Html.td [ class "px-4 py-3 align-top text-right text-slate-300 tabular-nums" ] [ text pace ]
         , Html.td [ class "px-4 py-3 align-top text-right" ] [ timeCell ]

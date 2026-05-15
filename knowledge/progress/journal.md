@@ -506,3 +506,15 @@ Wrote `knowledge/reference/cadence-backend-spec-addendum-1-profile-scope.md` —
 - The athlete cache uses a negative-`athlete_id` sentinel in `activity_cache`. Bust it with a one-shot migration after the scope change to avoid serving stale SummaryAthlete shape for up to 24 h.
 - Multi-session model survives the re-auth flow naturally because `SetTokens` upserts by `athlete_id` — all existing sessions for that athlete resolve to the upgraded tokens automatically. No session-row migration needed.
 **Next:** Resume trail's numeric PR order — TASK-015 next. The addendum spec is pending hand-off; the user can paste §"Hand-off brief" into a cadence Claude Code session whenever they want it shipped. Not blocking anything trail-side until TASK-022 (calibration) — `max_heartrate` is the field we'd consume there.
+
+---
+## 2026-05-15 17:40 — TASK-015: per-km grade classification
+
+**Task:** TASK-015 (second slice of pace-prediction roadmap; smallest still-unshipped item).
+**What I did:** Added `gradeClass : Float -> (String, String)` helper next to `densityLabel` — 5 buckets (Steep climb / Climb / Runnable / Descent / Steep descent) at cutoffs ±0.04 and ±0.10 per spec §3.2. Planning km-table gained a "Grade" column between Δ ele and Pace, rendering a compact pill (`ring-1 ring-inset`, rose-3→rose-4 for climbs, slate-4 neutral, emerald-4→emerald-3 for descents — mirrors the existing Δ ele cell palette). Section-table left untouched intentionally — sections span multiple grade buckets, a single chip would mislead.
+**What I verified:** `npm run build` exit 0; JS 288.34 → 289.02 kB (+680 B); gzip 90.53 → 90.74 kB. All five labels present in the bundle. Cutoff arithmetic verified by reading the conditional. In-browser visual check not performed (no GUI here).
+**What changed in the repo:** PR #18. Modified `src/Main.elm` (helper + table header + km-row), updated planning files + this entry.
+**What I learned:**
+- The pill ring outline (`ring-1 ring-inset`) was the right call — flat-fill backgrounds (`bg-rose-500/15`) alone don't read on the hover-darkened row. The ring gives the pill enough edge to survive `:hover bg-slate-950/60`.
+- Cutoffs ±4 % and ±10 % match the spec table cleanly. The boundary semantics (`>=` for climbs, `>` for the runnable band so 0.04 is "Climb" not "Runnable") mirror the Δ ele cell which uses `> 0` / `< 0` / `== 0`.
+**Next:** TASK-016 — planned-vs-actual via manual GPX upload. The math (parse actual GPX, snap to course, compute per-km actual splits at the *planned* km boundaries, render diff column) is identical regardless of where the GPX came from — the file picker path is what we ship; TASK-021 later swaps the source for Strava streams.
