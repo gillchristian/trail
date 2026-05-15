@@ -60,7 +60,7 @@ func (h *AuthHandler) Callback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.Store.SetTokens(result.Tokens, sessionToken); err != nil {
+	if err := h.Store.SetTokens(result.Tokens, sessionToken, "cadence"); err != nil {
 		log.Printf("Token store error: %v", err)
 		http.Error(w, "Authentication failed", http.StatusInternalServerError)
 		return

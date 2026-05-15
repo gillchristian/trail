@@ -118,6 +118,38 @@ var migrations = []Migration{
 			INSERT INTO activities_fts(rowid, name) VALUES (new.rowid, new.name);
 		END`,
 	},
+	{
+		ID: "013_create_tokens_v2",
+		SQL: `CREATE TABLE IF NOT EXISTS tokens_v2 (
+			athlete_id INTEGER PRIMARY KEY,
+			access_token TEXT NOT NULL,
+			refresh_token TEXT NOT NULL,
+			expires_at INTEGER NOT NULL
+		)`,
+	},
+	{
+		ID: "014_create_sessions_table",
+		SQL: `CREATE TABLE IF NOT EXISTS sessions (
+			session_token TEXT PRIMARY KEY,
+			athlete_id INTEGER NOT NULL REFERENCES tokens_v2(athlete_id),
+			origin TEXT NOT NULL,
+			created_at INTEGER NOT NULL,
+			last_seen_at INTEGER NOT NULL
+		);
+		CREATE INDEX IF NOT EXISTS idx_sessions_athlete ON sessions(athlete_id)`,
+	},
+	{
+		ID: "015_migrate_tokens_to_v2",
+		SQL: `INSERT OR IGNORE INTO tokens_v2 (athlete_id, access_token, refresh_token, expires_at)
+			SELECT athlete_id, access_token, refresh_token, expires_at FROM tokens;
+		INSERT OR IGNORE INTO sessions (session_token, athlete_id, origin, created_at, last_seen_at)
+			SELECT session_token, athlete_id, 'cadence', strftime('%s','now'), strftime('%s','now') FROM tokens`,
+	},
+	{
+		ID: "016_drop_old_tokens_rename_v2",
+		SQL: `DROP TABLE tokens;
+		ALTER TABLE tokens_v2 RENAME TO tokens`,
+	},
 }
 
 func RunMigrations(db *sql.DB) error {

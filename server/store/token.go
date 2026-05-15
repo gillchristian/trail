@@ -32,7 +32,10 @@ func NewTokenStore(db *sql.DB) *TokenStore {
 
 func (s *TokenStore) GetTokensBySession(sessionToken string) (*Tokens, error) {
 	row := s.db.QueryRow(
-		"SELECT access_token, refresh_token, expires_at, athlete_id FROM tokens WHERE session_token = ?",
+		`SELECT t.access_token, t.refresh_token, t.expires_at, t.athlete_id
+		 FROM sessions s
+		 JOIN tokens t ON t.athlete_id = s.athlete_id
+		 WHERE s.session_token = ?`,
 		sessionToken,
 	)
 
@@ -44,21 +47,46 @@ func (s *TokenStore) GetTokensBySession(sessionToken string) (*Tokens, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	if _, err := s.db.Exec(
+		"UPDATE sessions SET last_seen_at = ? WHERE session_token = ?",
+		time.Now().Unix(), sessionToken,
+	); err != nil {
+		return nil, err
+	}
+
 	return &t, nil
 }
 
-func (s *TokenStore) SetTokens(t Tokens, sessionToken string) error {
-	_, err := s.db.Exec(
-		`INSERT INTO tokens (athlete_id, session_token, access_token, refresh_token, expires_at)
-		 VALUES (?, ?, ?, ?, ?)
+func (s *TokenStore) SetTokens(t Tokens, sessionToken, origin string) error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	if _, err := tx.Exec(
+		`INSERT INTO tokens (athlete_id, access_token, refresh_token, expires_at)
+		 VALUES (?, ?, ?, ?)
 		 ON CONFLICT(athlete_id) DO UPDATE SET
-			session_token = excluded.session_token,
 			access_token = excluded.access_token,
 			refresh_token = excluded.refresh_token,
 			expires_at = excluded.expires_at`,
-		t.AthleteID, sessionToken, t.AccessToken, t.RefreshToken, t.ExpiresAt,
-	)
-	return err
+		t.AthleteID, t.AccessToken, t.RefreshToken, t.ExpiresAt,
+	); err != nil {
+		return err
+	}
+
+	now := time.Now().Unix()
+	if _, err := tx.Exec(
+		`INSERT INTO sessions (session_token, athlete_id, origin, created_at, last_seen_at)
+		 VALUES (?, ?, ?, ?, ?)`,
+		sessionToken, t.AthleteID, origin, now, now,
+	); err != nil {
+		return err
+	}
+
+	return tx.Commit()
 }
 
 func (s *TokenStore) UpdateTokens(t Tokens) error {
@@ -70,7 +98,7 @@ func (s *TokenStore) UpdateTokens(t Tokens) error {
 }
 
 func (s *TokenStore) ClearTokensBySession(sessionToken string) error {
-	_, err := s.db.Exec("DELETE FROM tokens WHERE session_token = ?", sessionToken)
+	_, err := s.db.Exec("DELETE FROM sessions WHERE session_token = ?", sessionToken)
 	return err
 }
 
