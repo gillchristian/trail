@@ -747,3 +747,23 @@ Bundle progression: 286 kB → 322 kB JS / 90 kB → 100 kB gzip. New modules: `
 - Cadence's FTS5 endpoint is exactly the same shape as the recent endpoint inside an envelope — the existing `activityDecoder` works against the inner array unchanged. Wrapping the decoder is one line.
 - The picker UX has two coexisting modes (recent / search) but they share the same state machine, just with different fetch sources. Holding the search string at the top level of Model keeps the state variants clean.
 **Next:** Visual smoke remains pending. TASK-022 (calibration) still deferred.
+
+---
+## 2026-05-16 01:15 — feat: Actual + Δ vs plan everywhere, labeled aid markers on cards
+
+**Task:** UX gap-fill — user noted Δ vs plan only appeared in the km table.
+**What I did:** Four extensions, all gated on `race.actualSplits /= Nothing` (and per-km/per-section availability):
+
+1. **Section table** — `viewSectionTable` + `sectionsWithCumulative` now insert "Actual" + "Δ vs plan" columns between Section time and Cum when actuals are linked. Aid-rest rows insert two extra `—` cells to keep column alignment. Section actual is the sum of contained-km actuals; if any contained km is missing from `actualSplits` (partial coverage on a DNF, for example), the section cell shows `—` instead of a misleading partial sum.
+2. **Per-km card form** — `viewKmForm` gains a 2-col grid below Target/Pace showing Actual + Δ when the km has a linked split. Two fallback states: actuals linked but km not in trace ("…this km isn't in its trace"); no actuals at all (renders nothing).
+3. **Per-section card stats** — `viewSectionDetails` gains an Actual + Δ row below the main 4-col stats grid. Same partial-coverage rule as the section table.
+4. **Labeled aid markers on per-km and per-section cards** — `viewKmCardStop` and the new `viewSectionCardEndAid` render the Profile.elm-style pill (amber rounded rect with the aid name) above a dashed line. Per-km bumps `chartTopPad` from 14 to 34 when stops exist; per-section card bumps the same way when `followedByAid` is `Just`. Pill x is clamped so it stays inside the card edges even when the aid is near the start/end.
+
+Shared helpers added: `sectionActualSeconds : Race -> List Int -> Maybe Int` (returns `Nothing` for no actuals or any-km-missing) and `viewSignedDeltaCell : Int -> Html msg` (the +mm:ss / −mm:ss / on-target tone-coded span, factored out so the four call sites share one implementation).
+**What I verified:** `npm run build` exit 0. JS 324.03 → 327.09 kB (+3 KB); gzip 100.95 → 101.73 kB. Bundle string check: all 3 new labels ("Δ vs plan" — used in two places — and both fallback messages).
+**What changed in the repo:** PR #32. Modified `src/Main.elm` only — five view fns extended (`viewKmCard`, `viewSectionCard`, `viewKmForm`, `viewSectionDetails`, `viewSectionTable`), three new helpers (`sectionActualSeconds`, `viewSignedDeltaCell`, `viewSectionCardEndAid`), `viewKmCardStop` rewritten to render the pill.
+**What I learned:**
+- The "any km missing → show —" rule beats "sum what's there" because the diff column needs the same denominator on both sides. Partial sums make the section look faster than reality.
+- The aid-station pill on the km card needed `cardWidth` for edge-clamping (otherwise an aid near the start of the km would have its pill bleed off the left). Passing `cardWidth` down through the marker fn rather than computing it inline keeps the geometry locally consistent.
+- The section card had no markers before this; adding the terminal-aid pill makes the "Ends at" panel feel anchored to the silhouette rather than floating below it. Earlier sections (where `followedByAid` is `Just`) get the marker; the last section ("→ Finish") gets the existing 🏁 panel only.
+**Next:** Visual smoke. TASK-022 still deferred.
