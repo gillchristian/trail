@@ -4440,19 +4440,33 @@ viewSectionTable race kms results =
 
         rows =
             sectionsWithCumulative race results sections
+
+        hasActual =
+            race.actualSplits /= Nothing
+
+        actualHeaders =
+            if hasActual then
+                [ Html.th [ class "px-4 py-3 text-right" ] [ text "Actual" ]
+                , Html.th [ class "px-4 py-3 text-right" ] [ text "Δ vs plan" ]
+                ]
+
+            else
+                []
     in
     div [ class "rounded-2xl bg-slate-900 border border-slate-800 overflow-x-auto" ]
         [ Html.table [ class "w-full text-sm" ]
             [ Html.thead [ class "text-xs uppercase tracking-wider text-slate-500" ]
                 [ Html.tr []
-                    [ Html.th [ class "px-4 py-3 text-left" ] [ text "Section" ]
-                    , Html.th [ class "px-4 py-3 text-right" ] [ text "Distance" ]
-                    , Html.th [ class "px-4 py-3 text-right" ] [ text "Gain" ]
-                    , Html.th [ class "px-4 py-3 text-right" ] [ text "Loss" ]
-                    , Html.th [ class "px-4 py-3 text-right" ] [ text "Pace" ]
-                    , Html.th [ class "px-4 py-3 text-right" ] [ text "Section time" ]
-                    , Html.th [ class "px-4 py-3 text-right" ] [ text "Cum" ]
-                    ]
+                    ([ Html.th [ class "px-4 py-3 text-left" ] [ text "Section" ]
+                     , Html.th [ class "px-4 py-3 text-right" ] [ text "Distance" ]
+                     , Html.th [ class "px-4 py-3 text-right" ] [ text "Gain" ]
+                     , Html.th [ class "px-4 py-3 text-right" ] [ text "Loss" ]
+                     , Html.th [ class "px-4 py-3 text-right" ] [ text "Pace" ]
+                     , Html.th [ class "px-4 py-3 text-right" ] [ text "Section time" ]
+                     ]
+                        ++ actualHeaders
+                        ++ [ Html.th [ class "px-4 py-3 text-right" ] [ text "Cum" ] ]
+                    )
                 ]
             , Html.tbody [] rows
             ]
@@ -4462,6 +4476,12 @@ viewSectionTable race kms results =
 sectionsWithCumulative : Race -> Dict Int KmResult -> List Planning.Section -> List (Html Msg)
 sectionsWithCumulative race results sections =
     let
+        hasActual =
+            race.actualSplits /= Nothing
+
+        emptyCell =
+            Html.td [ class "px-4 py-2 text-right text-xs text-slate-500 tabular-nums" ] [ text "—" ]
+
         go section ( running, acc ) =
             let
                 sectionSeconds =
@@ -4483,6 +4503,27 @@ sectionsWithCumulative race results sections =
                 pace =
                     paceMinPerKm sectionSeconds section.distance
 
+                actualMaybe =
+                    sectionActualSeconds race section.kmIndices
+
+                actualCells =
+                    if hasActual then
+                        case actualMaybe of
+                            Just s ->
+                                [ Html.td [ class "px-4 py-3 text-right text-slate-200 tabular-nums" ]
+                                    [ text (formatHmsLong s) ]
+                                , Html.td [ class "px-4 py-3 text-right" ]
+                                    [ viewSignedDeltaCell (s - sectionSeconds) ]
+                                ]
+
+                            Nothing ->
+                                [ Html.td [ class "px-4 py-3 text-right text-slate-700 tabular-nums" ] [ text "—" ]
+                                , Html.td [ class "px-4 py-3 text-right text-slate-700 tabular-nums" ] [ text "—" ]
+                                ]
+
+                    else
+                        []
+
                 sectionRow =
                     Html.tr
                         [ class "border-t border-slate-800 hover:bg-slate-950/60 transition-colors cursor-pointer"
@@ -4490,28 +4531,37 @@ sectionsWithCumulative race results sections =
                         , A.attribute "role" "link"
                         , A.attribute "tabindex" "0"
                         ]
-                        [ Html.td [ class "px-4 py-3 text-white font-medium" ] [ text section.label ]
-                        , Html.td [ class "px-4 py-3 text-right text-slate-300 tabular-nums" ] [ text (formatFloat 2 (section.distance / 1000) ++ " km") ]
-                        , Html.td [ class "px-4 py-3 text-right text-rose-300 tabular-nums" ] [ text (formatInt section.gain ++ " m+") ]
-                        , Html.td [ class "px-4 py-3 text-right text-emerald-300 tabular-nums" ] [ text (formatInt section.loss ++ " m−") ]
-                        , Html.td [ class "px-4 py-3 text-right text-slate-300 tabular-nums" ] [ text pace ]
-                        , Html.td [ class "px-4 py-3 text-right text-white font-medium tabular-nums" ] [ text (formatHmsLong sectionSeconds) ]
-                        , Html.td [ class "px-4 py-3 text-right text-slate-300 tabular-nums" ] [ text (formatHmsLong runningAfterSection) ]
-                        ]
+                        ([ Html.td [ class "px-4 py-3 text-white font-medium" ] [ text section.label ]
+                         , Html.td [ class "px-4 py-3 text-right text-slate-300 tabular-nums" ] [ text (formatFloat 2 (section.distance / 1000) ++ " km") ]
+                         , Html.td [ class "px-4 py-3 text-right text-rose-300 tabular-nums" ] [ text (formatInt section.gain ++ " m+") ]
+                         , Html.td [ class "px-4 py-3 text-right text-emerald-300 tabular-nums" ] [ text (formatInt section.loss ++ " m−") ]
+                         , Html.td [ class "px-4 py-3 text-right text-slate-300 tabular-nums" ] [ text pace ]
+                         , Html.td [ class "px-4 py-3 text-right text-white font-medium tabular-nums" ] [ text (formatHmsLong sectionSeconds) ]
+                         ]
+                            ++ actualCells
+                            ++ [ Html.td [ class "px-4 py-3 text-right text-slate-300 tabular-nums" ] [ text (formatHmsLong runningAfterSection) ] ]
+                        )
 
                 aidRow =
                     case section.followedByAid of
                         Just aid ->
                             Html.tr [ class "border-t border-slate-800 bg-slate-950/40" ]
-                                [ Html.td [ class "px-4 py-2 text-xs text-amber-300" ]
+                                ([ Html.td [ class "px-4 py-2 text-xs text-amber-300" ]
                                     [ text ("★ " ++ aid.name) ]
-                                , Html.td [ class "px-4 py-2 text-right text-xs text-slate-500 tabular-nums" ] [ text "—" ]
-                                , Html.td [ class "px-4 py-2 text-right text-xs text-slate-500 tabular-nums" ] [ text "—" ]
-                                , Html.td [ class "px-4 py-2 text-right text-xs text-slate-500 tabular-nums" ] [ text "—" ]
-                                , Html.td [ class "px-4 py-2 text-right text-xs text-slate-500 tabular-nums" ] [ text "—" ]
-                                , Html.td [ class "px-4 py-2 text-right text-xs text-amber-300 tabular-nums" ] [ text ("+" ++ formatHmsLong aid.restSeconds) ]
-                                , Html.td [ class "px-4 py-2 text-right text-xs text-slate-400 tabular-nums" ] [ text (formatHmsLong runningAfterRest) ]
-                                ]
+                                 , emptyCell
+                                 , emptyCell
+                                 , emptyCell
+                                 , emptyCell
+                                 , Html.td [ class "px-4 py-2 text-right text-xs text-amber-300 tabular-nums" ] [ text ("+" ++ formatHmsLong aid.restSeconds) ]
+                                 ]
+                                    ++ (if hasActual then
+                                            [ emptyCell, emptyCell ]
+
+                                        else
+                                            []
+                                       )
+                                    ++ [ Html.td [ class "px-4 py-2 text-right text-xs text-slate-400 tabular-nums" ] [ text (formatHmsLong runningAfterRest) ] ]
+                                )
 
                         Nothing ->
                             text ""
@@ -4680,7 +4730,12 @@ viewSectionCard section containedKms =
             max 90 (min 240 (eleSpan / mPerPx))
 
         chartTopPad =
-            14
+            case section.followedByAid of
+                Just _ ->
+                    34
+
+                Nothing ->
+                    14
 
         chartBottomPad =
             22
@@ -4697,6 +4752,14 @@ viewSectionCard section containedKms =
 
         toY ele =
             elevBaseline - (ele - minEle) * (chartHeight / eleSpan)
+
+        terminalAidMarker =
+            case section.followedByAid of
+                Just aid ->
+                    [ viewSectionCardEndAid chartTopPad elevBaseline cardWidth (toX section.distEnd) aid ]
+
+                Nothing ->
+                    []
 
         coords =
             containedKms
@@ -4771,6 +4834,7 @@ viewSectionCard section containedKms =
                     , SA.strokeLinecap "round"
                     ]
                     []
+                , Svg.g [] terminalAidMarker
                 ]
             ]
         , div [ class "px-5 py-3 border-t border-slate-800 flex items-baseline justify-between text-xs text-slate-400 tabular-nums" ]
@@ -4778,6 +4842,70 @@ viewSectionCard section containedKms =
             , span [ class "text-amber-400" ] [ text ("⤒ " ++ formatInt maxEle ++ " m") ]
             , span [] [ text (formatInt maxEle ++ " m") ]
             ]
+        ]
+
+
+viewSectionCardEndAid : Float -> Float -> Float -> Float -> AidStation -> Svg.Svg msg
+viewSectionCardEndAid yTop yBottom cardWidth x aid =
+    let
+        rawPillW =
+            max 48 (toFloat (String.length aid.name) * 6 + 14)
+
+        pillW =
+            min (cardWidth - 8) rawPillW
+
+        -- Aid sits at the right edge; pull the pill inward so it stays
+        -- inside the card.
+        pillX =
+            (x - pillW / 2)
+                |> max 4
+                |> min (cardWidth - pillW - 4)
+
+        pillTop =
+            yTop - 22
+
+        pillH =
+            16
+    in
+    Svg.g []
+        [ Svg.line
+            [ SA.x1 (String.fromFloat x)
+            , SA.x2 (String.fromFloat x)
+            , SA.y1 (String.fromFloat (pillTop + pillH))
+            , SA.y2 (String.fromFloat yBottom)
+            , SA.stroke "#fbbf24"
+            , SA.strokeWidth "1"
+            , SA.strokeDasharray "2 2"
+            , SA.opacity "0.7"
+            ]
+            []
+        , Svg.rect
+            [ SA.x (String.fromFloat pillX)
+            , SA.y (String.fromFloat pillTop)
+            , SA.width (String.fromFloat pillW)
+            , SA.height (String.fromInt pillH)
+            , SA.rx "8"
+            , SA.fill "#fbbf24"
+            , SA.opacity "0.95"
+            ]
+            []
+        , Svg.text_
+            [ SA.x (String.fromFloat (pillX + pillW / 2))
+            , SA.y (String.fromFloat (pillTop + 11))
+            , SA.textAnchor "middle"
+            , SA.fontSize "10"
+            , SA.fontWeight "600"
+            , SA.fill "#0b0b21"
+            , SA.fontFamily "system-ui, -apple-system, sans-serif"
+            ]
+            [ Svg.text aid.name ]
+        , Svg.circle
+            [ SA.cx (String.fromFloat x)
+            , SA.cy (String.fromFloat yBottom)
+            , SA.r "4"
+            , SA.fill "#fbbf24"
+            ]
+            []
         ]
 
 
@@ -4790,6 +4918,31 @@ viewSectionDetails :
     -> String
     -> Html Msg
 viewSectionDetails race section containedKms results sectionSeconds sectionPace =
+    let
+        actualRow =
+            case sectionActualSeconds race section.kmIndices of
+                Just actualS ->
+                    div [ class "grid grid-cols-2 gap-3 tabular-nums" ]
+                        [ smallStat "Actual" (formatHmsLong actualS) ""
+                        , div [ class "rounded-lg bg-slate-950/60 px-3 py-2" ]
+                            [ p [ class "text-[10px] uppercase tracking-wider text-slate-500" ]
+                                [ text "Δ vs plan" ]
+                            , p [ class "flex items-baseline gap-1" ]
+                                [ span [ class "text-base font-semibold" ]
+                                    [ viewSignedDeltaCell (actualS - sectionSeconds) ]
+                                ]
+                            ]
+                        ]
+
+                Nothing ->
+                    case race.actualSplits of
+                        Just _ ->
+                            p [ class "text-xs text-slate-500 italic" ]
+                                [ text "Actual run is linked, but some km in this section is missing from its trace." ]
+
+                        Nothing ->
+                            text ""
+    in
     div [ class "space-y-4" ]
         [ div [ class "rounded-2xl bg-slate-900 border border-slate-800 p-5 space-y-4" ]
             [ h3 [ class "text-base font-semibold text-white" ] [ text "Section plan" ]
@@ -4801,6 +4954,7 @@ viewSectionDetails race section containedKms results sectionSeconds sectionPace 
                     (String.fromInt (List.length containedKms))
                     ""
                 ]
+            , actualRow
             , case section.followedByAid of
                 Just aid ->
                     div [ class "rounded-xl bg-amber-400/5 border border-amber-400/30 p-4 space-y-2" ]
@@ -5039,7 +5193,11 @@ viewKmCard km stopsInKm raceMaxRange =
             max 80 (raceMaxRange / mPerPx)
 
         chartTopPad =
-            14
+            if List.isEmpty stopsInKm then
+                14
+
+            else
+                34
 
         chartBottomPad =
             22
@@ -5070,7 +5228,7 @@ viewKmCard km stopsInKm raceMaxRange =
             buildStrokePathLocal coords
 
         stopMarkers =
-            List.map (viewKmCardStop chartTopPad elevBaseline km.distStart toX) stopsInKm
+            List.map (viewKmCardStop chartTopPad elevBaseline km.distStart cardWidth toX) stopsInKm
 
         deltaEle =
             km.eleEnd - km.eleStart
@@ -5164,30 +5322,72 @@ viewKmCard km stopsInKm raceMaxRange =
         ]
 
 
-viewKmCardStop : Float -> Float -> Float -> (Float -> Float) -> AidStation -> Svg.Svg Msg
-viewKmCardStop yTop yBottom kmStart toX aid =
+viewKmCardStop : Float -> Float -> Float -> Float -> (Float -> Float) -> AidStation -> Svg.Svg Msg
+viewKmCardStop yTop yBottom kmStart cardWidth toX aid =
     let
         relative =
             aid.distance - kmStart
 
         x =
             toX relative
+
+        -- Pill width grows with the label so short names get tight
+        -- pills and longer ones don't truncate.
+        rawPillW =
+            max 48 (toFloat (String.length aid.name) * 6 + 14)
+
+        -- Keep the pill inside the card bounds when the aid lands
+        -- near the left or right edge.
+        pillW =
+            min (cardWidth - 8) rawPillW
+
+        pillX =
+            (x - pillW / 2)
+                |> max 4
+                |> min (cardWidth - pillW - 4)
+
+        pillTop =
+            yTop - 22
+
+        pillH =
+            16
     in
     Svg.g []
         [ Svg.line
             [ SA.x1 (String.fromFloat x)
             , SA.x2 (String.fromFloat x)
-            , SA.y1 (String.fromFloat yTop)
+            , SA.y1 (String.fromFloat (pillTop + pillH))
             , SA.y2 (String.fromFloat yBottom)
             , SA.stroke "#fbbf24"
             , SA.strokeWidth "1"
             , SA.strokeDasharray "2 2"
+            , SA.opacity "0.7"
             ]
             []
+        , Svg.rect
+            [ SA.x (String.fromFloat pillX)
+            , SA.y (String.fromFloat pillTop)
+            , SA.width (String.fromFloat pillW)
+            , SA.height (String.fromInt pillH)
+            , SA.rx "8"
+            , SA.fill "#fbbf24"
+            , SA.opacity "0.95"
+            ]
+            []
+        , Svg.text_
+            [ SA.x (String.fromFloat (pillX + pillW / 2))
+            , SA.y (String.fromFloat (pillTop + 11))
+            , SA.textAnchor "middle"
+            , SA.fontSize "10"
+            , SA.fontWeight "600"
+            , SA.fill "#0b0b21"
+            , SA.fontFamily "system-ui, -apple-system, sans-serif"
+            ]
+            [ Svg.text aid.name ]
         , Svg.circle
             [ SA.cx (String.fromFloat x)
-            , SA.cy (String.fromFloat yTop)
-            , SA.r "5"
+            , SA.cy (String.fromFloat yBottom)
+            , SA.r "4"
             , SA.fill "#fbbf24"
             ]
             []
@@ -5253,7 +5453,7 @@ viewKmForm :
     -> Types.KmPlan
     -> List AidStation
     -> Html Msg
-viewKmForm model _ km result kp stopsInKm =
+viewKmForm model race km result kp stopsInKm =
     let
         sourceBadge =
             case result.source of
@@ -5267,6 +5467,10 @@ viewKmForm model _ km result kp stopsInKm =
 
         pace =
             paceMinPerKm result.seconds km.distance
+
+        kmActualSeconds =
+            race.actualSplits
+                |> Maybe.andThen (\a -> Dict.get km.index a.splits)
     in
     div [ class "space-y-5 rounded-2xl bg-slate-900 border border-slate-800 p-5" ]
         [ div [ class "flex items-baseline justify-between gap-2" ]
@@ -5302,6 +5506,27 @@ viewKmForm model _ km result kp stopsInKm =
                     [ text (pace ++ "/km") ]
                 ]
             ]
+        , case ( race.actualSplits, kmActualSeconds ) of
+            ( Just _, Just actualS ) ->
+                div [ class "grid grid-cols-2 gap-3" ]
+                    [ div [ class "space-y-1" ]
+                        [ span [ class "text-xs text-emerald-400/80 uppercase tracking-wider" ] [ text "Actual" ]
+                        , div [ class "px-3 py-2 bg-slate-950 border border-emerald-500/30 rounded-md text-lg font-medium text-slate-100 tabular-nums" ]
+                            [ text (formatMmss actualS) ]
+                        ]
+                    , div [ class "space-y-1" ]
+                        [ span [ class "text-xs text-slate-500 uppercase tracking-wider" ] [ text "Δ vs plan" ]
+                        , div [ class "px-3 py-2 bg-slate-950 border border-slate-800 rounded-md text-lg font-medium" ]
+                            [ viewSignedDeltaCell (actualS - result.seconds) ]
+                        ]
+                    ]
+
+            ( Just _, Nothing ) ->
+                p [ class "text-xs text-slate-500 italic" ]
+                    [ text "Actual run linked, but this km isn't in its trace." ]
+
+            ( Nothing, _ ) ->
+                text ""
         , case kp.time of
             Manual _ ->
                 button
@@ -5449,6 +5674,50 @@ formatFloat decimals f =
             toFloat (round (f * mult)) / mult
     in
     String.fromFloat rounded
+
+
+{-| Sum the actual seconds for the kms in a section. Returns
+`Nothing` when the race has no linked actuals OR when at least one
+contained km has no split — both surfaced as "—" in the UI so
+partial coverage doesn't quietly produce a wrong sum.
+-}
+sectionActualSeconds : Race -> List Int -> Maybe Int
+sectionActualSeconds race kmIndices =
+    case race.actualSplits of
+        Nothing ->
+            Nothing
+
+        Just actual ->
+            let
+                pairs =
+                    List.map (\idx -> Dict.get idx actual.splits) kmIndices
+            in
+            if List.any ((==) Nothing) pairs then
+                Nothing
+
+            else
+                Just (List.sum (List.filterMap identity pairs))
+
+
+{-| Render a signed +mm:ss / −mm:ss / on-target label with the
+matching rose/emerald/slate tone. Used in both km and section
+contexts.
+-}
+viewSignedDeltaCell : Int -> Html msg
+viewSignedDeltaCell diff =
+    let
+        ( tone, prefix, mag ) =
+            if diff > 0 then
+                ( "text-rose-300", "+", diff )
+
+            else if diff < 0 then
+                ( "text-emerald-300", "−", -diff )
+
+            else
+                ( "text-slate-400", "", 0 )
+    in
+    span [ class ("tabular-nums " ++ tone) ]
+        [ text (prefix ++ formatMmss mag) ]
 
 
 formatRest : Int -> String
