@@ -889,3 +889,13 @@ Bundle progression across the session: 327.09 kB → 330.92 kB JS (+3.83 kB), 10
 2. Section-overlap bug (parking lot) — design + implementation, probably an M task with care taken around pro-rate.
 3. TASK-022 (calibration from past activities) still deferred from the previous session.
 4. The two whiteboard entries (profile management, training-as-analysis) are tagged "re-open when the user has more opinions" — no scheduled work.
+
+---
+## 2026-05-18 — fix: Executions sort by race.date desc, not uploadedAt
+
+**Task:** user feedback after PR #37 shipped — Executions should sort by race date (newest first), not by `actualSplits.uploadedAt`. Symmetric with Plans (race date asc, soonest first).
+**What I did:** `compareExecutions` rewritten to mirror `comparePlans` with `compare db da` (descending). Dated executions cluster before undated; undated tie-break by `uploadedAt` desc via new `compareUploadedAtDesc` helper.
+**What I verified:** `npm run build` exit 0. JS 330.92 → 331.11 kB (+190 B). Visual smoke deferred to the user.
+**What changed in the repo:** PR #39, merged `b73f4f6`. `src/Main.elm` only (+25 lines).
+**What I learned:** premature inference on my part. "When did I log this run?" (uploadedAt) is a different question than "when did this race happen?" (race.date). The user reads the home page by the latter axis; the former is implementation detail. Symmetric axes (date asc vs date desc) read more cleanly than two different axes.
+**Next:** Same as the previous session-wrap entry — visual smoke pending; section-overlap bug still parked.
