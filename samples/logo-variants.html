@@ -1,0 +1,403 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>trail — logo variants</title>
+<style>
+  :root {
+    --bg: #0f172a;
+    --card-bg: #1e293b;
+    --card-border: #334155;
+    --text: #f1f5f9;
+    --text-dim: #94a3b8;
+    --text-muted: #64748b;
+    --rose-light: #ff5f6a;
+    --rose-deep: #E52E3A;
+    --amber: #fbbf24;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    padding: 40px;
+    background: var(--bg);
+    color: var(--text);
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    line-height: 1.5;
+  }
+
+  header { max-width: 960px; margin: 0 auto 32px; }
+  header h1 { font-size: 28px; font-weight: 700; margin: 0 0 8px 0; letter-spacing: -0.01em; }
+  header p { color: var(--text-dim); margin: 0; font-size: 14px; }
+  header code {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 4px;
+    padding: 1px 6px;
+    font-size: 13px;
+    color: var(--rose-light);
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 20px;
+    max-width: 1280px;
+    margin: 0 auto;
+  }
+
+  .variant {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 16px;
+    padding: 24px 20px 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    transition: border-color 0.2s, transform 0.2s;
+  }
+  .variant:hover {
+    border-color: rgba(255,95,106,0.4);
+    transform: translateY(-2px);
+  }
+
+  .variant .big {
+    width: 140px;
+    height: 140px;
+    margin-bottom: 14px;
+  }
+
+  .variant .name {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 4px;
+    letter-spacing: 0.01em;
+  }
+  .variant .desc {
+    font-size: 12px;
+    color: var(--text-dim);
+    text-align: center;
+    margin: 0 0 14px 0;
+    min-height: 36px;
+  }
+
+  .actual {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    background: var(--bg);
+    border: 1px solid var(--card-border);
+    border-radius: 8px;
+    width: 100%;
+  }
+  .actual svg { flex-shrink: 0; }
+  .actual .wordmark {
+    font-size: 16px;
+    font-weight: 700;
+    background: linear-gradient(90deg, #fbbf24 0%, #ff5f6a 50%, #E52E3A 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    letter-spacing: -0.01em;
+  }
+  .actual .label {
+    margin-left: auto;
+    font-size: 10px;
+    color: var(--text-muted);
+    font-family: ui-monospace, SFMono-Regular, monospace;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+</style>
+</head>
+<body>
+
+<!-- Hidden defs reused across every variant. -->
+<svg width="0" height="0" style="position: absolute" aria-hidden="true">
+  <defs>
+    <linearGradient id="g-peak-vert" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ff5f6a"/>
+      <stop offset="100%" stop-color="#E52E3A"/>
+    </linearGradient>
+    <linearGradient id="g-peak-horiz" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#fbbf24"/>
+      <stop offset="50%" stop-color="#ff5f6a"/>
+      <stop offset="100%" stop-color="#E52E3A"/>
+    </linearGradient>
+  </defs>
+</svg>
+
+<header>
+  <h1>trail — logo variants</h1>
+  <p>Same spirit as the current logo (sharp race profile, summits, amber checkpoint dots). Pick one and reply with the letter — I'll wire it into <code>viewLogo</code> in <code>src/Main.elm</code>. Each card shows the variant at 140 px for inspection plus a 28 px preview next to the wordmark so you can judge how it'll actually feel in the header.</p>
+</header>
+
+<div class="grid">
+
+  <!-- A — Original (current logo, for reference) -->
+  <div class="variant">
+    <svg class="big" viewBox="0 0 64 64">
+      <path d="M6 50 L22 28 L30 38 L42 18 L58 50 Z" fill="url(#g-peak-vert)" opacity="0.85"/>
+      <path d="M6 50 L22 28 L30 38 L42 18 L58 50" fill="none" stroke="#ff5f6a" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+      <circle cx="42" cy="18" r="2.5" fill="#fbbf24"/>
+    </svg>
+    <div class="name">A — Original</div>
+    <div class="desc">Today's logo. Two peaks, single checkpoint on the higher summit (right).</div>
+    <div class="actual">
+      <svg width="28" height="28" viewBox="0 0 64 64">
+        <path d="M6 50 L22 28 L30 38 L42 18 L58 50 Z" fill="url(#g-peak-vert)" opacity="0.85"/>
+        <path d="M6 50 L22 28 L30 38 L42 18 L58 50" fill="none" stroke="#ff5f6a" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+        <circle cx="42" cy="18" r="2.5" fill="#fbbf24"/>
+      </svg>
+      <span class="wordmark">trail</span>
+      <span class="label">28 px</span>
+    </div>
+  </div>
+
+  <!-- B — Flipped -->
+  <div class="variant">
+    <svg class="big" viewBox="0 0 64 64">
+      <path d="M6 50 L22 18 L34 38 L42 28 L58 50 Z" fill="url(#g-peak-vert)" opacity="0.85"/>
+      <path d="M6 50 L22 18 L34 38 L42 28 L58 50" fill="none" stroke="#ff5f6a" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+      <circle cx="22" cy="18" r="2.5" fill="#fbbf24"/>
+    </svg>
+    <div class="name">B — Flipped</div>
+    <div class="desc">Mirror of original. Higher peak first (left), smaller second peak. Reads as &ldquo;leading climb.&rdquo;</div>
+    <div class="actual">
+      <svg width="28" height="28" viewBox="0 0 64 64">
+        <path d="M6 50 L22 18 L34 38 L42 28 L58 50 Z" fill="url(#g-peak-vert)" opacity="0.85"/>
+        <path d="M6 50 L22 18 L34 38 L42 28 L58 50" fill="none" stroke="#ff5f6a" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+        <circle cx="22" cy="18" r="2.5" fill="#fbbf24"/>
+      </svg>
+      <span class="wordmark">trail</span>
+      <span class="label">28 px</span>
+    </div>
+  </div>
+
+  <!-- C — Twin summits (2 dots) -->
+  <div class="variant">
+    <svg class="big" viewBox="0 0 64 64">
+      <path d="M6 50 L22 28 L30 38 L42 18 L58 50 Z" fill="url(#g-peak-vert)" opacity="0.85"/>
+      <path d="M6 50 L22 28 L30 38 L42 18 L58 50" fill="none" stroke="#ff5f6a" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+      <circle cx="22" cy="28" r="2.5" fill="#fbbf24"/>
+      <circle cx="42" cy="18" r="2.5" fill="#fbbf24"/>
+    </svg>
+    <div class="name">C — Twin summits</div>
+    <div class="desc">Original profile, a checkpoint on each peak. Two aid stations.</div>
+    <div class="actual">
+      <svg width="28" height="28" viewBox="0 0 64 64">
+        <path d="M6 50 L22 28 L30 38 L42 18 L58 50 Z" fill="url(#g-peak-vert)" opacity="0.85"/>
+        <path d="M6 50 L22 28 L30 38 L42 18 L58 50" fill="none" stroke="#ff5f6a" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+        <circle cx="22" cy="28" r="2.5" fill="#fbbf24"/>
+        <circle cx="42" cy="18" r="2.5" fill="#fbbf24"/>
+      </svg>
+      <span class="wordmark">trail</span>
+      <span class="label">28 px</span>
+    </div>
+  </div>
+
+  <!-- D — Triple peak, single dot -->
+  <div class="variant">
+    <svg class="big" viewBox="0 0 64 64">
+      <path d="M4 52 L16 32 L24 42 L32 22 L40 36 L50 14 L60 52 Z" fill="url(#g-peak-vert)" opacity="0.85"/>
+      <path d="M4 52 L16 32 L24 42 L32 22 L40 36 L50 14 L60 52" fill="none" stroke="#ff5f6a" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+      <circle cx="50" cy="14" r="2.5" fill="#fbbf24"/>
+    </svg>
+    <div class="name">D — Triple peak</div>
+    <div class="desc">Three summits, dot at the highest. More &ldquo;ultra&rdquo; energy — late climb is the headline.</div>
+    <div class="actual">
+      <svg width="28" height="28" viewBox="0 0 64 64">
+        <path d="M4 52 L16 32 L24 42 L32 22 L40 36 L50 14 L60 52 Z" fill="url(#g-peak-vert)" opacity="0.85"/>
+        <path d="M4 52 L16 32 L24 42 L32 22 L40 36 L50 14 L60 52" fill="none" stroke="#ff5f6a" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+        <circle cx="50" cy="14" r="2.5" fill="#fbbf24"/>
+      </svg>
+      <span class="wordmark">trail</span>
+      <span class="label">28 px</span>
+    </div>
+  </div>
+
+  <!-- E — Triple peak, three dots -->
+  <div class="variant">
+    <svg class="big" viewBox="0 0 64 64">
+      <path d="M4 52 L16 32 L24 42 L32 22 L40 36 L50 14 L60 52 Z" fill="url(#g-peak-vert)" opacity="0.85"/>
+      <path d="M4 52 L16 32 L24 42 L32 22 L40 36 L50 14 L60 52" fill="none" stroke="#ff5f6a" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+      <circle cx="16" cy="32" r="2.2" fill="#fbbf24"/>
+      <circle cx="32" cy="22" r="2.2" fill="#fbbf24"/>
+      <circle cx="50" cy="14" r="2.5" fill="#fbbf24"/>
+    </svg>
+    <div class="name">E — Triple peak ✕ 3</div>
+    <div class="desc">Three summits, a checkpoint on every one. Stations get bigger at the higher peak.</div>
+    <div class="actual">
+      <svg width="28" height="28" viewBox="0 0 64 64">
+        <path d="M4 52 L16 32 L24 42 L32 22 L40 36 L50 14 L60 52 Z" fill="url(#g-peak-vert)" opacity="0.85"/>
+        <path d="M4 52 L16 32 L24 42 L32 22 L40 36 L50 14 L60 52" fill="none" stroke="#ff5f6a" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+        <circle cx="16" cy="32" r="2.2" fill="#fbbf24"/>
+        <circle cx="32" cy="22" r="2.2" fill="#fbbf24"/>
+        <circle cx="50" cy="14" r="2.5" fill="#fbbf24"/>
+      </svg>
+      <span class="wordmark">trail</span>
+      <span class="label">28 px</span>
+    </div>
+  </div>
+
+  <!-- F — Big mountain (asymmetric) -->
+  <div class="variant">
+    <svg class="big" viewBox="0 0 64 64">
+      <path d="M4 52 L18 14 L30 28 L40 22 L50 34 L60 50 Z" fill="url(#g-peak-vert)" opacity="0.85"/>
+      <path d="M4 52 L18 14 L30 28 L40 22 L50 34 L60 50" fill="none" stroke="#ff5f6a" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+      <circle cx="18" cy="14" r="2.5" fill="#fbbf24"/>
+    </svg>
+    <div class="name">F — Big mountain</div>
+    <div class="desc">Steep early climb to one dominant summit, then rolling descent. Cocodona-shaped.</div>
+    <div class="actual">
+      <svg width="28" height="28" viewBox="0 0 64 64">
+        <path d="M4 52 L18 14 L30 28 L40 22 L50 34 L60 50 Z" fill="url(#g-peak-vert)" opacity="0.85"/>
+        <path d="M4 52 L18 14 L30 28 L40 22 L50 34 L60 50" fill="none" stroke="#ff5f6a" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+        <circle cx="18" cy="14" r="2.5" fill="#fbbf24"/>
+      </svg>
+      <span class="wordmark">trail</span>
+      <span class="label">28 px</span>
+    </div>
+  </div>
+
+  <!-- G — Aid stations along route (3 dots on the path, not all at peaks) -->
+  <div class="variant">
+    <svg class="big" viewBox="0 0 64 64">
+      <path d="M6 50 L22 28 L30 38 L42 18 L58 50 Z" fill="url(#g-peak-vert)" opacity="0.85"/>
+      <path d="M6 50 L22 28 L30 38 L42 18 L58 50" fill="none" stroke="#ff5f6a" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+      <circle cx="15" cy="37.6" r="2.2" fill="#fbbf24"/>
+      <circle cx="36" cy="28" r="2.2" fill="#fbbf24"/>
+      <circle cx="50" cy="34" r="2.2" fill="#fbbf24"/>
+    </svg>
+    <div class="name">G — Aid stations</div>
+    <div class="desc">Original profile, three checkpoints spaced along the route — on the climb, the second climb, and the descent.</div>
+    <div class="actual">
+      <svg width="28" height="28" viewBox="0 0 64 64">
+        <path d="M6 50 L22 28 L30 38 L42 18 L58 50 Z" fill="url(#g-peak-vert)" opacity="0.85"/>
+        <path d="M6 50 L22 28 L30 38 L42 18 L58 50" fill="none" stroke="#ff5f6a" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+        <circle cx="15" cy="37.6" r="2.2" fill="#fbbf24"/>
+        <circle cx="36" cy="28" r="2.2" fill="#fbbf24"/>
+        <circle cx="50" cy="34" r="2.2" fill="#fbbf24"/>
+      </svg>
+      <span class="wordmark">trail</span>
+      <span class="label">28 px</span>
+    </div>
+  </div>
+
+  <!-- H — Outline only (minimal) -->
+  <div class="variant">
+    <svg class="big" viewBox="0 0 64 64">
+      <path d="M6 50 L22 28 L30 38 L42 18 L58 50" fill="none" stroke="url(#g-peak-horiz)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+      <circle cx="42" cy="18" r="3" fill="#fbbf24"/>
+    </svg>
+    <div class="name">H — Outline only</div>
+    <div class="desc">No fill. Just the stroke with the amber→rose horizontal gradient, single checkpoint. Cleanest at small sizes.</div>
+    <div class="actual">
+      <svg width="28" height="28" viewBox="0 0 64 64">
+        <path d="M6 50 L22 28 L30 38 L42 18 L58 50" fill="none" stroke="url(#g-peak-horiz)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+        <circle cx="42" cy="18" r="3" fill="#fbbf24"/>
+      </svg>
+      <span class="wordmark">trail</span>
+      <span class="label">28 px</span>
+    </div>
+  </div>
+
+  <!-- I — Outline + multi-dot -->
+  <div class="variant">
+    <svg class="big" viewBox="0 0 64 64">
+      <path d="M6 50 L22 28 L30 38 L42 18 L58 50" fill="none" stroke="url(#g-peak-horiz)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+      <circle cx="22" cy="28" r="2.5" fill="#fbbf24"/>
+      <circle cx="42" cy="18" r="2.5" fill="#fbbf24"/>
+    </svg>
+    <div class="name">I — Outline + twin</div>
+    <div class="desc">H with two dots — original-flavored profile, no fill, both peaks marked.</div>
+    <div class="actual">
+      <svg width="28" height="28" viewBox="0 0 64 64">
+        <path d="M6 50 L22 28 L30 38 L42 18 L58 50" fill="none" stroke="url(#g-peak-horiz)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+        <circle cx="22" cy="28" r="2.5" fill="#fbbf24"/>
+        <circle cx="42" cy="18" r="2.5" fill="#fbbf24"/>
+      </svg>
+      <span class="wordmark">trail</span>
+      <span class="label">28 px</span>
+    </div>
+  </div>
+
+  <!-- J — Race-day (gradient stroke + ghost echo) -->
+  <div class="variant">
+    <svg class="big" viewBox="0 0 64 64">
+      <path d="M6 50 L22 28 L30 38 L42 18 L58 50 Z" fill="url(#g-peak-vert)" opacity="0.65"/>
+      <g opacity="0.18">
+        <path d="M6 47 L22 25 L30 35 L42 15 L58 47" fill="none" stroke="#ff5f6a" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+        <path d="M6 44 L22 22 L30 32 L42 12 L58 44" fill="none" stroke="#ff5f6a" stroke-width="1" stroke-linejoin="round" stroke-linecap="round"/>
+      </g>
+      <path d="M6 50 L22 28 L30 38 L42 18 L58 50" fill="none" stroke="url(#g-peak-horiz)" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/>
+      <circle cx="42" cy="18" r="2.8" fill="#fbbf24"/>
+    </svg>
+    <div class="name">J — Ghost-wave</div>
+    <div class="desc">Original profile plus the two ghost echoes from the elevation chart — same DNA as the in-app rendering.</div>
+    <div class="actual">
+      <svg width="28" height="28" viewBox="0 0 64 64">
+        <path d="M6 50 L22 28 L30 38 L42 18 L58 50 Z" fill="url(#g-peak-vert)" opacity="0.65"/>
+        <g opacity="0.18">
+          <path d="M6 47 L22 25 L30 35 L42 15 L58 47" fill="none" stroke="#ff5f6a" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+          <path d="M6 44 L22 22 L30 32 L42 12 L58 44" fill="none" stroke="#ff5f6a" stroke-width="1" stroke-linejoin="round" stroke-linecap="round"/>
+        </g>
+        <path d="M6 50 L22 28 L30 38 L42 18 L58 50" fill="none" stroke="url(#g-peak-horiz)" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/>
+        <circle cx="42" cy="18" r="2.8" fill="#fbbf24"/>
+      </svg>
+      <span class="wordmark">trail</span>
+      <span class="label">28 px</span>
+    </div>
+  </div>
+
+  <!-- K — Five-peak jagged (race-chart silhouette) -->
+  <div class="variant">
+    <svg class="big" viewBox="0 0 64 64">
+      <path d="M2 54 L8 36 L14 44 L20 28 L26 36 L32 18 L38 32 L44 24 L50 38 L56 30 L62 54 Z" fill="url(#g-peak-vert)" opacity="0.85"/>
+      <path d="M2 54 L8 36 L14 44 L20 28 L26 36 L32 18 L38 32 L44 24 L50 38 L56 30 L62 54" fill="none" stroke="#ff5f6a" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/>
+      <circle cx="32" cy="18" r="2.5" fill="#fbbf24"/>
+    </svg>
+    <div class="name">K — Five-peak jagged</div>
+    <div class="desc">Five summits, sharp valleys. Closest to a real UTMB-ish elevation chart silhouette. Reads busier at 28 px.</div>
+    <div class="actual">
+      <svg width="28" height="28" viewBox="0 0 64 64">
+        <path d="M2 54 L8 36 L14 44 L20 28 L26 36 L32 18 L38 32 L44 24 L50 38 L56 30 L62 54 Z" fill="url(#g-peak-vert)" opacity="0.85"/>
+        <path d="M2 54 L8 36 L14 44 L20 28 L26 36 L32 18 L38 32 L44 24 L50 38 L56 30 L62 54" fill="none" stroke="#ff5f6a" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/>
+        <circle cx="32" cy="18" r="2.5" fill="#fbbf24"/>
+      </svg>
+      <span class="wordmark">trail</span>
+      <span class="label">28 px</span>
+    </div>
+  </div>
+
+  <!-- L — Original + finish-line dot at end -->
+  <div class="variant">
+    <svg class="big" viewBox="0 0 64 64">
+      <path d="M6 50 L22 28 L30 38 L42 18 L58 50 Z" fill="url(#g-peak-vert)" opacity="0.85"/>
+      <path d="M6 50 L22 28 L30 38 L42 18 L58 50" fill="none" stroke="#ff5f6a" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+      <circle cx="22" cy="28" r="2.2" fill="#fbbf24"/>
+      <circle cx="42" cy="18" r="2.5" fill="#fbbf24"/>
+      <circle cx="58" cy="50" r="2.5" fill="#10b981"/>
+    </svg>
+    <div class="name">L — With finish</div>
+    <div class="desc">Twin-summit checkpoints in amber, plus an emerald finish-line dot at the bottom right. Tells the whole-race story.</div>
+    <div class="actual">
+      <svg width="28" height="28" viewBox="0 0 64 64">
+        <path d="M6 50 L22 28 L30 38 L42 18 L58 50 Z" fill="url(#g-peak-vert)" opacity="0.85"/>
+        <path d="M6 50 L22 28 L30 38 L42 18 L58 50" fill="none" stroke="#ff5f6a" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+        <circle cx="22" cy="28" r="2.2" fill="#fbbf24"/>
+        <circle cx="42" cy="18" r="2.5" fill="#fbbf24"/>
+        <circle cx="58" cy="50" r="2.5" fill="#10b981"/>
+      </svg>
+      <span class="wordmark">trail</span>
+      <span class="label">28 px</span>
+    </div>
+  </div>
+
+</div>
+
+</body>
+</html>
