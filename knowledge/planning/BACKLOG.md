@@ -20,7 +20,7 @@ Ordered. Top item is next. Promote into `CURRENT.md` when started.
 - [x] TASK-025 — Fix pace bug: per-km Target Time should be clock time (moving + aid rest in that km); Pace stays moving-only. Flows through km card, km table, section table, section card. Manual-typed target subtracts in-km aid rest before storing. See `samples/aid-station.png` for the screenshot the user flagged. — (S) — ✓ PR #34
 - [x] TASK-026 — Show HR avg per km on linked actuals (per-km card + km table). Extend the streams fetch to include `heartrate` if it isn't already; persist on `ActualSplits.splits`. — (S) — ✓ PR #35
 - [x] TASK-027 — Skeleton/pulse loading state on the home page drop component while a GPX parse is in progress. Pulse animation on the whole drop area, "Parsing <filename>…", input disabled during parse. Applies to file-drop, file-select, and Strava picker paths. — (S) — ✓ PR #36
-- [ ] TASK-028 — Home page two-section split: "Plans" (no `actualSplits`) and "Executions" (linked). Find better naming if "Plans / Executions" doesn't feel right; the cut is linked-actual vs. not. Section headers + empty states. — (S)
+- [x] TASK-028 — Home page two-section split: "Plans" (no `actualSplits`) and "Executions" (linked). Find better naming if "Plans / Executions" doesn't feel right; the cut is linked-actual vs. not. Section headers + empty states. — (S) — ✓ PR #37
 
 ## Parking lot
 

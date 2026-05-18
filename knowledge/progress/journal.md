@@ -842,3 +842,50 @@ Touched sites: per-km card (Target placeholder + Δ vs plan + an amber caption w
 - `animate-pulse` plus skeleton bars is a stable Tailwind idiom; the bars don't need their own animation, the container's pulse propagates via opacity-on-element-tree.
 - Resisted the urge to make the skeleton bars look like a race card preview. The race grid lives *below* the banner — fake-card-in-banner would mislead.
 **Next:** TASK-028 — home page split into Plans / Executions sections.
+
+---
+## 2026-05-18 — feat: split home page into Plans / Executions (TASK-028)
+
+**Task:** TASK-028 — last item from the 2026-05-18 brainstorm. User wanted a cut between races with a linked actual and races without.
+**What I did:** New `viewRaceSections : Model -> List Race -> Html Msg` partitions via `List.partition (\r -> r.actualSplits /= Nothing) races`. Each non-empty group renders a `viewRaceSection` with heading + count + sub caption + the existing `viewRaceGrid` underneath. Sort: `comparePlans` orders by `race.date` ascending with `Just` before `Nothing`, ties broken by `createdAt` desc; `compareExecutions` orders by `actualSplits.uploadedAt` desc. Section heading is a flex row with `<h2 text-lg font-semibold text-slate-200>` + `<span text-sm text-slate-500 tabular-nums>` count + `<span text-xs text-slate-600>` sub caption. Empty sections hidden entirely. Existing "No races yet" empty state still covers the both-empty case.
+**What I verified:**
+- `npm run build` exit 0. JS 329.87 → 330.92 kB (+1.05 kB); gzip 102.50 → 102.83 kB.
+- Bundle-string check: `"Plans"` ×2 (heading + class fragment), `"Executions"` ×1, `"Courses you've prepared"` ×1, `"Runs you came back from"` ×1.
+- Sort ordering reasoned through manually: dated plans first (asc), undated cluster last (createdAt desc); executions newest-uploaded first.
+- **Visual smoke not performed.** User to verify with a mixed race list that both sections render and sort correctly.
+**What changed in the repo:** PR #37, merged `4b8b2ae`. `src/Main.elm` only — +81 lines for the partition / sort / section render; existing `viewRaceGrid` kept as the cards-row component.
+**What I learned:**
+- The right cut wasn't past-vs-future (my first instinct) but linked-vs-unlinked (the user's correction). Past-vs-future depends on `Date.today` and conflates the user's intent ("which of these do I plan from vs. revisit logs of"). Linked-vs-unlinked mirrors the data model and is calendar-free.
+- Resisted adding an emerald accent or Δ-as-headline to Executions cards. The section heading is the structural cue; layering visual differentiation on top would be loud and would need a per-card refactor that wasn't asked for.
+**Next:** Session-level wrap-up. Brainstorm fully closed out; `CURRENT.md` empty.
+
+---
+## 2026-05-18 — session wrap
+
+Five PRs in sequence from the brainstorm in this session:
+
+| # | Task | Theme |
+|---|---|---|
+| #33 | chore | New `knowledge/whiteboard/` area for in-flight discussions + queue TASK-025..028 |
+| #34 | TASK-025 | Pace bug: per-km Target is clock time, Pace stays moving |
+| #35 | TASK-026 | Avg HR per km on Strava-linked actuals |
+| #36 | TASK-027 | Pulse + skeleton loading state on the home drop area |
+| #37 | TASK-028 | Split home page into Plans / Executions |
+
+Bundle progression across the session: 327.09 kB → 330.92 kB JS (+3.83 kB), 101.73 kB → 102.83 kB gzip (+1.10 kB). New modules: none — all changes additive to existing modules (`Main`, `Csv`, `Types`, `ActualGpx`, `StravaStreams`). New IDB shape: `ActualSplits.hrPerKm : Maybe (Dict Int Int)` with back-compat decoder.
+
+**Brainstorm framework that emerged.** The user surfaced that we needed a place to record in-flight discussions that aren't yet ADRs / backlog / brief edits. `knowledge/whiteboard/` is now the home for that, with two seed entries:
+
+- `whiteboard/profile-management.md` — design open; load-bearing argument is *longitudinal tracking* (snapshot the profile into the race; soft-link only). Six design questions listed for next time.
+- `whiteboard/training-as-analysis.md` — resolved: trail stays a planner; analysis features admitted only if they sharpen planning. HR-on-linked-actuals is the one feature admitted; training-mode-from-Strava is explicitly deferred.
+
+**Pre-existing bugs surfaced during this session, logged in parking lot, not fixed:**
+- `Planning.sectionsForRace` overlap test: a km that straddles an aid distance lands in *both* adjacent sections, so section table totals + section card "Time" stat double-count it. Section card Δ vs plan still has the moving-vs-clock apples-to-oranges bug at the section level (same class as the per-km bug fixed in TASK-025). Both fixes want one task because the right shape (pro-rate by overlap distance? assign to the section the km's center is in?) is a design call.
+
+**Verification gap that the user knows about:** every PR description in this session flags `Visual smoke not performed`. The user is the source of truth for visual smoke; the build-only verification catches type errors and the bundle-string checks confirm new labels reached the bundle.
+
+**Next session priorities (if/when picked up):**
+1. Visual smoke each shipped feature — pace bug, HR display, skeleton, sections. File any visual bugs as `fix/` PRs.
+2. Section-overlap bug (parking lot) — design + implementation, probably an M task with care taken around pro-rate.
+3. TASK-022 (calibration from past activities) still deferred from the previous session.
+4. The two whiteboard entries (profile management, training-as-analysis) are tagged "re-open when the user has more opinions" — no scheduled work.
