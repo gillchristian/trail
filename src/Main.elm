@@ -1950,14 +1950,13 @@ viewLogo =
         [ Svg.defs []
             [ Svg.linearGradient
                 [ SA.id "logo-peak", SA.x1 "0", SA.y1 "0", SA.x2 "0", SA.y2 "1" ]
-                [ Svg.stop [ SA.offset "0%", SA.stopColor "#ff5f6a" ] []
-                , Svg.stop [ SA.offset "100%", SA.stopColor "#E52E3A" ] []
+                [ Svg.stop [ SA.offset "0%", SA.stopColor "#ff5f6a", SA.stopOpacity "0.55" ] []
+                , Svg.stop [ SA.offset "100%", SA.stopColor "#E52E3A", SA.stopOpacity "0.05" ] []
                 ]
             ]
         , Svg.path
             [ SA.d "M6 50 L22 28 L30 38 L42 18 L58 50 Z"
             , SA.fill "url(#logo-peak)"
-            , SA.opacity "0.85"
             ]
             []
         , Svg.path
@@ -1970,10 +1969,24 @@ viewLogo =
             ]
             []
         , Svg.circle
+            [ SA.cx "15"
+            , SA.cy "37.6"
+            , SA.r "2.5"
+            , SA.fill "#fbbf24"
+            ]
+            []
+        , Svg.circle
             [ SA.cx "42"
             , SA.cy "18"
             , SA.r "2.5"
             , SA.fill "#fbbf24"
+            ]
+            []
+        , Svg.circle
+            [ SA.cx "56.8"
+            , SA.cy "48.8"
+            , SA.r "2.5"
+            , SA.fill "#10b981"
             ]
             []
         ]
