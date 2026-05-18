@@ -2495,6 +2495,31 @@ comparePlans a b =
 
 compareExecutions : Race -> Race -> Order
 compareExecutions a b =
+    -- Newest race first (race.date descending). Undated executions
+    -- sort after dated ones; among themselves, order by the time
+    -- the actual was uploaded (the closest proxy for "when did I
+    -- run this" when no race date was set).
+    case ( a.date, b.date ) of
+        ( Just da, Just db ) ->
+            case compare db da of
+                EQ ->
+                    compareUploadedAtDesc a b
+
+                ord ->
+                    ord
+
+        ( Just _, Nothing ) ->
+            LT
+
+        ( Nothing, Just _ ) ->
+            GT
+
+        ( Nothing, Nothing ) ->
+            compareUploadedAtDesc a b
+
+
+compareUploadedAtDesc : Race -> Race -> Order
+compareUploadedAtDesc a b =
     let
         ts r =
             r.actualSplits
