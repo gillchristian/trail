@@ -57,7 +57,7 @@ Locked in as ADR-0001:
 
 ## Visual direction
 
-Hybrid: **UTMB DNA** (circular aid-station badges, layered/ghost-wave elevation rendering, pill distance markers, modal detail cards — see `samples/profile-01/03/04/05.png`) crossed with **our own gamified personality** (glow accents, animated reveal of segments, custom badge variants, race-card aesthetic from `samples/race-cards.png`). **Not** the flat Strava grey of `samples/profile-02-strava.png`.
+Hybrid: **UTMB DNA** (circular aid-station badges, layered/ghost-wave elevation rendering, pill distance markers, modal detail cards) crossed with **our own gamified personality** (glow accents, animated reveal of segments, custom badge variants, race-card aesthetic). **Not** the flat Strava grey of typical activity-logging tools — the planning UI should feel earned, not utilitarian. The original mockups that grounded these decisions lived in `samples/` and were removed in the 2026-05-18 cleanup; the *implemented* style is the canonical reference now (live in `src/Profile.elm` for the elevation chart, `viewRaceCard` in `src/Main.elm` for the cards).
 
 ## Race metadata fields
 

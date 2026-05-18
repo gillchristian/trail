@@ -7,7 +7,8 @@
     "dev": "vite --port 5174",
     "build": "vite build",
     "preview": "vite preview",
-    "smoke": "node scripts/smoke-storage.mjs"
+    "smoke": "node scripts/smoke-storage.mjs",
+    "perf:trace": "node scripts/profile-trace.mjs"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.0.0",

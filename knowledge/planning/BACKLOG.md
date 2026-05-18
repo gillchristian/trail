@@ -21,6 +21,8 @@ Ordered. Top item is next. Promote into `CURRENT.md` when started.
 - [x] TASK-026 — Show HR avg per km on linked actuals (per-km card + km table). Extend the streams fetch to include `heartrate` if it isn't already; persist on `ActualSplits.splits`. — (S) — ✓ PR #35
 - [x] TASK-027 — Skeleton/pulse loading state on the home page drop component while a GPX parse is in progress. Pulse animation on the whole drop area, "Parsing <filename>…", input disabled during parse. Applies to file-drop, file-select, and Strava picker paths. — (S) — ✓ PR #36
 - [x] TASK-028 — Home page two-section split: "Plans" (no `actualSplits`) and "Executions" (linked). Find better naming if "Plans / Executions" doesn't feel right; the cut is linked-actual vs. not. Section headers + empty states. — (S) — ✓ PR #37
+- [x] TASK-029 — Chunked SVG profile path so the elevation chart renders end-to-end on long tracks (Cocodona 250 stops mid-track at 10 m/px). Browser SVG single-path rendering limit; not in Elm. — (S) — ✓ PR #41
+- [x] TASK-030 — Populate plan-table Pace / Time / Current-sum from `Predictor.predict` at intensity = 1.0 when `race.plan.targetSeconds = Nothing`, so a freshly-uploaded race shows a sensible plan immediately. Display-only; commit happens on first slider interaction. — (S) — ✓ PR #42
 
 ## Parking lot
 
