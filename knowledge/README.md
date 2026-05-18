@@ -9,6 +9,7 @@ The source of truth for autonomous work on this project. Everything I need to ke
 - **progress/** — A running log of what was done, what was verified, what broke. Append-only.
 - **decisions/** — One file per non-trivial decision (an ADR). Captures *why* a path was chosen.
 - **reference/** — Project facts: domain glossary, external APIs, fixed constraints. Things I look up.
+- **whiteboard/** — In-flight discussions that haven't earned an ADR or a backlog task yet. Records of what we considered, with the resolution noted when one is reached.
 
 ## The loop
 
@@ -40,3 +41,4 @@ If I ever feel stuck or unsure, the answer is in `philosophy/when-stuck.md` — 
 - `decisions/INDEX.md` — Pointers to ADRs.
 - `reference/glossary.md` — Project-specific terms.
 - `reference/project-brief.md` — What the project actually is (filled in once user describes it).
+- `whiteboard/README.md` — How the whiteboard area works; index of open discussions.

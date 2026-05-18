@@ -767,3 +767,19 @@ Shared helpers added: `sectionActualSeconds : Race -> List Int -> Maybe Int` (re
 - The aid-station pill on the km card needed `cardWidth` for edge-clamping (otherwise an aid near the start of the km would have its pill bleed off the left). Passing `cardWidth` down through the marker fn rather than computing it inline keeps the geometry locally consistent.
 - The section card had no markers before this; adding the terminal-aid pill makes the "Ends at" panel feel anchored to the silhouette rather than floating below it. Earlier sections (where `followedByAid` is `Just`) get the marker; the last section ("→ Finish") gets the existing 🏁 panel only.
 **Next:** Visual smoke. TASK-022 still deferred.
+
+---
+## 2026-05-18 — chore: knowledge whiteboard area + queue 4 follow-up tasks
+
+**Task:** chore — set up `knowledge/whiteboard/`; record two open discussions; queue TASK-025..028 in `BACKLOG.md`.
+**What I did:** User had a five-item brainstorm (home page UX, drop-area loading state, pace/aid-station bug, profile management, training-as-analysis). Three items got "build it" answers (pace bug, home split, skeleton drop area) plus one new small task (HR data on linked actuals). Two items got "record and keep thinking" answers (profile management, training-mode vs. planner). The user surfaced that we don't have a place for in-flight discussions and asked for a "working desk / ideation area / whiteboard" — hence `knowledge/whiteboard/`. New files: `whiteboard/README.md` (purpose, lifecycle, distinction from ADRs/backlog/brief), `whiteboard/profile-management.md` (full record of the snapshot-vs-hard-link debate; the user's longitudinal-tracking argument is the load-bearing one), `whiteboard/training-as-analysis.md` (resolved: trail stays a planner; analysis features must "sharpen planning" or stay out; HR-on-linked-actuals is the one admitted action). Updated `knowledge/README.md` Layout + key-docs sections to list `whiteboard/`. Added TASK-025..028 to `BACKLOG.md` (pace bug → HR display → skeleton loading → home split, in execution order).
+**What I verified:**
+- `npm run build` exit 0 (`dist/assets/index-DHcPyE6_.js 327.09 kB / gzip 101.73 kB` — unchanged from PR #32 since this PR is docs-only).
+- File presence: `ls knowledge/whiteboard/` shows three files (README + two discussion entries). `grep -n "whiteboard" knowledge/README.md` returns two hits (Layout + key-docs index).
+- `BACKLOG.md` reads cleanly; the four new tasks are in the Active section under the existing completed tasks, marked `[ ]` with size estimates.
+**What changed in the repo:** doc-only. New `knowledge/whiteboard/` (3 files). Edits to `knowledge/README.md`, `knowledge/planning/CURRENT.md`, `knowledge/planning/BACKLOG.md`, `knowledge/progress/journal.md`. No code touched.
+**What I learned:**
+- The whiteboard is a real gap in the system. ADRs are for decisions made; backlog is for decided work; the brief is for what we're building. There was nowhere for "we discussed this, here's what we considered, no action yet." Naming: "whiteboard" beat "ideation" / "desk" / "discussions" — it evokes ephemeral, in-progress, not-yet-canonical.
+- The user's framing on profile management ("snapshot + soft link, source of truth lives in the race") is the right shape and the load-bearing argument is longitudinal tracking — *"you can view a race from 2 years ago with a 'Push hard' profile, but now that could be just a normal profile since you've grown as a runner."* That's a strictly stronger reason than the hard-link breakage problem; recording it for next-time.
+- For training-mode: the test "can I write a one-line sentence connecting this to better future race plans?" is a useful rule of thumb to keep in the whiteboard entry as a future scope-creep filter.
+**Next:** Pull TASK-025 (pace bug) into `CURRENT.md` and start the next branch.
