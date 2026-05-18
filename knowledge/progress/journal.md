@@ -955,3 +955,17 @@ Fix: new `chunkByXExtent : Float -> List (Float, Float) -> List (List (Float, Fl
 - The user explicitly asked about perf testing. Answer was "no, we don't have any" — `scripts/profile-trace.mjs` is now the first one. It's an algorithm-side mirror, not a full end-to-end perf test (which would need browser instrumentation), but it answers questions like "is `Gpx.simplify` the slow part?" without booting the app.
 - The "aggressive" option for cleanup wasn't actually destructive — the brief refs to deleted mockups were one-liners describing visual intent, and the canonical reference is now the implementation itself.
 **Next:** Session-level wrap. Brainstorm + Cocodona-feedback sessions fully closed out.
+
+---
+## 2026-05-18 — fix: SVG gradient spans full SVG, not per-chunk bbox
+
+**Task:** user reported visible amber-to-rose seam at chunk boundaries after PR #41 landed; screenshot at `samples/profile-chunk.png` (deleted in this PR per the new convention below).
+**What I did:** Both `Svg.linearGradient` defs in `Profile.elm` now use `gradientUnits="userSpaceOnUse"` with explicit SVG-coordinate endpoints (stroke: padLeft → padLeft + drawWidth; fill: padTop → padTop + chartHeight). Single continuous gradient across the whole chart regardless of chunk count.
+
+Also added a "Bug-screenshot hygiene" section to `knowledge/philosophy/working-style.md` codifying when bug screenshots in `samples/` get deleted (default: with the fix; keep only when referenced by durable docs). Applied the rule by removing `samples/profile-chunk.png` itself.
+**What I verified:** `npm run build` exit 0. JS 331.77 → 331.85 kB (+80 B). Inline comment in `Profile.elm` left for future-me to avoid re-introducing.
+**What changed in the repo:** PR #44, merged `3384452`. `src/Profile.elm` (+12/-4) + `knowledge/philosophy/working-style.md` (+15) + one screenshot deletion.
+**What I learned:**
+- SVG gradient defaults (`objectBoundingBox`) are convenient for single-element paintings but become a footgun when the same `<linearGradient>` reference is used across multiple paths. The seam isn't obvious in code review — the gradient def looks identical to before — but the rendering is per-element. Inline comment now explains why.
+- The user's "we should codify this" observation about screenshot hygiene was the right shape — it'd otherwise drift into "always keep" because deletes are friction-y. Default-delete with explicit-keep makes the deliberate path the easier one.
+**Next:** Nothing queued.
