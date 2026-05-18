@@ -17,13 +17,14 @@ Ordered. Top item is next. Promote into `CURRENT.md` when started.
 - [x] TASK-012 — Offline-first: PWA manifest + service worker for app shell + IDB confirmed durable — (M) — ✓ PR #7
 - [x] TASK-013 — Real-world map overview view via Leaflet/OSM JS port — (M) — ✓ PR #10
 - [x] TASK-003 — Race metadata editing (name inline + date/location/url/notes + cover image upload) — (S) — ✓ PR #9
-- [ ] TASK-025 — Fix pace bug: per-km Target Time should be clock time (moving + aid rest in that km); Pace stays moving-only. Flows through km card, km table, section table, section card. Manual-typed target subtracts in-km aid rest before storing. See `samples/aid-station.png` for the screenshot the user flagged. — (S)
+- [x] TASK-025 — Fix pace bug: per-km Target Time should be clock time (moving + aid rest in that km); Pace stays moving-only. Flows through km card, km table, section table, section card. Manual-typed target subtracts in-km aid rest before storing. See `samples/aid-station.png` for the screenshot the user flagged. — (S) — ✓ PR #34
 - [ ] TASK-026 — Show HR avg per km on linked actuals (per-km card + km table). Extend the streams fetch to include `heartrate` if it isn't already; persist on `ActualSplits.splits`. — (S)
 - [ ] TASK-027 — Skeleton/pulse loading state on the home page drop component while a GPX parse is in progress. Pulse animation on the whole drop area, "Parsing <filename>…", input disabled during parse. Applies to file-drop, file-select, and Strava picker paths. — (S)
 - [ ] TASK-028 — Home page two-section split: "Plans" (no `actualSplits`) and "Executions" (linked). Find better naming if "Plans / Executions" doesn't feel right; the cut is linked-actual vs. not. Section headers + empty states. — (S)
 
 ## Parking lot
 
+- **Section-overlap bug.** `Planning.sectionsForRace` uses an overlap test (`km.distStart < b && km.distEnd > a`) when assigning kms to sections. A km that straddles an aid distance is placed in *both* adjacent sections, so `sectionSeconds`, section-card "Time" stat, and section-table cum column all double-count that km. Discovered while scoping TASK-025; the fix wants careful thought about pro-rating and was deferred. Section-card Δ vs plan still has the moving-vs-clock apples-to-oranges bug at the section level; fixing that cleanly needs the section-overlap fix first.
 - **Separate `gpxText` into its own IDB row** so plan-only saves (slider commit, aid-station edits, etc.) don't have to re-ship the ~3 MB GPX string across the FFI. PR #29 deferred this by deferring the save off the drag hot path; a schema refactor would let those saves be small.
 - Strava GAP-style descent aggressiveness slider (if Tobler feels off in practice).
 - Per-km gain/loss separately for slope-factor (instead of net Δele).
