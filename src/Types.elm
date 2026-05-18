@@ -212,6 +212,7 @@ type alias ActualSplits =
     , totalSeconds : Int
     , totalDistance : Float
     , uploadedAt : Int
+    , hrPerKm : Maybe (Dict Int Int)
     }
 
 
@@ -315,12 +316,28 @@ encodeActualSplits a =
         , ( "totalSeconds", E.int a.totalSeconds )
         , ( "totalDistance", E.float a.totalDistance )
         , ( "uploadedAt", E.int a.uploadedAt )
+        , ( "hrPerKm"
+          , case a.hrPerKm of
+                Just hrs ->
+                    hrs
+                        |> Dict.toList
+                        |> E.list
+                            (\( idx, bpm ) ->
+                                E.object
+                                    [ ( "index", E.int idx )
+                                    , ( "bpm", E.int bpm )
+                                    ]
+                            )
+
+                Nothing ->
+                    E.null
+          )
         ]
 
 
 decodeActualSplits : Decoder ActualSplits
 decodeActualSplits =
-    D.map4 ActualSplits
+    D.map5 ActualSplits
         (D.field "splits"
             (D.list
                 (D.map2 Tuple.pair
@@ -333,6 +350,20 @@ decodeActualSplits =
         (D.field "totalSeconds" D.int)
         (D.field "totalDistance" D.float)
         (D.field "uploadedAt" D.int)
+        (D.oneOf
+            [ D.field "hrPerKm"
+                (D.nullable
+                    (D.list
+                        (D.map2 Tuple.pair
+                            (D.field "index" D.int)
+                            (D.field "bpm" D.int)
+                        )
+                        |> D.map Dict.fromList
+                    )
+                )
+            , D.succeed Nothing
+            ]
+        )
 
 
 planToValue : Plan -> Value
