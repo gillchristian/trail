@@ -786,7 +786,7 @@ update msg model =
 
                         results =
                             Planning.distribute
-                                { target = race.plan.targetSeconds
+                                { target = Just (effectiveTargetSeconds model.profile race kms)
                                 , kms = kms
                                 , plan = race.plan
                                 , aidRestSeconds = Planning.aidRestTotal race.aidStations
@@ -819,7 +819,7 @@ update msg model =
 
                         results =
                             Planning.distribute
-                                { target = race.plan.targetSeconds
+                                { target = Just (effectiveTargetSeconds model.profile race kms)
                                 , kms = kms
                                 , plan = race.plan
                                 , aidRestSeconds = Planning.aidRestTotal race.aidStations
@@ -3696,7 +3696,7 @@ viewPlanTable model race =
 
         results =
             Planning.distribute
-                { target = race.plan.targetSeconds
+                { target = Just (effectiveTargetSeconds model.profile race kms)
                 , kms = kms
                 , plan = race.plan
                 , aidRestSeconds = aidRest
@@ -4776,7 +4776,7 @@ viewPlanSection model race secIndex =
 
         results =
             Planning.distribute
-                { target = race.plan.targetSeconds
+                { target = Just (effectiveTargetSeconds model.profile race kms)
                 , kms = kms
                 , plan = race.plan
                 , aidRestSeconds = aidRest
@@ -5274,7 +5274,7 @@ viewPlanKm model race kmIndex =
 
         results =
             Planning.distribute
-                { target = race.plan.targetSeconds
+                { target = Just (effectiveTargetSeconds model.profile race kms)
                 , kms = kms
                 , plan = race.plan
                 , aidRestSeconds = aidRest
@@ -6094,6 +6094,27 @@ formatMmss totalSeconds =
             modBy 60 totalSeconds
     in
     String.fromInt m ++ ":" ++ String.padLeft 2 '0' (String.fromInt s)
+
+
+{-| The target finish time we hand to `Planning.distribute`. Falls
+back to `Predictor.predict` at intensity = 1.0 when the user hasn't
+committed a target yet, so the per-km Pace / Time columns populate
+from a sane default rather than showing blank until the slider is
+moved. Display-only — `race.plan.targetSeconds` stays `Nothing`
+until the user explicitly commits via the slider or input field.
+-}
+effectiveTargetSeconds : Profile -> Race -> List Km -> Int
+effectiveTargetSeconds profile race kms =
+    case race.plan.targetSeconds of
+        Just s ->
+            s
+
+        Nothing ->
+            if List.isEmpty kms then
+                0
+
+            else
+                .totalS (Predictor.predict profile race kms 1.0)
 
 
 {-| Total aid-station rest scheduled inside a given km index.
