@@ -2319,7 +2319,7 @@ viewIndex model races =
             viewEmptyState
 
           else
-            viewRaceGrid model races
+            viewRaceSections model races
         ]
 
 
@@ -2422,6 +2422,86 @@ viewEmptyState =
         [ p [ class "text-lg" ] [ text "No races yet." ]
         , p [ class "text-sm mt-2" ] [ text "Drop in a GPX above to get started." ]
         ]
+
+
+{-| Partition races into "Plans" (no actualSplits) and "Executions"
+(linked to a completed run), render each as its own section. The
+cut matches the data model rather than dates: a plan whose race
+date already passed but was never linked stays in Plans (the user
+might still revisit it); a recently-logged training loop with an
+actual shows up in Executions even though it has no future date.
+-}
+viewRaceSections : Model -> List Race -> Html Msg
+viewRaceSections model races =
+    let
+        ( executions, plans ) =
+            List.partition (\r -> r.actualSplits /= Nothing) races
+
+        sortedPlans =
+            List.sortWith comparePlans plans
+
+        sortedExecutions =
+            List.sortWith compareExecutions executions
+    in
+    div [ class "space-y-10" ]
+        [ if List.isEmpty sortedPlans then
+            text ""
+
+          else
+            viewRaceSection model "Plans" "Courses you've prepared but haven't run yet." sortedPlans
+        , if List.isEmpty sortedExecutions then
+            text ""
+
+          else
+            viewRaceSection model "Executions" "Runs you came back from — linked to an actual activity." sortedExecutions
+        ]
+
+
+viewRaceSection : Model -> String -> String -> List Race -> Html Msg
+viewRaceSection model heading sub races =
+    div [ class "space-y-4" ]
+        [ div [ class "flex items-baseline gap-3 flex-wrap" ]
+            [ h2 [ class "text-lg font-semibold text-slate-200" ] [ text heading ]
+            , span [ class "text-sm text-slate-500 tabular-nums" ]
+                [ text (String.fromInt (List.length races)) ]
+            , span [ class "text-xs text-slate-600" ] [ text sub ]
+            ]
+        , viewRaceGrid model races
+        ]
+
+
+comparePlans : Race -> Race -> Order
+comparePlans a b =
+    -- Next race first (race.date ascending). Undated entries sort
+    -- after dated ones, ordered by createdAt desc among themselves.
+    case ( a.date, b.date ) of
+        ( Just da, Just db ) ->
+            case compare da db of
+                EQ ->
+                    compare b.createdAt a.createdAt
+
+                ord ->
+                    ord
+
+        ( Just _, Nothing ) ->
+            LT
+
+        ( Nothing, Just _ ) ->
+            GT
+
+        ( Nothing, Nothing ) ->
+            compare b.createdAt a.createdAt
+
+
+compareExecutions : Race -> Race -> Order
+compareExecutions a b =
+    let
+        ts r =
+            r.actualSplits
+                |> Maybe.map .uploadedAt
+                |> Maybe.withDefault 0
+    in
+    compare (ts b) (ts a)
 
 
 viewRaceGrid : Model -> List Race -> Html Msg
