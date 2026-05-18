@@ -4,43 +4,51 @@
 
 ## Active
 
-### TASK-026 — show avg HR per km on linked actuals
+### TASK-027 — skeleton/pulse loading state on the home-page drop area
 
-Recorded from the 2026-05-18 brainstorm (whiteboard:
-`training-as-analysis.md`). Strava already returns the `heartrate`
-stream alongside time/distance/latlng/altitude, and `StravaApi.elm`
-already requests it. The decoder, the data model, and the UI haven't
-caught up. We surface average HR per km wherever an actual is linked
-*and* the source carried HR data. File-uploaded `.gpx` actuals have
-no HR for now (the GPX-with-time parser doesn't read `<extensions>
-<gpxtpx:hr>`); they display nothing for HR. This is the only
-analysis-side feature admitted out of the brainstorm — see the
-whiteboard for the "must sharpen planning" rule.
+From the 2026-05-18 brainstorm. Today: dropping a UTMB-size GPX
+freezes the UI for several seconds with no visual feedback. The
+`Parsing` state already exists in the upload state machine, but
+because `Gpx.parseGPX` is synchronous and runs inside the same
+update handler that flips the state to `Parsing`, the renderer
+never gets a chance to draw the Parsing UI before the parse
+blocks. The user picked: pulse animation on the whole drop
+component (not a spinner, "out of fashion").
+
+Two-part fix:
+
+1. **Defer the heavy parse one tick** so the `Parsing` state
+   actually renders before the synchronous parse blocks the
+   runtime. Use `Process.sleep 1 |> Task.perform` to bounce
+   through the event loop.
+2. **Pulse + skeleton styling** on the drop banner when the
+   upload state is `Parsing` or `Persisting`. Tailwind's
+   `animate-pulse` on the container; replace the inner button
+   with a couple of skeleton placeholder bars so the component
+   visibly shows "something is happening here, a card is on the
+   way."
 
 **Acceptance criteria:**
 
-- [ ] `ActualPoint` carries `hr : Maybe Int`.
-- [ ] `StravaStreams.parse` decodes the `heartrate` stream (default
-      `[]` if missing, for back-compat with old saved actuals never
-      re-linked) and populates `ActualPoint.hr`.
-- [ ] `ActualGpx.parse` (file-upload path) sets `hr = Nothing` on
-      every point.
-- [ ] New `ActualGpx.computeHrPerKm : ActualTrack -> Maybe (Dict Int
-      Int)` returns `Nothing` if no point has HR; otherwise
-      `Just (Dict.fromList ...)` with km-index → average bpm.
-- [ ] `Types.ActualSplits` gains `hrPerKm : Maybe (Dict Int Int)`.
-- [ ] `encodeActualSplits` writes the field (null when Nothing).
-- [ ] `decodeActualSplits` defaults `hrPerKm` to Nothing when absent
-      (back-compat for actuals saved before this PR).
-- [ ] Both ActualSplits construction sites (file upload, Strava
-      link) compute and persist `hrPerKm`.
-- [ ] Per-km card: when HR is available for this km, display an
-      "Avg HR" stat next to / under Actual + Δ.
-- [ ] Km table: when `actualSplits.hrPerKm` is `Just`, add an "HR"
-      column to the right of Δ vs plan, showing the avg bpm or "—"
-      when the km has no HR data.
+- [ ] New Msg `StartParse fileName content` runs the actual
+      parsing logic that used to live in `GotContent`.
+- [ ] `GotContent` now only sets `upload = Parsing fileName` and
+      dispatches `StartParse fileName content` after
+      `Process.sleep 1`.
+- [ ] `StartParse` branches on `isProjectFile` exactly as the
+      old `GotContent` did (decoding the `.trail` envelope vs.
+      running `Gpx.parseGPX`).
+- [ ] `viewUploadBanner` adds `animate-pulse` to the container
+      div when the state is `Parsing` or `Persisting`.
+- [ ] Inner content during Parsing / Persisting shows: a label
+      ("Parsing X…" / "Saving X…"), 2–3 skeleton placeholder
+      bars (`bg-slate-700 rounded h-* w-*`), the original sub
+      caption, and no clickable button.
+- [ ] `cursor-wait` and dragging disabled (today's behavior
+      preserved).
 - [ ] Build clean (`npm run build`).
-- [ ] Bundle-string check: new labels ("Avg HR", "HR" column).
+- [ ] Bundle-string check: new strings ("Processing your file"
+      or similar) present if added.
 - [ ] Journal entry + PR opened and merged.
 
 User flagged in `samples/aid-station.png`: km has 15 m gain, slope 1.5 %, an
