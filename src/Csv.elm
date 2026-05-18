@@ -85,8 +85,11 @@ buildKmRows race aidByKm results kms =
                 stopRest =
                     List.foldl (\a sum -> sum + a.restSeconds) 0 stops
 
+                kmClockTime =
+                    result.seconds + stopRest
+
                 newRunning =
-                    running + result.seconds + stopRest
+                    running + kmClockTime
 
                 kp =
                     kmPlanFor km.index race.plan
@@ -118,8 +121,8 @@ buildKmRows race aidByKm results kms =
                     , formatInt km.gain
                     , formatInt km.loss
                     , formatFloat 2 (km.slope * 100)
-                    , String.fromInt result.seconds
-                    , formatHhmmss result.seconds
+                    , String.fromInt kmClockTime
+                    , formatHhmmss kmClockTime
                     , pace
                     , source
                     , String.fromInt newRunning

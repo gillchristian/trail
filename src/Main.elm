@@ -679,6 +679,9 @@ update msg model =
                         kp =
                             kmPlanFor kmIndex race.plan
 
+                        kmRest =
+                            aidRestInKm race.aidStations kmIndex
+
                         trimmed =
                             String.trim model.kmTimeText
 
@@ -689,7 +692,11 @@ update msg model =
                             else
                                 case parseMmss trimmed of
                                     Just secs ->
-                                        Manual secs
+                                        -- User typed clock time. Store
+                                        -- moving = clock − in-km aid rest.
+                                        -- Clamp at 0 if they typed less
+                                        -- than the aid rest itself.
+                                        Manual (max 0 (secs - kmRest))
 
                                     Nothing ->
                                         kp.time
@@ -697,7 +704,7 @@ update msg model =
                         formatted =
                             case newTime of
                                 Manual s ->
-                                    formatMmss s
+                                    formatMmss (s + kmRest)
 
                                 Auto ->
                                     ""
@@ -1424,10 +1431,13 @@ hydratePlanInputs model =
                             let
                                 kp =
                                     kmPlanFor idx race.plan
+
+                                kmRest =
+                                    aidRestInKm race.aidStations idx
                             in
                             ( case kp.time of
                                 Manual s ->
-                                    formatMmss s
+                                    formatMmss (s + kmRest)
 
                                 Auto ->
                                     ""
@@ -4261,12 +4271,18 @@ viewKmRow race km result stops notes cumulative =
         deltaEle =
             km.eleEnd - km.eleStart
 
+        stopRest =
+            List.foldl (\a acc -> acc + a.restSeconds) 0 stops
+
+        kmClockTime =
+            result.seconds + stopRest
+
         pace =
             paceMinPerKm result.seconds km.distance
 
         timeCell =
             div [ class "flex items-baseline justify-end gap-1 tabular-nums" ]
-                [ span [ class "text-slate-100 font-medium" ] [ text (formatMmss result.seconds) ]
+                [ span [ class "text-slate-100 font-medium" ] [ text (formatMmss kmClockTime) ]
                 , span
                     [ classList
                         [ ( "text-[10px] uppercase tracking-wider", True )
@@ -4366,7 +4382,7 @@ viewKmRow race km result stops notes cumulative =
                                     Just s ->
                                         let
                                             diff =
-                                                s - result.seconds
+                                                s - kmClockTime
 
                                             ( tone, prefix ) =
                                                 if diff > 0 then
@@ -4404,7 +4420,7 @@ viewKmRow race km result stops notes cumulative =
                         (List.map
                             (\a ->
                                 div [ class "text-amber-300" ]
-                                    [ text ("★ " ++ a.name ++ " · +" ++ formatRest a.restSeconds) ]
+                                    [ text ("★ " ++ a.name ++ " · " ++ formatRest a.restSeconds) ]
                             )
                             stops
                             ++ (if String.isEmpty notes then
@@ -5006,6 +5022,12 @@ viewSectionKmRow race results km =
         deltaEle =
             km.eleEnd - km.eleStart
 
+        stopRest =
+            aidRestInKm race.aidStations km.index
+
+        kmClockTime =
+            result.seconds + stopRest
+
         pace =
             paceMinPerKm result.seconds km.distance
     in
@@ -5040,7 +5062,7 @@ viewSectionKmRow race results km =
                 ]
             ]
         , div [ class "flex items-baseline gap-2 tabular-nums" ]
-            [ span [ class "text-sm text-white font-medium" ] [ text (formatMmss result.seconds) ]
+            [ span [ class "text-sm text-white font-medium" ] [ text (formatMmss kmClockTime) ]
             , span
                 [ classList
                     [ ( "text-[10px] uppercase tracking-wider", True )
@@ -5131,7 +5153,7 @@ viewKmCardAndForm model race km allKms results _ prevIndex nextIndex =
 
         stopsInKm =
             race.aidStations
-                |> List.filter (\a -> a.distance >= km.distStart && a.distance <= km.distEnd)
+                |> List.filter (\a -> Planning.kmAtDistance a.distance == km.index)
 
         -- Uniform chart height across every km in this race, so the card
         -- shape doesn't change as we navigate and the prev/next buttons
@@ -5465,6 +5487,12 @@ viewKmForm model race km result kp stopsInKm =
                     span [ class "px-2 py-0.5 text-[10px] uppercase tracking-wider bg-slate-800 text-slate-400 rounded" ]
                         [ text "Auto" ]
 
+        stopRestInKm =
+            List.foldl (\a acc -> acc + a.restSeconds) 0 stopsInKm
+
+        kmClockTime =
+            result.seconds + stopRestInKm
+
         pace =
             paceMinPerKm result.seconds km.distance
 
@@ -5489,7 +5517,7 @@ viewKmForm model race km result kp stopsInKm =
                     , A.value model.kmTimeText
                     , A.placeholder
                         (if result.seconds > 0 then
-                            formatMmss result.seconds ++ " (auto)"
+                            formatMmss kmClockTime ++ " (auto)"
 
                          else
                             "m:ss"
@@ -5506,6 +5534,12 @@ viewKmForm model race km result kp stopsInKm =
                     [ text (pace ++ "/km") ]
                 ]
             ]
+        , if stopRestInKm > 0 then
+            p [ class "text-xs text-amber-300/80 -mt-3" ]
+                [ text ("Target time is clock time, including " ++ formatRest stopRestInKm ++ " at the aid station. Pace is moving only.") ]
+
+          else
+            text ""
         , case ( race.actualSplits, kmActualSeconds ) of
             ( Just _, Just actualS ) ->
                 div [ class "grid grid-cols-2 gap-3" ]
@@ -5517,7 +5551,7 @@ viewKmForm model race km result kp stopsInKm =
                     , div [ class "space-y-1" ]
                         [ span [ class "text-xs text-slate-500 uppercase tracking-wider" ] [ text "Δ vs plan" ]
                         , div [ class "px-3 py-2 bg-slate-950 border border-slate-800 rounded-md text-lg font-medium" ]
-                            [ viewSignedDeltaCell (actualS - result.seconds) ]
+                            [ viewSignedDeltaCell (actualS - kmClockTime) ]
                         ]
                     ]
 
@@ -5852,6 +5886,19 @@ formatMmss totalSeconds =
             modBy 60 totalSeconds
     in
     String.fromInt m ++ ":" ++ String.padLeft 2 '0' (String.fromInt s)
+
+
+{-| Total aid-station rest scheduled inside a given km index.
+Used to convert between *moving* time (what `Planning.distribute`
+allocates) and *clock* time (what shows up in km splits on the
+watch). A km that contains an aid carries its rest in clock time
+but not in moving time.
+-}
+aidRestInKm : List AidStation -> Int -> Int
+aidRestInKm aids kmIndex =
+    aids
+        |> List.filter (\a -> Planning.kmAtDistance a.distance == kmIndex)
+        |> List.foldl (\a acc -> acc + a.restSeconds) 0
 
 
 paceMinPerKm : Int -> Float -> String
