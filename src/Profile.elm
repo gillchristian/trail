@@ -260,22 +260,31 @@ view track mode containerWidth markers =
                     ++ String.fromFloat totalHeight
                 )
             ]
-            [ Svg.defs []
+            [ -- Both gradients use userSpaceOnUse coordinates so they
+              -- span the *whole* SVG, not each `<path>` element's
+              -- bounding box. Necessary because we emit multiple chunk
+              -- paths (see `coordChunks`); the default objectBoundingBox
+              -- behaviour would restart the gradient at every chunk
+              -- boundary, producing a visible amber-to-rose seam at each
+              -- chunk join.
+              Svg.defs []
                 [ Svg.linearGradient
                     [ SA.id "elev-fill"
+                    , SA.gradientUnits "userSpaceOnUse"
                     , SA.x1 "0"
-                    , SA.y1 "0"
+                    , SA.y1 (fmt padTop)
                     , SA.x2 "0"
-                    , SA.y2 "1"
+                    , SA.y2 (fmt (padTop + chartHeight))
                     ]
                     [ Svg.stop [ SA.offset "0%", SA.stopColor "#E52E3A", SA.stopOpacity "0.65" ] []
                     , Svg.stop [ SA.offset "100%", SA.stopColor "#E52E3A", SA.stopOpacity "0.05" ] []
                     ]
                 , Svg.linearGradient
                     [ SA.id "elev-stroke"
-                    , SA.x1 "0"
+                    , SA.gradientUnits "userSpaceOnUse"
+                    , SA.x1 (fmt padLeft)
                     , SA.y1 "0"
-                    , SA.x2 "1"
+                    , SA.x2 (fmt (padLeft + drawWidth))
                     , SA.y2 "0"
                     ]
                     [ Svg.stop [ SA.offset "0%", SA.stopColor "#fbbf24" ] []
