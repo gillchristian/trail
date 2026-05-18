@@ -1,6 +1,7 @@
 module ActualGpx exposing
     ( ActualPoint
     , ActualTrack
+    , computeHrPerKm
     , computeSplits
     , cumulativeDistances
     , parse
@@ -24,6 +25,7 @@ day count; intra-day h/m/s are trivial. See
 
 -}
 
+import Dict exposing (Dict)
 import Regex exposing (Regex)
 
 
@@ -36,6 +38,7 @@ type alias ActualPoint =
     , lon : Float
     , ele : Float
     , elapsedS : Int -- seconds since the first point
+    , hr : Maybe Int -- bpm, when the source carries heart-rate data
     }
 
 
@@ -75,6 +78,7 @@ parse content =
                                 , lon = r.lon
                                 , ele = r.ele
                                 , elapsedS = r.ts - firstTs
+                                , hr = Nothing
                                 }
                             )
 
@@ -449,3 +453,55 @@ crossBoundaries dist point state =
 
     else
         state
+
+
+
+-- HEART RATE
+
+
+{-| Average heart rate per km, when the source carries HR data.
+Returns `Nothing` if no point in the track has a `hr` value (this
+is the case for file-uploaded `.gpx` actuals today; the GPX-with-
+time parser doesn't extract HR from extensions). Otherwise returns
+`Just (Dict.fromList ...)` with km-index → rounded average bpm.
+
+Each point is counted once toward whichever km its current cumulative
+distance falls in (`floor (cumDist / 1000)`). Samples are equally
+weighted; Strava streams come back at ~1 Hz so this is close to a
+time-weighted average in practice.
+-}
+computeHrPerKm : ActualTrack -> Maybe (Dict Int Int)
+computeHrPerKm track =
+    let
+        sums =
+            List.map2 Tuple.pair track.cumDist track.points
+                |> List.foldl stepHr Dict.empty
+    in
+    if Dict.isEmpty sums then
+        Nothing
+
+    else
+        Just (Dict.map (\_ ( sum, count ) -> sum // max 1 count) sums)
+
+
+stepHr : ( Float, ActualPoint ) -> Dict Int ( Int, Int ) -> Dict Int ( Int, Int )
+stepHr ( dist, point ) acc =
+    case point.hr of
+        Nothing ->
+            acc
+
+        Just bpm ->
+            let
+                kmIdx =
+                    floor (dist / 1000)
+            in
+            Dict.update kmIdx
+                (\existing ->
+                    case existing of
+                        Nothing ->
+                            Just ( bpm, 1 )
+
+                        Just ( sum, count ) ->
+                            Just ( sum + bpm, count + 1 )
+                )
+                acc

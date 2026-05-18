@@ -968,6 +968,7 @@ update msg model =
                                     , totalSeconds = track.totalElapsedS
                                     , totalDistance = track.totalDist
                                     , uploadedAt = uploadedAtMs
+                                    , hrPerKm = ActualGpx.computeHrPerKm track
                                     }
 
                                 updatedRace =
@@ -1253,6 +1254,7 @@ update msg model =
                                             , totalSeconds = track.totalElapsedS
                                             , totalDistance = track.totalDist
                                             , uploadedAt = uploadedAtMs
+                                            , hrPerKm = ActualGpx.computeHrPerKm track
                                             }
 
                                         updatedRace =
@@ -4200,11 +4202,21 @@ viewKmTable race kms results =
         hasActual =
             race.actualSplits /= Nothing
 
+        hasHr =
+            race.actualSplits |> Maybe.andThen .hrPerKm |> (/=) Nothing
+
         actualHeaders =
             if hasActual then
                 [ Html.th [ class "px-4 py-3 text-right" ] [ text "Actual" ]
                 , Html.th [ class "px-4 py-3 text-right" ] [ text "Δ vs plan" ]
                 ]
+
+            else
+                []
+
+        hrHeader =
+            if hasHr then
+                [ Html.th [ class "px-4 py-3 text-right" ] [ text "Avg HR" ] ]
 
             else
                 []
@@ -4221,6 +4233,7 @@ viewKmTable race kms results =
                      , Html.th [ class "px-4 py-3 text-right" ] [ text "Time" ]
                      ]
                         ++ actualHeaders
+                        ++ hrHeader
                         ++ [ Html.th [ class "px-4 py-3 text-right" ] [ text "Cum" ]
                            , Html.th [ class "px-4 py-3 text-left" ] [ text "Notes / stops" ]
                            ]
@@ -4400,8 +4413,24 @@ viewKmRow race km result stops notes cumulative =
                                     Nothing ->
                                         span [ class "text-slate-700" ] [ text "—" ]
                                 ]
+
+                        hrCells =
+                            case actual.hrPerKm of
+                                Just hrs ->
+                                    [ Html.td [ class "px-4 py-3 align-top text-right tabular-nums" ]
+                                        [ case Dict.get km.index hrs of
+                                            Just bpm ->
+                                                span [ class "text-rose-300" ] [ text (String.fromInt bpm) ]
+
+                                            Nothing ->
+                                                span [ class "text-slate-700" ] [ text "—" ]
+                                        ]
+                                    ]
+
+                                Nothing ->
+                                    []
                     in
-                    [ actualCell, diffCell ]
+                    [ actualCell, diffCell ] ++ hrCells
 
                 Nothing ->
                     []
@@ -5499,6 +5528,11 @@ viewKmForm model race km result kp stopsInKm =
         kmActualSeconds =
             race.actualSplits
                 |> Maybe.andThen (\a -> Dict.get km.index a.splits)
+
+        kmAvgHr =
+            race.actualSplits
+                |> Maybe.andThen .hrPerKm
+                |> Maybe.andThen (Dict.get km.index)
     in
     div [ class "space-y-5 rounded-2xl bg-slate-900 border border-slate-800 p-5" ]
         [ div [ class "flex items-baseline justify-between gap-2" ]
@@ -5541,19 +5575,52 @@ viewKmForm model race km result kp stopsInKm =
           else
             text ""
         , case ( race.actualSplits, kmActualSeconds ) of
-            ( Just _, Just actualS ) ->
-                div [ class "grid grid-cols-2 gap-3" ]
-                    [ div [ class "space-y-1" ]
+            ( Just actualSplits, Just actualS ) ->
+                let
+                    hasHrData =
+                        actualSplits.hrPerKm /= Nothing
+
+                    hrCell =
+                        if hasHrData then
+                            [ div [ class "space-y-1" ]
+                                [ span [ class "text-xs text-rose-400/80 uppercase tracking-wider" ] [ text "Avg HR" ]
+                                , div [ class "px-3 py-2 bg-slate-950 border border-rose-500/30 rounded-md text-lg font-medium text-slate-100 tabular-nums" ]
+                                    (case kmAvgHr of
+                                        Just bpm ->
+                                            [ span [] [ text (String.fromInt bpm) ]
+                                            , span [ class "text-xs text-slate-500 ml-1" ] [ text "bpm" ]
+                                            ]
+
+                                        Nothing ->
+                                            [ span [ class "text-slate-700" ] [ text "—" ] ]
+                                    )
+                                ]
+                            ]
+
+                        else
+                            []
+
+                    gridClass =
+                        if hasHrData then
+                            "grid grid-cols-3 gap-3"
+
+                        else
+                            "grid grid-cols-2 gap-3"
+                in
+                div [ class gridClass ]
+                    ([ div [ class "space-y-1" ]
                         [ span [ class "text-xs text-emerald-400/80 uppercase tracking-wider" ] [ text "Actual" ]
                         , div [ class "px-3 py-2 bg-slate-950 border border-emerald-500/30 rounded-md text-lg font-medium text-slate-100 tabular-nums" ]
                             [ text (formatMmss actualS) ]
                         ]
-                    , div [ class "space-y-1" ]
+                     , div [ class "space-y-1" ]
                         [ span [ class "text-xs text-slate-500 uppercase tracking-wider" ] [ text "Δ vs plan" ]
                         , div [ class "px-3 py-2 bg-slate-950 border border-slate-800 rounded-md text-lg font-medium" ]
                             [ viewSignedDeltaCell (actualS - kmClockTime) ]
                         ]
-                    ]
+                     ]
+                        ++ hrCell
+                    )
 
             ( Just _, Nothing ) ->
                 p [ class "text-xs text-slate-500 italic" ]

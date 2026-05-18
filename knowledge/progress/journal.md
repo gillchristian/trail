@@ -783,3 +783,24 @@ Shared helpers added: `sectionActualSeconds : Race -> List Int -> Maybe Int` (re
 - The user's framing on profile management ("snapshot + soft link, source of truth lives in the race") is the right shape and the load-bearing argument is longitudinal tracking — *"you can view a race from 2 years ago with a 'Push hard' profile, but now that could be just a normal profile since you've grown as a runner."* That's a strictly stronger reason than the hard-link breakage problem; recording it for next-time.
 - For training-mode: the test "can I write a one-line sentence connecting this to better future race plans?" is a useful rule of thumb to keep in the whiteboard entry as a future scope-creep filter.
 **Next:** Pull TASK-025 (pace bug) into `CURRENT.md` and start the next branch.
+
+---
+## 2026-05-18 — fix: per-km Target = clock time, Pace stays moving (TASK-025)
+
+**Task:** TASK-025 — fix the apples-to-oranges Δ vs plan bug visible in `samples/aid-station.png`.
+**What I did:** The screenshot showed a km containing a 1-min aid station with Target 6:11 / Pace 6:11/km / Actual 7:14 / Δ +1:03. Diagnosed: `result.seconds` (from `Planning.distribute`) is moving time only (aid rest is subtracted from `budget` before allocation), the Target field displayed moving, the Actual came from the GPS as clock time, so Δ subtracted moving from clock — apples-to-oranges. The runner was only 3 seconds slow, not 63. Fix: the display layer now folds in-km aid rest into Target; Pace stays moving / distance. Underlying distribution math unchanged. Manual-input parser converts clock→moving on commit (`Manual (max 0 (typed − kmRest))`), and echoes clock back (`formatMmss (stored + kmRest)`).
+
+Touched sites: per-km card (Target placeholder + Δ vs plan + an amber caption when stopRestInKm > 0), km table (Time column + Δ vs plan + drop the "+" prefix from the aid-stop notes line), per-section card's contained-km list (Time per km), `Csv.buildKmRows` (`target_time_s` / `target_time` now clock). New helper `aidRestInKm : List AidStation -> Int -> Int` uses `Planning.kmAtDistance` so each aid is attributed to exactly one km (no double-count at exact km boundaries). The per-km card's `stopsInKm` filter was unified onto the same convention.
+**What I verified:**
+- `npm run build` exit 0. JS 327.09 → 327.51 kB (+420 B); gzip 101.73 → 101.91 kB.
+- Bundle-string check: `"Target time is clock time"` present (1), `"at the aid station"` present (1).
+- Math sketch: total clock at race level = `sum_auto(moving) + sum_manual(moving_stored) + sum_all(kmRest) = (T − aidRestSum − manualSum) + manualSum + aidRestSum = T`. Holds for any mix of Auto / Manual kms.
+- Edge case: Manual time typed < in-km aid rest → `max 0` clamps stored seconds to 0; echo shows the rest itself; user notices and re-types.
+- Edge case: km with no aid → `stopRest = 0`, no behavior change.
+- **Visual smoke not performed** (no GUI in this session). User to confirm on `samples/aid-station.png` km: Target 7:11, Pace 6:11/km, Δ +0:03, caption visible.
+**What changed in the repo:** PR #34, merged `0f316fb`. Modified `src/Main.elm` (helper + hydrate + commit + 3 view sites) and `src/Csv.elm` (km-mode export).
+**What I learned:**
+- The bug existed because two different mental models for "Target time per km" co-existed in the codebase: distribute()'s allocation said "moving only" but the watch / user said "clock time". Whenever those models read the same number, one is wrong. The fix anchors the display side to the user's model.
+- During the scoping I noticed a *separate* pre-existing bug in `Planning.sectionsForRace`: the overlap test `km.distStart < b && km.distEnd > a` puts a km straddling an aid into both adjacent sections. The section-table `sectionSeconds`, the section-card "Time" stat, and the cumulative-after-section column all double-count that km. Logged in the parking lot; fix wants its own task because (a) it interacts with the section-card's own moving-vs-clock Δ bug and (b) the right shape (pro-rate by overlap distance? assign to the section the km's center is in?) is a design call.
+- Build-only verification continues — I'm honest about it in the PR description. The user's screenshot is the acceptance artefact.
+**Next:** TASK-026 (HR display on linked actuals) is next.

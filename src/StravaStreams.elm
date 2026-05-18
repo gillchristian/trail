@@ -51,8 +51,16 @@ parse value =
                         altSlice =
                             sliceAlign raw.altitude len
 
+                        hrSlice =
+                            -- Heart rate is optional; activities recorded
+                            -- without an HR sensor come back with `[]`. Wrap
+                            -- present samples in `Just`; `sliceAlignMaybe`
+                            -- pads with `Nothing` if the stream is shorter
+                            -- than the others.
+                            sliceAlignMaybe (List.map Just raw.heartrate) len
+
                         points =
-                            buildPoints (List.take len ts) latlngs altSlice
+                            buildPoints (List.take len ts) latlngs altSlice hrSlice
 
                         cumDist =
                             -- cadence already gave us cumulative distance;
@@ -82,16 +90,18 @@ type alias RawStreams =
     , distance : List Float
     , latlng : List ( Float, Float )
     , altitude : List Float
+    , heartrate : List Int
     }
 
 
 rawStreamsDecoder : Decoder RawStreams
 rawStreamsDecoder =
-    D.map4 RawStreams
+    D.map5 RawStreams
         (streamData "time" (D.list D.int) [])
         (streamData "distance" (D.list D.float) [])
         (streamData "latlng" (D.list latlngEntry) [])
         (streamData "altitude" (D.list D.float) [])
+        (streamData "heartrate" (D.list D.int) [])
 
 
 streamData : String -> Decoder a -> a -> Decoder a
@@ -129,44 +139,62 @@ sliceAlign source len =
         source ++ List.repeat (len - cur) 0
 
 
-buildPoints : List Int -> List ( Float, Float ) -> List Float -> List ActualPoint
-buildPoints times latlngs alts =
-    let
-        ll =
-            List.take (List.length times) latlngs
-
-        ele =
-            sliceAlign alts (List.length times)
-
-        zipped =
-            zip3 times ll ele
-    in
-    List.map
-        (\( t, ( lat, lng ), elev ) ->
-            { lat = lat
-            , lon = lng
-            , ele = elev
-            , elapsedS = t
-            }
-        )
-        zipped
-
-
-{-| Tail-recursive 3-way zip. The naive `(a, b, c) :: zip3 xs ys zs`
-form blows the stack on real-world streams (6 000+ points per
-activity); Elm's TCE only kicks in when the recursive call is in
-tail position, which it isn't with a leading cons.
+{-| Walk the four parallel streams together and emit `ActualPoint`
+records directly. We sidestep both Elm's 4-tuple ban *and* the
+non-tail-recursive `::` trap that bit us before in `zip3`: each
+recursive call here is in tail position because the cons happens
+inside the accumulator argument.
 -}
-zip3 : List a -> List b -> List c -> List ( a, b, c )
-zip3 xs ys zs =
-    zip3Help xs ys zs []
+buildPoints : List Int -> List ( Float, Float ) -> List Float -> List (Maybe Int) -> List ActualPoint
+buildPoints times latlngs alts hrs =
+    let
+        n =
+            List.length times
+
+        eleAligned =
+            sliceAlign alts n
+
+        hrAligned =
+            sliceAlignMaybe hrs n
+    in
+    buildPointsHelp times latlngs eleAligned hrAligned []
 
 
-zip3Help : List a -> List b -> List c -> List ( a, b, c ) -> List ( a, b, c )
-zip3Help xs ys zs acc =
-    case ( xs, ys, zs ) of
-        ( x :: xRest, y :: yRest, z :: zRest ) ->
-            zip3Help xRest yRest zRest (( x, y, z ) :: acc)
+buildPointsHelp :
+    List Int
+    -> List ( Float, Float )
+    -> List Float
+    -> List (Maybe Int)
+    -> List ActualPoint
+    -> List ActualPoint
+buildPointsHelp ts lls es hs acc =
+    case ( ts, lls, ( es, hs ) ) of
+        ( t :: trest, ( lat, lng ) :: llrest, ( e :: erest, h :: hrest ) ) ->
+            buildPointsHelp trest
+                llrest
+                erest
+                hrest
+                ({ lat = lat
+                 , lon = lng
+                 , ele = e
+                 , elapsedS = t
+                 , hr = h
+                 }
+                    :: acc
+                )
 
         _ ->
             List.reverse acc
+
+
+sliceAlignMaybe : List (Maybe Int) -> Int -> List (Maybe Int)
+sliceAlignMaybe source len =
+    let
+        cur =
+            List.length source
+    in
+    if cur >= len then
+        List.take len source
+
+    else
+        source ++ List.repeat (len - cur) Nothing
