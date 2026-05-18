@@ -5,13 +5,14 @@
       <stop offset="100%" stop-color="#0b0b21"/>
     </linearGradient>
     <linearGradient id="peak" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#ff5f6a"/>
-      <stop offset="100%" stop-color="#E52E3A"/>
+      <stop offset="0%" stop-color="#ff5f6a" stop-opacity="0.55"/>
+      <stop offset="100%" stop-color="#E52E3A" stop-opacity="0.05"/>
     </linearGradient>
   </defs>
   <rect width="512" height="512" rx="96" fill="url(#bg)"/>
-  <path d="M64 384 L160 240 L224 320 L320 160 L448 384 Z" fill="url(#peak)" opacity="0.85"/>
-  <path d="M64 384 L160 240 L224 320 L320 160 L448 384" fill="none" stroke="#ff5f6a" stroke-width="6" stroke-linejoin="round" stroke-linecap="round"/>
-  <circle cx="320" cy="160" r="14" fill="#fbbf24"/>
-  <text x="256" y="464" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-weight="700" font-size="56" fill="#ff5f6a">Trail</text>
+  <path d="M48 400 L176 224 L240 304 L336 144 L464 400 Z" fill="url(#peak)"/>
+  <path d="M48 400 L176 224 L240 304 L336 144 L464 400" fill="none" stroke="#ff5f6a" stroke-width="6" stroke-linejoin="round" stroke-linecap="round"/>
+  <circle cx="120" cy="301" r="14" fill="#fbbf24"/>
+  <circle cx="336" cy="144" r="14" fill="#fbbf24"/>
+  <circle cx="454" cy="390" r="14" fill="#10b981"/>
 </svg>
