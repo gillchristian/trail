@@ -823,3 +823,22 @@ Touched sites: per-km card (Target placeholder + Δ vs plan + an amber caption w
 - Back-compat for IDB-persisted records is dirt-cheap when the new field has a meaningful default (`Nothing`). `D.oneOf [..., D.succeed default]` is the one-liner. No migration code; no schema version bump.
 - Layout-stability matters more than I expected. First pass collapsed the per-km card grid from 3-col to 2-col on kms without HR samples (the if-Just was on the per-km HR rather than the activity-level HR). When the user navigates between kms with and without samples, the entire card jumps. Switched the gating to activity-level `hrPerKm /= Nothing` and used "—" for missing per-km values. Smooth.
 **Next:** TASK-027 — skeleton/pulse loading state on the home-page drop area.
+
+---
+## 2026-05-18 — feat: pulse + skeleton on home drop area while parsing (TASK-027)
+
+**Task:** TASK-027 — give the home drop area visual feedback while a large GPX is being processed. User specifically picked pulse + skeleton over a spinner ("out of fashion").
+**What I did:** Two-part change. (1) New `StartParse fileName content` Msg moves the synchronous `isProjectFile` branch + `ProjectFile.decode` / `Gpx.parseGPX` logic out of `GotContent`. `GotContent` now only flips `upload = Parsing fileName` and dispatches `StartParse` via `Task.perform (\_ -> ...) (Process.sleep 1)`. The sleep yields to the renderer so the Parsing UI paints before the synchronous parse blocks. (2) `viewUploadBanner` splits into `viewUploadIdle` / `viewUploadSkeleton`. The skeleton variant renders the label + sub caption + three slate-700 skeleton bars (h-3, varying widths), no clickable button. The outer container adds `animate-pulse` whenever `disabled` is True (Parsing or Persisting). Status copy tightened: "Processing X… / Crunching the track — this can take a moment on a long course."
+**What I verified:**
+- `npm run build` exit 0. JS 329.33 → 329.87 kB (+540 B); gzip 102.38 → 102.50 kB.
+- Bundle-string check: `"Processing"`, `"Crunching the track"`, `animate-pulse` class string — all present once.
+- `Process` import added; no unused-import warning.
+- `Task.perform (\_ -> StartParse ...) (Process.sleep 1)` discharges the deferred work via the standard Task pipeline. Process.sleep returns `Task Never ()`, so no error-handling burden.
+- Edge case: user drops while a parse is in progress. New `GotFiles` overwrites the upload state and queues a fresh StartParse. The earlier in-flight `Process.sleep` will still fire its own StartParse with the *old* content, but model.upload will reflect the *new* file. Slight inconsistency on the failure path (error attributed to wrong filename) but probability is low and behavior was the same before this PR. Out of scope.
+- **Visual smoke not performed.** User to verify by dropping a UTMB-size GPX and confirming the dashed banner pulses with three skeleton bars before and after the parse freeze.
+**What changed in the repo:** PR #36, merged `bd6038b`. Modified `src/Main.elm` only (+47/-11 lines).
+**What I learned:**
+- The freeze-without-feedback bug was structural, not stylistic: even with the perfect skeleton animation, the renderer would never have drawn it without the deferred-parse trick. The bug = "we set the state and immediately starve the runtime before render." Process.sleep 1 is the cheapest fix; longer-term the parser itself wants to move off the main thread (port to JS, or a Worker). Tracked indirectly via the brief's "Performance target" line.
+- `animate-pulse` plus skeleton bars is a stable Tailwind idiom; the bars don't need their own animation, the container's pulse propagates via opacity-on-element-tree.
+- Resisted the urge to make the skeleton bars look like a race card preview. The race grid lives *below* the banner — fake-card-in-banner would mislead.
+**Next:** TASK-028 — home page split into Plans / Executions sections.
