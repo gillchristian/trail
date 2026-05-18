@@ -899,3 +899,59 @@ Bundle progression across the session: 327.09 kB → 330.92 kB JS (+3.83 kB), 10
 **What changed in the repo:** PR #39, merged `b73f4f6`. `src/Main.elm` only (+25 lines).
 **What I learned:** premature inference on my part. "When did I log this run?" (uploadedAt) is a different question than "when did this race happen?" (race.date). The user reads the home page by the latter axis; the former is implementation detail. Symmetric axes (date asc vs date desc) read more cleanly than two different axes.
 **Next:** Same as the previous session-wrap entry — visual smoke pending; section-overlap bug still parked.
+
+---
+## 2026-05-18 — fix: chunked SVG path so long-track profile renders end-to-end (TASK-029)
+
+**Task:** TASK-029 — user loaded Cocodona 250 (~400 km, 36 746 trkpts) and the elevation profile at 10 m/px stopped mid-track. Screenshot: `samples/profile-interrupted.png` (removed in the closeout chore — it's in PR #41's history if needed).
+**What I did:** Diagnosed in two steps. Wrote a Node-side mirror of the Elm pipeline (`scripts/profile-trace.mjs`) and a headless Elm `Platform.worker` with the actual `src/Gpx.elm` to compare outputs. Both produced identical numbers — 1 195 simplified points after `Gpx.simplify` at 5 m tolerance, last point at d=393 467 m (the very end of the track). So the truncation isn't in Elm. The culprit is browser SVG rendering: a single `<path>` element whose drawn extent exceeds a soft per-element limit (~16-20 k px in Chromium) gets clipped at roughly half its width. UTMB at 10 m/px is 17 500 px and renders fine; Cocodona at 39 400 px exceeds the limit.
+
+Fix: new `chunkByXExtent : Float -> List (Float, Float) -> List (List (Float, Float))` in `src/Profile.elm` splits the coord list into chunks no wider than 10 000 px each. Adjacent chunks share their boundary point so the rendered line stays visually continuous. The `view` function emits one `<path>` per chunk for the area fill, one per chunk for the stroke, and uses `List.concatMap ghostLayers` to fan the sound-wave ghost variants across chunks.
+**What I verified:**
+- `npm run build` exit 0. JS 331.11 → 331.59 kB (+480 B); gzip 102.86 → 102.96 kB.
+- Pipeline mirror: `scripts/profile-trace.mjs samples/cocodona_250.gpx 10` produces 1 195 simplified points reaching the end. The Elm-side `Platform.worker` (in a scratch dir `/tmp/elm-diag/`, not committed) produces identical output with the real `Gpx.elm`. Confirms the bug is browser-only.
+- Chunk arithmetic: 39 400 / 10 000 ≈ 4 chunks for Cocodona; 17 500 / 10 000 ≈ 2 chunks for UTMB; ~1 chunk for any track under ~10 000 px (no-op for the common case).
+- **Visual smoke not performed.** User to confirm the profile now draws to km 393.
+**What changed in the repo:** PR #41, merged `3612aeb`. `src/Profile.elm` only (+92/-22 lines).
+**What I learned:**
+- "Pure pipeline is fine; the bug is downstream" is best diagnosed by running the pipeline outside the runtime suspected of the bug. A headless `Platform.worker` is light to set up (~30 lines of Elm + a Node runner) and worth keeping in mind for similar UI vs. pipeline questions.
+- The Chromium soft path-element limit isn't documented in any spec I could find, but the empirical evidence (Cocodona truncated, UTMB renders) is consistent with a per-element rendering ceiling around 16-20 k px. 10 k chunks give healthy margin without producing absurd counts even for hypothetical 2 000 km races.
+- The area fill uses a closed polygon (`M baseline L profile L baseline Z`). Splitting into N polygons that share boundary points produces N adjacent filled regions that visually appear as one continuous shape — the shared boundary edge means there's no seam at the joins.
+**Next:** TASK-030 — plan table populates from predictor default when no target saved.
+
+---
+## 2026-05-18 — fix: predictor-default target on plan view (TASK-030)
+
+**Task:** TASK-030 — same Cocodona session, user noted the plan view's Pace / Time / Current sum columns are blank when first opened until they move the slider. Their hypothesis: "maybe this wasn't a performance issue but the plan not being applied directly but rather waiting for me to move the slider." Correct.
+**What I did:** Traced through: `Planning.distribute` short-circuits to `Dict.empty` when `target == Nothing` (Planning.elm L372), so every km's `result.seconds = 0` until the slider commits a real `targetSeconds`. New `effectiveTargetSeconds : Profile -> Race -> List Km -> Int` falls back to `Predictor.predict profile race kms 1.0 |> .totalS` when no target is saved. Plumbed through all five `Planning.distribute` call sites: `viewPlanTable`, `viewPlanSection`, `viewPlanKm`, `ExportCsvKms`, `ExportCsvSections`. Display-only — `race.plan.targetSeconds` stays `Nothing` until the slider commits explicitly.
+**What I verified:**
+- `npm run build` exit 0. JS 331.59 → 331.77 kB (+180 B); gzip 102.96 → 103.02 kB.
+- Five distribute call sites updated, confirmed via `grep "Planning.distribute" src/Main.elm`.
+- Display gating preserved: plan target panel's Δ-vs-Target and Avg-pace cells still hide when `race.plan.targetSeconds = Nothing` (showing diff vs an implicit target would be misleading).
+- **Visual smoke not performed.** User to verify by uploading a new race — table should populate immediately, slider stays in sync.
+**What changed in the repo:** PR #42, merged `3d296e5`. `src/Main.elm` only (+26/-5 lines).
+**What I learned:**
+- `Planning.distribute` was internally consistent (Nothing target → empty dict) but the UX assumed a saved target. The seam between "what the data model lets you express" and "what the user sees" is the right place to insert a fallback, not in `distribute` itself.
+- The fact that CSV exports also benefit (a no-target-yet export now produces a sensible plan, not zeros) was a nice side-effect of plumbing `effectiveTargetSeconds` through all five call sites rather than just the view code.
+**Next:** Cleanup chore.
+
+---
+## 2026-05-18 — chore: samples cleanup, archive spec, perf trace tool
+
+**Task:** User asked to cleanup `samples/` and the root `trail_race_planner_spec.md` if unused. Picked "Aggressive" — also drop the early UI mockups referenced only by the brief.
+**What I did:**
+- Deleted 15 files from `samples/`: all `f-*` UI feedback mockups (8), `profile-01/03/04/05.png` (4), `profile-02-strava.png`, `race-cards.png`, `route-cards.png`, `profile-interrupted.png` (TASK-029's bug screenshot, no longer needed).
+- Kept: `aid-station.png` (TASK-025 ref), `20k_oh_meu_deus.gpx` / `utmb_2025.gpx` / `cocodona_250.gpx` / `sample.gpx` (perf fixtures), `coros_pace_strategy.html` (ADR-0002 source).
+- Moved `trail_race_planner_spec.md` → `knowledge/reference/archive/`. Updated `pace-prediction-roadmap.md`'s source-path reference.
+- Rewrote `project-brief.md`'s "Visual direction" paragraph to drop refs to deleted mockups; pointed to the live implementation (`src/Profile.elm`, `viewRaceCard`) as the canonical style reference now.
+- Committed `scripts/profile-trace.mjs` as the perf trace tool used to diagnose TASK-029. Added `npm run perf:trace` script in `package.json` — `npm run perf:trace -- samples/cocodona_250.gpx 10` runs the parse + Haversine + DP pipeline against any GPX and reports counts + per-stage timing. **This is our first real perf-testing tool.**
+**What I verified:**
+- `samples/` is down from 22 files to 6.
+- `npm run perf:trace -- samples/cocodona_250.gpx 10` → parse 24.7 ms, cumDist 4.1 ms, simplify 19.0 ms, total 47.8 ms. UTMB: total 34.3 ms. Both well under 100 ms in pure Elm-mirror JS; the on-device parse is slower due to Elm Regex.find iteration and IDB write, but the algorithm itself isn't the bottleneck.
+- No code references to deleted files remain. Journal mentions are historical (acceptable; journal is append-only).
+- `npm run build` exit 0 (doc-only changes outside of `package.json`'s scripts hash, which doesn't affect the bundle).
+**What changed in the repo:** PR #43, merged `<sha>`. 15 file deletes, 1 file move, 4 file edits (brief, roadmap, planning files, journal), 1 new file (`scripts/profile-trace.mjs`), 1 package.json line.
+**What I learned:**
+- The user explicitly asked about perf testing. Answer was "no, we don't have any" — `scripts/profile-trace.mjs` is now the first one. It's an algorithm-side mirror, not a full end-to-end perf test (which would need browser instrumentation), but it answers questions like "is `Gpx.simplify` the slow part?" without booting the app.
+- The "aggressive" option for cleanup wasn't actually destructive — the brief refs to deleted mockups were one-liners describing visual intent, and the canonical reference is now the implementation itself.
+**Next:** Session-level wrap. Brainstorm + Cocodona-feedback sessions fully closed out.

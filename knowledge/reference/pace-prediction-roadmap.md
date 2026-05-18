@@ -1,7 +1,7 @@
 # Pace Prediction Roadmap
 
 **Status:** proposal — exploration only, nothing committed.
-**Source:** `trail_race_planner_spec.md` (an exploration the user did with another agent), cross-referenced against the current codebase, ADR-0003, and two adjacent projects (`strava-mcp`, `cadence`).
+**Source:** `archive/trail_race_planner_spec.md` (an exploration the user did with another agent — archived 2026-05-18), cross-referenced against the current codebase, ADR-0003, and two adjacent projects (`strava-mcp`, `cadence`).
 
 This doc is the *plan*. It does not change code. When/if individual chunks are approved, each one gets a real task in `BACKLOG.md` and an ADR in `decisions/`.
 
