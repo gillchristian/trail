@@ -27,6 +27,20 @@ How I pace myself across a long autonomous session.
 - **Refactoring while debugging.** Pick one or the other. Mixing produces commits no one can review and bugs no one can find.
 - **Polishing the unbuilt.** Don't tune performance, naming, or comments on code whose behavior isn't yet verified.
 
+## Bug-screenshot hygiene
+
+When the user pastes a screenshot into `samples/` to report a bug, treat
+it as a transient artifact tied to that bug's lifecycle:
+
+- Reference it from the task / PR / journal during the fix.
+- Delete it in the same PR that lands the fix (or as a fast follow-up).
+- A screenshot that's still referenced by *durable* docs (the brief, an
+  ADR, a still-active task) sticks around — `samples/aid-station.png`
+  earned its keep that way. Anything ephemeral does not.
+
+The default is "delete with the fix." Keeping is the deliberate
+exception, justified inline in the PR description.
+
 ## Energy management (mine, not literal)
 
 - After a hard task, pick an easy task next. Alternate cognitive load.
