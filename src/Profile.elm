@@ -221,11 +221,24 @@ view track mode containerWidth markers =
         coords =
             List.map (\( d, e ) -> ( toX d, toY e )) profile
 
-        pathD =
-            buildAreaPath coords (padTop + chartHeight)
+        -- Chromium (and other engines) truncate single SVG `<path>`
+        -- elements whose rendered extent grows past a soft per-element
+        -- limit, observed at ~16-20 k px in practice. The pure-Elm
+        -- pipeline produces the full coord list correctly for 400 km
+        -- courses (Cocodona 250 → 1 195 simplified points reaching
+        -- d=393 467 m), but the resulting single `<path>` gets clipped
+        -- mid-track in the browser. Splitting the coords into
+        -- max-10 000 px-wide chunks keeps every path element well
+        -- below that limit; adjacent chunks share their boundary point
+        -- so the rendered line stays visually continuous.
+        coordChunks =
+            chunkByXExtent 10000 coords
 
-        strokeD =
-            buildStrokePath coords
+        areaPaths =
+            List.map (\c -> buildAreaPath c (padTop + chartHeight)) coordChunks
+
+        strokePaths =
+            List.map buildStrokePath coordChunks
 
         gridLines =
             elevationGridLines track mPerPx padTop padLeft (padLeft + drawWidth) chartHeight
@@ -271,23 +284,35 @@ view track mode containerWidth markers =
                     ]
                 ]
             , g [] gridLines
-            , path
-                [ SA.d pathD
-                , SA.fill "url(#elev-fill)"
-                , SA.stroke "none"
-                ]
-                []
-            , g [] (ghostLayers strokeD)
-            , path
-                [ SA.d strokeD
-                , SA.fill "none"
-                , SA.stroke "url(#elev-stroke)"
-                , SA.strokeWidth "1.8"
-                , SA.strokeLinejoin "round"
-                , SA.strokeLinecap "round"
-                , SA.class "trail-stroke"
-                ]
-                []
+            , g []
+                (List.map
+                    (\d ->
+                        path
+                            [ SA.d d
+                            , SA.fill "url(#elev-fill)"
+                            , SA.stroke "none"
+                            ]
+                            []
+                    )
+                    areaPaths
+                )
+            , g [] (List.concatMap ghostLayers strokePaths)
+            , g []
+                (List.map
+                    (\d ->
+                        path
+                            [ SA.d d
+                            , SA.fill "none"
+                            , SA.stroke "url(#elev-stroke)"
+                            , SA.strokeWidth "1.8"
+                            , SA.strokeLinejoin "round"
+                            , SA.strokeLinecap "round"
+                            , SA.class "trail-stroke"
+                            ]
+                            []
+                    )
+                    strokePaths
+                )
             , g [] kmTicks
             , g [] markerNodes
             ]
@@ -452,6 +477,51 @@ buildStrokePath coords =
             ("M " ++ fmt x0 ++ " " ++ fmt y0)
                 :: List.map (\( x, y ) -> "L " ++ fmt x ++ " " ++ fmt y) rest
                 |> String.join " "
+
+
+{-| Split a polyline into pieces that each span no more than `maxWidth`
+pixels horizontally. Adjacent chunks share their boundary point so the
+rendered line stays continuous. Used to dodge a per-element SVG path
+rendering limit observed in Chromium at very wide profiles (400 km @
+10 m/px ≈ 39 000 px — single `<path>` truncates mid-track even though
+the underlying coord list is complete).
+-}
+chunkByXExtent : Float -> List ( Float, Float ) -> List (List ( Float, Float ))
+chunkByXExtent maxWidth coords =
+    case coords of
+        [] ->
+            []
+
+        first :: rest ->
+            chunkByXExtentHelp maxWidth (Tuple.first first) rest [ first ] []
+
+
+chunkByXExtentHelp :
+    Float
+    -> Float
+    -> List ( Float, Float )
+    -> List ( Float, Float )
+    -> List (List ( Float, Float ))
+    -> List (List ( Float, Float ))
+chunkByXExtentHelp maxWidth startX coords currentRev completedRev =
+    case coords of
+        [] ->
+            List.reverse (List.reverse currentRev :: completedRev)
+
+        (( x, _ ) as pt) :: rest ->
+            let
+                shouldClose =
+                    x - startX > maxWidth
+            in
+            if shouldClose then
+                let
+                    closedChunk =
+                        List.reverse (pt :: currentRev)
+                in
+                chunkByXExtentHelp maxWidth x rest [ pt ] (closedChunk :: completedRev)
+
+            else
+                chunkByXExtentHelp maxWidth startX rest (pt :: currentRev) completedRev
 
 
 fmt : Float -> String
