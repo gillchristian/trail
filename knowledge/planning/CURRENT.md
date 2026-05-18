@@ -4,42 +4,9 @@
 
 ## Active
 
-### TASK-028 — split home page into Plans / Executions
-
-From the 2026-05-18 brainstorm. User wanted a cut between *races
-with a linked actual* (the runs you came back from) and *races
-without* (plans you haven't run yet, or training-loop plans).
-Naming: "Plans" / "Executions" was the user's suggested phrasing
-("plans and executions" / "plans and linked"). Going with **Plans
-and Executions** as the section headers.
-
-**Acceptance criteria:**
-
-- [ ] `viewRaceGrid` is replaced by `viewRaceSections` (or
-      similar) that partitions `races` into two groups by
-      `race.actualSplits` presence.
-- [ ] Plans section (no `actualSplits`): heading "Plans"
-      followed by a count and the existing grid. Sorted by
-      `race.date` ascending with undated entries last (so the
-      next upcoming race floats to the top); ties broken by
-      `createdAt` desc.
-- [ ] Executions section (`actualSplits` present): heading
-      "Executions" followed by a count and the same grid. Sorted
-      by `actualSplits.uploadedAt` desc so the most recently
-      logged run is first.
-- [ ] Section headers use the existing visual language (uppercase
-      tracking-wider chip / slate text) — don't introduce a new
-      typographic register.
-- [ ] When a section is empty (e.g., no executions yet), suppress
-      the heading entirely rather than rendering an empty grid.
-      The existing `viewEmptyState` covers the "no races at all"
-      case; only show it when *both* sections are empty.
-- [ ] Section accent: executions cards keep their existing
-      emerald glow / accents (already there from earlier work).
-      No new per-card styling here.
-- [ ] Build clean (`npm run build`).
-- [ ] Bundle-string check: "Plans" + "Executions" labels.
-- [ ] Journal entry + PR opened and merged.
+_(none — TASK-028 shipped; brainstorm-driven session of 2026-05-18
+fully closed out. Next session: pick from `BACKLOG.md` or refill
+from the "Proposals" section.)_
 
 User flagged in `samples/aid-station.png`: km has 15 m gain, slope 1.5 %, an
 aid station "Second · 13.7 km · 1 min rest" inside it. Display shows
