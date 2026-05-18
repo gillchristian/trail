@@ -804,3 +804,22 @@ Touched sites: per-km card (Target placeholder + Δ vs plan + an amber caption w
 - During the scoping I noticed a *separate* pre-existing bug in `Planning.sectionsForRace`: the overlap test `km.distStart < b && km.distEnd > a` puts a km straddling an aid into both adjacent sections. The section-table `sectionSeconds`, the section-card "Time" stat, and the cumulative-after-section column all double-count that km. Logged in the parking lot; fix wants its own task because (a) it interacts with the section-card's own moving-vs-clock Δ bug and (b) the right shape (pro-rate by overlap distance? assign to the section the km's center is in?) is a design call.
 - Build-only verification continues — I'm honest about it in the PR description. The user's screenshot is the acceptance artefact.
 **Next:** TASK-026 (HR display on linked actuals) is next.
+
+---
+## 2026-05-18 — feat: avg HR per km on linked actuals (TASK-026)
+
+**Task:** TASK-026 — surface average heart rate per km on linked actuals. Only analysis-side feature admitted from the brainstorm; the "must sharpen planning" rule is in `knowledge/whiteboard/training-as-analysis.md`.
+**What I did:** Wired HR end-to-end. `ActualPoint` gains `hr : Maybe Int`. `StravaStreams.parse` decodes the `heartrate` stream (cadence already requests it). The old `zip3 times ll ele` helper is replaced by a direct tail-recursive walker `buildPointsHelp` that consumes four parallel streams without needing a 4-tuple (Elm forbids those — caught us before in journal 2026-05-15 18:00). New `ActualGpx.computeHrPerKm : ActualTrack -> Maybe (Dict Int Int)` averages per km via `floor (cumDist / 1000)` (matches `Planning.kmAtDistance`). `Types.ActualSplits` gains `hrPerKm : Maybe (Dict Int Int)`; encoder writes it; decoder back-compats via `D.oneOf [..., D.succeed Nothing]`. Both ActualSplits construction sites (file upload + Strava streams) call `computeHrPerKm` and persist the result. Per-km card grid flips 2-col → 3-col with an Avg HR cell (shows '—' for kms without samples so the layout doesn't shift across navigation). Km table adds an "Avg HR" column gated on `hrPerKm /= Nothing`.
+**What I verified:**
+- `npm run build` exit 0. JS 327.51 → 329.33 kB (+1.82 kB); gzip 101.91 → 102.38 kB.
+- Bundle-string check: `"Avg HR"` present (1, deduped across two sites), `"bpm"` present (2), `"hrPerKm"` present (1 — encoder/decoder).
+- Back-compat sanity: `decodeActualSplits` uses `D.oneOf [D.field "hrPerKm" ..., D.succeed Nothing]`. Old saved actuals lack the field and fall through to `Nothing`. Re-linking via the Strava picker recomputes.
+- Edge case: HR sensor absent → `raw.heartrate = []` → `sliceAlignMaybe (List.map Just []) len = List.repeat len Nothing` → no point has hr → `computeHrPerKm` returns `Nothing`. ✓
+- Edge case: HR sensor mid-activity dropout → `sliceAlignMaybe` pads trailing samples with `Nothing`, average over the live samples only. ✓
+- **Visual smoke not performed.** User has to re-link a Strava activity with HR data to see the new UI.
+**What changed in the repo:** PR #35, merged `68cb869`. Modified `src/ActualGpx.elm` (helper + ActualPoint field), `src/StravaStreams.elm` (decoder + buildPoints walker), `src/Types.elm` (ActualSplits + encoder/decoder), `src/Main.elm` (per-km card + km table + both construction sites).
+**What I learned:**
+- The "4-tuple banned, cons-after-recur kills TCE" duo is now a known trap in this codebase. Both bit us in the previous Strava streams work (journal 2026-05-15 23:25); writing `buildPointsHelp` as a direct walker with the accumulator-cons pattern sidesteps both at once. Worth noting as a stable idiom for parallel-stream merging.
+- Back-compat for IDB-persisted records is dirt-cheap when the new field has a meaningful default (`Nothing`). `D.oneOf [..., D.succeed default]` is the one-liner. No migration code; no schema version bump.
+- Layout-stability matters more than I expected. First pass collapsed the per-km card grid from 3-col to 2-col on kms without HR samples (the if-Just was on the per-km HR rather than the activity-level HR). When the user navigates between kms with and without samples, the entire card jumps. Switched the gating to activity-level `hrPerKm /= Nothing` and used "—" for missing per-km values. Smooth.
+**Next:** TASK-027 — skeleton/pulse loading state on the home-page drop area.

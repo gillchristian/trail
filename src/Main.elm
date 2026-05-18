@@ -34,6 +34,7 @@ import Json.Decode as D
 import Json.Encode as Encode
 import Planning exposing (Km, KmResult, KmSource(..))
 import Predictor
+import Process
 import ProjectFile
 import Profile exposing (Marker, ScaleMode(..))
 import Route exposing (Route)
@@ -255,6 +256,7 @@ type Msg
     | GotFiles File (List File)
     | PickedFile File
     | GotContent String String
+    | StartParse String String
       -- storage
     | RacesLoaded Encode.Value
     | RaceSaved Encode.Value
@@ -393,6 +395,17 @@ update msg model =
             )
 
         GotContent fileName content ->
+            -- File read finished. The actual parse (Gpx.parseGPX, possibly
+            -- multi-second on UTMB-size files) is synchronous and would
+            -- block the Elm runtime if we ran it here in the same update
+            -- step — the `Parsing` state never reaches the renderer. Yield
+            -- one event-loop tick first so the pulse animation can paint,
+            -- then do the heavy lifting in StartParse.
+            ( { model | upload = Parsing fileName }
+            , Task.perform (\_ -> StartParse fileName content) (Process.sleep 1)
+            )
+
+        StartParse fileName content ->
             if isProjectFile fileName then
                 case ProjectFile.decode content of
                     Err err ->
@@ -2343,35 +2356,58 @@ viewUploadBanner model =
                     ( "Drop a .gpx or .trail file", "or click to choose one", False )
 
                 Parsing fname ->
-                    ( "Parsing " ++ fname ++ "…", "this should take a moment", True )
+                    ( "Processing " ++ fname ++ "…", "Crunching the track — this can take a moment on a long course.", True )
 
                 Persisting fname ->
-                    ( "Saving " ++ fname ++ "…", "writing to local storage", True )
+                    ( "Saving " ++ fname ++ "…", "Writing to local storage.", True )
 
                 UploadFailed fname err ->
                     ( "Couldn't read " ++ fname, err, False )
+
+        inner =
+            if disabled then
+                viewUploadSkeleton labelText sub
+
+            else
+                viewUploadIdle labelText sub
     in
     div
         [ classList
             [ ( "rounded-2xl border-2 border-dashed p-6 text-center transition-colors", True )
             , ( "border-slate-700 bg-slate-900/40 hover:bg-slate-900/70", not model.dragOver && not disabled )
             , ( "border-rose-500 bg-rose-500/5", model.dragOver )
-            , ( "border-slate-800 bg-slate-900/30 cursor-wait", disabled )
+            , ( "border-slate-700 bg-slate-900/30 cursor-wait animate-pulse", disabled )
             ]
         , preventDefaultOn "dragenter" (D.succeed ( DragEnter, True ))
         , preventDefaultOn "dragover" (D.succeed ( DragEnter, True ))
         , preventDefaultOn "dragleave" (D.succeed ( DragLeave, True ))
         , preventDefaultOn "drop" dropDecoder
         ]
-        [ p [ class "text-slate-200 font-medium" ] [ text labelText ]
-        , p [ class "text-sm text-slate-500 mt-1" ] [ text sub ]
-        , button
-            [ onClick OpenPicker
-            , A.disabled disabled
-            , class "mt-4 px-4 py-2 bg-rose-600 text-white rounded-md hover:bg-rose-500 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
-            ]
-            [ text "Choose a file" ]
+        inner
+
+
+viewUploadIdle : String -> String -> List (Html Msg)
+viewUploadIdle labelText sub =
+    [ p [ class "text-slate-200 font-medium" ] [ text labelText ]
+    , p [ class "text-sm text-slate-500 mt-1" ] [ text sub ]
+    , button
+        [ onClick OpenPicker
+        , class "mt-4 px-4 py-2 bg-rose-600 text-white rounded-md hover:bg-rose-500 text-sm font-medium"
         ]
+        [ text "Choose a file" ]
+    ]
+
+
+viewUploadSkeleton : String -> String -> List (Html Msg)
+viewUploadSkeleton labelText sub =
+    [ p [ class "text-slate-200 font-medium" ] [ text labelText ]
+    , p [ class "text-xs text-slate-500 mt-1" ] [ text sub ]
+    , div [ class "mt-5 flex flex-col items-center gap-2" ]
+        [ div [ class "h-3 w-56 rounded bg-slate-700/70" ] []
+        , div [ class "h-3 w-72 rounded bg-slate-700/60" ] []
+        , div [ class "h-3 w-40 rounded bg-slate-700/50" ] []
+        ]
+    ]
 
 
 dropDecoder : D.Decoder ( Msg, Bool )
