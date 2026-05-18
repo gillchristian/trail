@@ -4,51 +4,41 @@
 
 ## Active
 
-### TASK-027 — skeleton/pulse loading state on the home-page drop area
+### TASK-028 — split home page into Plans / Executions
 
-From the 2026-05-18 brainstorm. Today: dropping a UTMB-size GPX
-freezes the UI for several seconds with no visual feedback. The
-`Parsing` state already exists in the upload state machine, but
-because `Gpx.parseGPX` is synchronous and runs inside the same
-update handler that flips the state to `Parsing`, the renderer
-never gets a chance to draw the Parsing UI before the parse
-blocks. The user picked: pulse animation on the whole drop
-component (not a spinner, "out of fashion").
-
-Two-part fix:
-
-1. **Defer the heavy parse one tick** so the `Parsing` state
-   actually renders before the synchronous parse blocks the
-   runtime. Use `Process.sleep 1 |> Task.perform` to bounce
-   through the event loop.
-2. **Pulse + skeleton styling** on the drop banner when the
-   upload state is `Parsing` or `Persisting`. Tailwind's
-   `animate-pulse` on the container; replace the inner button
-   with a couple of skeleton placeholder bars so the component
-   visibly shows "something is happening here, a card is on the
-   way."
+From the 2026-05-18 brainstorm. User wanted a cut between *races
+with a linked actual* (the runs you came back from) and *races
+without* (plans you haven't run yet, or training-loop plans).
+Naming: "Plans" / "Executions" was the user's suggested phrasing
+("plans and executions" / "plans and linked"). Going with **Plans
+and Executions** as the section headers.
 
 **Acceptance criteria:**
 
-- [ ] New Msg `StartParse fileName content` runs the actual
-      parsing logic that used to live in `GotContent`.
-- [ ] `GotContent` now only sets `upload = Parsing fileName` and
-      dispatches `StartParse fileName content` after
-      `Process.sleep 1`.
-- [ ] `StartParse` branches on `isProjectFile` exactly as the
-      old `GotContent` did (decoding the `.trail` envelope vs.
-      running `Gpx.parseGPX`).
-- [ ] `viewUploadBanner` adds `animate-pulse` to the container
-      div when the state is `Parsing` or `Persisting`.
-- [ ] Inner content during Parsing / Persisting shows: a label
-      ("Parsing X…" / "Saving X…"), 2–3 skeleton placeholder
-      bars (`bg-slate-700 rounded h-* w-*`), the original sub
-      caption, and no clickable button.
-- [ ] `cursor-wait` and dragging disabled (today's behavior
-      preserved).
+- [ ] `viewRaceGrid` is replaced by `viewRaceSections` (or
+      similar) that partitions `races` into two groups by
+      `race.actualSplits` presence.
+- [ ] Plans section (no `actualSplits`): heading "Plans"
+      followed by a count and the existing grid. Sorted by
+      `race.date` ascending with undated entries last (so the
+      next upcoming race floats to the top); ties broken by
+      `createdAt` desc.
+- [ ] Executions section (`actualSplits` present): heading
+      "Executions" followed by a count and the same grid. Sorted
+      by `actualSplits.uploadedAt` desc so the most recently
+      logged run is first.
+- [ ] Section headers use the existing visual language (uppercase
+      tracking-wider chip / slate text) — don't introduce a new
+      typographic register.
+- [ ] When a section is empty (e.g., no executions yet), suppress
+      the heading entirely rather than rendering an empty grid.
+      The existing `viewEmptyState` covers the "no races at all"
+      case; only show it when *both* sections are empty.
+- [ ] Section accent: executions cards keep their existing
+      emerald glow / accents (already there from earlier work).
+      No new per-card styling here.
 - [ ] Build clean (`npm run build`).
-- [ ] Bundle-string check: new strings ("Processing your file"
-      or similar) present if added.
+- [ ] Bundle-string check: "Plans" + "Executions" labels.
 - [ ] Journal entry + PR opened and merged.
 
 User flagged in `samples/aid-station.png`: km has 15 m gain, slope 1.5 %, an
