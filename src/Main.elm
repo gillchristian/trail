@@ -15,6 +15,7 @@ a page passes ~250 lines on its own.
 -}
 
 import ActualGpx
+import AidCsv
 import AthleteProfile exposing (AidStyle(..), DescentSkill(..), Preset(..), Profile, TechSkill(..))
 import Browser
 import Browser.Events
@@ -125,6 +126,7 @@ type alias AidForm =
     , mode : AidFormMode
     , distanceKm : String
     , restMinutes : String
+    , cutoffText : String -- elapsed cutoff "h:mm" / "h:mm:ss"; "" = none
     , services : List Service
     , error : Maybe String
     }
@@ -274,6 +276,7 @@ type Msg
     | AidSetMode AidFormMode
     | AidSetDistanceKm String
     | AidSetRestMinutes String
+    | AidSetCutoff String
     | AidToggleService Service
     | AidSubmit
     | AidDelete String
@@ -593,6 +596,9 @@ update msg model =
 
         AidSetRestMinutes s ->
             ( updateAidForm (\f -> { f | restMinutes = s, error = Nothing }) model, Cmd.none )
+
+        AidSetCutoff s ->
+            ( updateAidForm (\f -> { f | cutoffText = s, error = Nothing }) model, Cmd.none )
 
         AidToggleService s ->
             ( updateAidForm (\f -> { f | services = toggleService s f.services }) model, Cmd.none )
@@ -1694,6 +1700,7 @@ emptyAidForm editingId =
     , mode = FromPrevious
     , distanceKm = ""
     , restMinutes = "2"
+    , cutoffText = ""
     , services = [ Types.Water ]
     , error = Nothing
     }
@@ -1706,6 +1713,7 @@ aidFormFromExisting aid =
     , mode = FromStart
     , distanceKm = formatFloat 2 (aid.distance / 1000)
     , restMinutes = String.fromInt (aid.restSeconds // 60)
+    , cutoffText = aid.cutoff |> Maybe.map AidCsv.formatClock |> Maybe.withDefault ""
     , services = aid.services
     , error = Nothing
     }
@@ -1790,20 +1798,44 @@ validateAidForm form race =
                                     Err "Rest can't be negative."
 
                                 else
-                                    let
-                                        id =
-                                            Maybe.withDefault
-                                                ("a" ++ String.fromInt race.aidStationSeq)
-                                                form.editing
-                                    in
-                                    Ok
-                                        { id = id
-                                        , name = trimmedName
-                                        , distance = absolute
-                                        , restSeconds = restMin * 60
-                                        , services = form.services
-                                        , notes = ""
-                                        }
+                                    case parseCutoffInput form.cutoffText of
+                                        Err cutoffErr ->
+                                            Err cutoffErr
+
+                                        Ok cutoff ->
+                                            let
+                                                id =
+                                                    Maybe.withDefault
+                                                        ("a" ++ String.fromInt race.aidStationSeq)
+                                                        form.editing
+                                            in
+                                            Ok
+                                                { id = id
+                                                , name = trimmedName
+                                                , distance = absolute
+                                                , restSeconds = restMin * 60
+                                                , services = form.services
+                                                , notes = ""
+                                                , cutoff = cutoff
+                                                }
+
+
+parseCutoffInput : String -> Result String (Maybe Int)
+parseCutoffInput raw =
+    let
+        trimmed =
+            String.trim raw
+    in
+    if String.isEmpty trimmed then
+        Ok Nothing
+
+    else
+        case AidCsv.parseClock trimmed of
+            Just secs ->
+                Ok (Just secs)
+
+            Nothing ->
+                Err "Cutoff must be a time like 6:30 or 6:30:00 (elapsed from start)."
 
 
 previousAidDistance : Maybe String -> Race -> Float
@@ -3502,6 +3534,13 @@ viewAidRow allAids totalDistance index aid =
                         ++ " km to finish"
                     )
                 ]
+            , case aid.cutoff of
+                Just secs ->
+                    p [ class "text-xs text-amber-400/80" ]
+                        [ text ("⏱ cutoff " ++ AidCsv.formatClock secs) ]
+
+                Nothing ->
+                    text ""
             , if List.isEmpty aid.services then
                 text ""
 
@@ -3569,6 +3608,16 @@ viewAidForm form race =
                     , A.step "1"
                     , A.value form.restMinutes
                     , onInput AidSetRestMinutes
+                    , inputClass
+                    ]
+                    []
+                ]
+            , field "Cutoff (optional)"
+                [ input
+                    [ A.type_ "text"
+                    , A.value form.cutoffText
+                    , A.placeholder "h:mm from start, e.g. 6:30"
+                    , onInput AidSetCutoff
                     , inputClass
                     ]
                     []

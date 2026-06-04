@@ -8,6 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "smoke": "node scripts/smoke-storage.mjs",
+    "smoke:aidcsv": "node scripts/smoke-aid-csv.mjs",
     "perf:trace": "node scripts/profile-trace.mjs"
   },
   "devDependencies": {
