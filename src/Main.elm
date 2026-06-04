@@ -137,6 +137,18 @@ type AidEditor
     | AidOpen AidForm
 
 
+type AidImportState
+    = AidImportClosed
+    | AidImportReading String -- filename being read
+    | AidImportPreview ImportPreview
+
+
+type alias ImportPreview =
+    { fileName : String
+    , result : AidCsv.ParseResult
+    }
+
+
 type alias MetaForm =
     { name : String
     , date : String
@@ -171,6 +183,7 @@ type alias Model =
     , storageError : Maybe String
     , pendingDelete : Maybe RaceId
     , aidEditor : AidEditor
+    , aidImport : AidImportState
     , metaEditor : MetaEditor
     , planTableMode : TableMode
     , targetTimeText : String
@@ -211,6 +224,7 @@ init flags url key =
       , storageError = Nothing
       , pendingDelete = Nothing
       , aidEditor = AidClosed
+      , aidImport = AidImportClosed
       , metaEditor = MetaClosed
       , planTableMode = ByKm
       , targetTimeText = ""
@@ -280,6 +294,12 @@ type Msg
     | AidToggleService Service
     | AidSubmit
     | AidDelete String
+    | OpenAidImport
+    | AidImportPicked File
+    | AidImportContent String String
+    | AidImportConfirm
+    | AidImportCancel
+    | ExportAidCsv
       -- plan
     | SetPlanTableMode TableMode
     | SetTargetTimeText String
@@ -649,6 +669,71 @@ update msg model =
                             { race | aidStations = List.filter (\a -> a.id /= aidId) race.aidStations }
                     in
                     ( model, Storage.saveRace (encodeRace updatedRace) )
+
+                Nothing ->
+                    ( model, Cmd.none )
+
+        OpenAidImport ->
+            ( { model | aidEditor = AidClosed }
+            , Select.file [ "text/csv", "text/plain", ".csv" ] AidImportPicked
+            )
+
+        AidImportPicked file ->
+            ( { model | aidImport = AidImportReading (File.name file) }
+            , Task.perform (AidImportContent (File.name file)) (File.toString file)
+            )
+
+        AidImportContent fileName content ->
+            case currentRace model of
+                Just race ->
+                    let
+                        result =
+                            AidCsv.parse
+                                { totalDistance = race.distance
+                                , defaultRestSeconds = AthleteProfile.aidStyleSecondsPerStation model.profile.aidStyle
+                                }
+                                content
+                    in
+                    ( { model | aidImport = AidImportPreview { fileName = fileName, result = result } }
+                    , Cmd.none
+                    )
+
+                Nothing ->
+                    ( { model | aidImport = AidImportClosed }, Cmd.none )
+
+        AidImportConfirm ->
+            case ( model.aidImport, currentRace model ) of
+                ( AidImportPreview preview, Just race ) ->
+                    let
+                        ( stations, nextSeq ) =
+                            assignAidIds race.aidStationSeq preview.result.stations
+
+                        updatedRace =
+                            { race
+                                | aidStations = sortAidStations stations
+                                , aidStationSeq = nextSeq
+                            }
+                    in
+                    ( { model | aidImport = AidImportClosed }
+                    , Storage.saveRace (encodeRace updatedRace)
+                    )
+
+                _ ->
+                    ( { model | aidImport = AidImportClosed }, Cmd.none )
+
+        AidImportCancel ->
+            ( { model | aidImport = AidImportClosed }, Cmd.none )
+
+        ExportAidCsv ->
+            case currentRace model of
+                Just race ->
+                    ( model
+                    , Download.file
+                        { filename = csvFilename race "aid-stations"
+                        , content = AidCsv.toCsv race.aidStations
+                        , mime = "text/csv"
+                        }
+                    )
 
                 Nothing ->
                     ( model, Cmd.none )
@@ -1847,6 +1932,24 @@ previousAidDistance editing race =
         |> List.head
         |> Maybe.map .distance
         |> Maybe.withDefault 0
+
+
+{-| Issue stable ids to imported stations, continuing the race's existing
+sequence so a later manual add can't collide. Returns the stations with
+ids plus the next free sequence number.
+-}
+assignAidIds : Int -> List AidStation -> ( List AidStation, Int )
+assignAidIds startSeq stations =
+    let
+        ( reversed, nextSeq ) =
+            List.foldl
+                (\station ( acc, seq ) ->
+                    ( { station | id = "a" ++ String.fromInt seq } :: acc, seq + 1 )
+                )
+                ( [], startSeq )
+                stations
+    in
+    ( List.reverse reversed, nextSeq )
 
 
 
@@ -3447,6 +3550,9 @@ viewAidStationsSection model race =
     let
         sorted =
             sortAidStations race.aidStations
+
+        idle =
+            model.aidEditor == AidClosed && model.aidImport == AidImportClosed
     in
     div [ class "space-y-3" ]
         [ div [ class "flex items-baseline justify-between gap-3" ]
@@ -3465,17 +3571,34 @@ viewAidStationsSection model race =
                         )
                     ]
                 ]
-            , case model.aidEditor of
-                AidClosed ->
-                    button
+            , if idle then
+                div [ class "flex items-center gap-2" ]
+                    [ button [ onClick OpenAidImport, secondaryBtnClass ] [ text "Import CSV" ]
+                    , if List.isEmpty sorted then
+                        text ""
+
+                      else
+                        button [ onClick ExportAidCsv, secondaryBtnClass ] [ text "Export CSV" ]
+                    , button
                         [ onClick OpenAddAid
                         , class "px-3 py-1.5 text-sm rounded-md bg-rose-600 text-white hover:bg-rose-500"
                         ]
                         [ text "+ Add" ]
+                    ]
 
-                AidOpen _ ->
-                    text ""
+              else
+                text ""
             ]
+        , case model.aidImport of
+            AidImportClosed ->
+                text ""
+
+            AidImportReading fileName ->
+                div [ class "rounded-2xl bg-slate-900 border border-slate-800 p-5 text-sm text-slate-400" ]
+                    [ text ("Reading " ++ fileName ++ "…") ]
+
+            AidImportPreview preview ->
+                viewAidImportPreview preview race
         , case model.aidEditor of
             AidOpen form ->
                 viewAidForm form race
@@ -3485,13 +3608,171 @@ viewAidStationsSection model race =
         , if List.isEmpty sorted then
             div [ class "rounded-2xl border border-dashed border-slate-800 p-8 text-center text-slate-500 text-sm" ]
                 [ p [] [ text "No aid stations yet." ]
-                , p [ class "mt-1 text-xs text-slate-600" ] [ text "Add them by distance from start or from the previous stop." ]
+                , p [ class "mt-1 text-xs text-slate-600" ] [ text "Add them one at a time, or Import CSV from a race organiser's aid table." ]
                 ]
 
           else
             div [ class "rounded-2xl bg-slate-900 border border-slate-800 overflow-hidden" ]
                 (List.indexedMap (viewAidRow sorted race.distance) sorted)
         ]
+
+
+secondaryBtnClass : Html.Attribute msg
+secondaryBtnClass =
+    class "px-3 py-1.5 text-sm rounded-md border border-slate-700 text-slate-200 hover:bg-slate-800"
+
+
+viewAidImportPreview : ImportPreview -> Race -> Html Msg
+viewAidImportPreview preview race =
+    let
+        r =
+            preview.result
+
+        n =
+            List.length r.stations
+
+        existing =
+            List.length race.aidStations
+
+        confirmLabel =
+            if n == 0 then
+                "Nothing to import"
+
+            else if existing > 0 then
+                "Replace with " ++ String.fromInt n
+
+            else
+                "Import " ++ String.fromInt n
+    in
+    div [ class "rounded-2xl bg-slate-900 border border-rose-500/30 p-5 space-y-4" ]
+        [ div [ class "flex items-baseline justify-between gap-3" ]
+            [ h3 [ class "text-base font-semibold text-slate-100" ] [ text "Import preview" ]
+            , span [ class "text-xs text-slate-500 truncate max-w-[12rem]" ] [ text preview.fileName ]
+            ]
+        , p [ class "text-sm text-slate-300" ]
+            [ text (String.fromInt n ++ plural n " station" " stations" ++ " ready")
+            , if List.isEmpty r.errors then
+                text ""
+
+              else
+                span [ class "text-rose-400" ] [ text (" · " ++ String.fromInt (List.length r.errors) ++ " skipped") ]
+            , if List.isEmpty r.warnings then
+                text ""
+
+              else
+                span [ class "text-amber-400" ] [ text (" · " ++ String.fromInt (List.length r.warnings) ++ plural (List.length r.warnings) " warning" " warnings") ]
+            ]
+        , if n == 0 then
+            p [ class "text-sm text-slate-500" ] [ text "Nothing parsed — fix the file and try Import again." ]
+
+          else
+            div [ class "rounded-xl bg-slate-950 border border-slate-800 overflow-hidden max-h-72 overflow-y-auto" ]
+                (List.indexedMap viewPreviewRow r.stations)
+        , viewIssueBlock "Skipped rows" "text-rose-300/80" r.errors
+        , viewIssueBlock "Warnings" "text-amber-300/80" r.warnings
+        , div [ class "flex items-center justify-between gap-3 pt-1" ]
+            [ p [ class "text-xs text-slate-500" ]
+                [ text
+                    (if existing > 0 then
+                        "Replaces your current " ++ String.fromInt existing ++ plural existing " stop." " stops."
+
+                     else
+                        "Adds these to the race."
+                    )
+                ]
+            , div [ class "flex gap-2" ]
+                [ button
+                    [ onClick AidImportCancel
+                    , class "px-4 py-2 text-sm border border-slate-700 rounded-md hover:bg-slate-800 text-slate-200"
+                    ]
+                    [ text "Cancel" ]
+                , button
+                    [ onClick AidImportConfirm
+                    , A.disabled (n == 0)
+                    , classList
+                        [ ( "px-4 py-2 text-sm rounded-md font-medium", True )
+                        , ( "bg-rose-600 text-white hover:bg-rose-500", n > 0 )
+                        , ( "bg-slate-800 text-slate-500 cursor-not-allowed", n == 0 )
+                        ]
+                    ]
+                    [ text confirmLabel ]
+                ]
+            ]
+        ]
+
+
+viewPreviewRow : Int -> AidStation -> Html Msg
+viewPreviewRow index aid =
+    div
+        [ classList
+            [ ( "flex items-center gap-3 px-4 py-2.5", True )
+            , ( "border-t border-slate-800", index > 0 )
+            ]
+        ]
+        [ div [ class "flex items-center justify-center w-7 h-7 rounded-full bg-amber-400/20 border border-amber-400/50 text-amber-300 text-[11px] font-semibold flex-shrink-0" ]
+            [ text (String.fromInt (index + 1)) ]
+        , div [ class "min-w-0 flex-1" ]
+            [ p [ class "text-sm text-slate-100 truncate" ] [ text aid.name ]
+            , p [ class "text-xs text-slate-500" ]
+                [ text
+                    (formatFloat 1 (aid.distance / 1000)
+                        ++ " km · rest "
+                        ++ formatRest aid.restSeconds
+                        ++ (case aid.cutoff of
+                                Just secs ->
+                                    " · cutoff " ++ AidCsv.formatClock secs
+
+                                Nothing ->
+                                    ""
+                           )
+                    )
+                ]
+            ]
+        , if List.isEmpty aid.services then
+            text ""
+
+          else
+            span [ class "flex gap-1 text-sm flex-shrink-0" ]
+                (List.map (\s -> span [ A.title (serviceLabel s) ] [ text (serviceIcon s) ]) aid.services)
+        ]
+
+
+viewIssueBlock : String -> String -> List AidCsv.RowIssue -> Html Msg
+viewIssueBlock heading toneClass issues =
+    if List.isEmpty issues then
+        text ""
+
+    else
+        div [ class "space-y-1" ]
+            [ p [ class "text-xs uppercase tracking-wider text-slate-500" ] [ text heading ]
+            , div [ class "space-y-0.5" ]
+                (List.map
+                    (\issue ->
+                        p [ class ("text-xs " ++ toneClass) ]
+                            [ text
+                                ((if issue.row == 0 then
+                                    "File"
+
+                                  else
+                                    "Row " ++ String.fromInt issue.row
+                                 )
+                                    ++ ": "
+                                    ++ issue.message
+                                )
+                            ]
+                    )
+                    issues
+                )
+            ]
+
+
+plural : Int -> String -> String -> String
+plural n singular pluralForm =
+    if n == 1 then
+        singular
+
+    else
+        pluralForm
 
 
 viewAidRow : List AidStation -> Float -> Int -> AidStation -> Html Msg

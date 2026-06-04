@@ -165,6 +165,16 @@ const run = async () => {
     check('comma name is quoted in export', /"bring, poles"/.test(exported), exported)
   }
 
+  // --- H: the shipped sample file parses cleanly ---
+  {
+    const csv = readFileSync(resolve(repoRoot, 'samples/aid-stations-example.csv'), 'utf8')
+    const { result } = await call({ op: 'parse', csv, totalDistance: 21000, defaultRestSeconds: 180 })
+    console.log('H: samples/aid-stations-example.csv')
+    check('5 stations', result.stations.length === 5, `got ${result.stations.length}`)
+    check('no errors', result.errors.length === 0, JSON.stringify(result.errors))
+    check('no warnings', result.warnings.length === 0, JSON.stringify(result.warnings))
+  }
+
   console.log('')
   if (failures === 0) {
     console.log('PASS — all aid-csv checks green')
