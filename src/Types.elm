@@ -69,6 +69,7 @@ raceIdToString (RaceId s) =
 type Service
     = Water
     | Food
+    | WarmFood
     | Medical
     | WC
     | DropBag
@@ -76,7 +77,7 @@ type Service
 
 allServices : List Service
 allServices =
-    [ Water, Food, Medical, WC, DropBag ]
+    [ Water, Food, WarmFood, Medical, WC, DropBag ]
 
 
 serviceToString : Service -> String
@@ -87,6 +88,9 @@ serviceToString s =
 
         Food ->
             "food"
+
+        WarmFood ->
+            "warm_food"
 
         Medical ->
             "medical"
@@ -106,6 +110,9 @@ serviceFromString s =
 
         "food" ->
             Just Food
+
+        "warm_food" ->
+            Just WarmFood
 
         "medical" ->
             Just Medical
@@ -129,6 +136,9 @@ serviceLabel s =
         Food ->
             "Food"
 
+        WarmFood ->
+            "Warm food"
+
         Medical ->
             "Medical"
 
@@ -147,6 +157,9 @@ serviceIcon s =
 
         Food ->
             "🍌"
+
+        WarmFood ->
+            "🍲"
 
         Medical ->
             "⛑"

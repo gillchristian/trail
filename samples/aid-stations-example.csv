@@ -1,6 +1,6 @@
 name,distance_km,rest_min,services,cutoff,notes
 Saida / Start,0,0,water,,
 Mirante,4.5,2,water|food,0:45,quick top-up
-Cachoeira,9.0,5,water|food|wc,1:40,drop bag access
+Cachoeira,9.0,5,water|food|warm food|wc,1:40,drop bag access
 Trilha Alta,14.2,3,water|food|medical,2:50,last water before the climb
 Chegada / Finish,20.0,0,,3:45,

@@ -173,6 +173,25 @@ const run = async () => {
     check('5 stations', result.stations.length === 5, `got ${result.stations.length}`)
     check('no errors', result.errors.length === 0, JSON.stringify(result.errors))
     check('no warnings', result.warnings.length === 0, JSON.stringify(result.warnings))
+    check('a station has warm_food', result.stations.some((s) => s.services.includes('warm_food')))
+  }
+
+  // --- I: warm food is its own category, with token aliases ---
+  {
+    const csv = [
+      'name,distance_km,services',
+      'A,5,warm food',
+      'B,10,soup',
+      'C,15,Hot Food',
+      'D,18,food|warm food',
+    ].join('\n')
+    const { result } = await call({ op: 'parse', csv, totalDistance: 20000, defaultRestSeconds: 180 })
+    console.log('I: warm food category + aliases')
+    check('4 stations, no warnings', result.stations.length === 4 && result.warnings.length === 0, JSON.stringify(result.warnings))
+    check('"warm food" -> warm_food', eqJson(result.stations[0].services, ['warm_food']))
+    check('"soup" -> warm_food', eqJson(result.stations[1].services, ['warm_food']))
+    check('"Hot Food" -> warm_food (case-insensitive)', eqJson(result.stations[2].services, ['warm_food']))
+    check('distinct from food', eqJson(result.stations[3].services, ['food', 'warm_food']))
   }
 
   console.log('')

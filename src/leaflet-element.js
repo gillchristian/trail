@@ -101,6 +101,7 @@ class TrailMap extends HTMLElement {
 const SERVICE_EMOJI = {
   water: '💧',
   food: '🍌',
+  warm_food: '🍲',
   medical: '⛑',
   wc: '🚻',
   drop_bag: '🎒',
@@ -109,6 +110,7 @@ const SERVICE_EMOJI = {
 const SERVICE_LABEL = {
   water: 'Water',
   food: 'Food',
+  warm_food: 'Warm food',
   medical: 'Medical',
   wc: 'WC',
   drop_bag: 'Drop bag',

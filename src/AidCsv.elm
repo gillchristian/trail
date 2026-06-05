@@ -444,6 +444,30 @@ serviceFromToken raw =
         "gels" ->
             Just Food
 
+        "warm food" ->
+            Just WarmFood
+
+        "warmfood" ->
+            Just WarmFood
+
+        "hot food" ->
+            Just WarmFood
+
+        "hotfood" ->
+            Just WarmFood
+
+        "hot meal" ->
+            Just WarmFood
+
+        "hot meals" ->
+            Just WarmFood
+
+        "soup" ->
+            Just WarmFood
+
+        "broth" ->
+            Just WarmFood
+
         "medical" ->
             Just Medical
 
