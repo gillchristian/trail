@@ -30,7 +30,7 @@ Ordered. Top item is next. Promote into `CURRENT.md` when started.
 - **Separate `gpxText` into its own IDB row** so plan-only saves (slider commit, aid-station edits, etc.) don't have to re-ship the ~3 MB GPX string across the FFI. PR #29 deferred this by deferring the save off the drag hot path; a schema refactor would let those saves be small.
 - Strava GAP-style descent aggressiveness slider (if Tobler feels off in practice).
 - Per-km gain/loss separately for slope-factor (instead of net Δele).
-- Race-organiser bulk-import (paste a list of aid stations with distances).
+- ~~Race-organiser bulk-import (paste a list of aid stations with distances).~~ **Shipped 2026-06-05 as TASK-031** — CSV *file* import/export (+ cutoff, warm food, notes). Paste-a-table can reuse `AidCsv.parse` as-is when wanted.
 - Print-friendly export of the planning table.
 - Light / dark mode toggle (dark default).
 - Multi-language UI ("tramos" → "sections" toggle).

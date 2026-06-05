@@ -969,3 +969,34 @@ Also added a "Bug-screenshot hygiene" section to `knowledge/philosophy/working-s
 - SVG gradient defaults (`objectBoundingBox`) are convenient for single-element paintings but become a footgun when the same `<linearGradient>` reference is used across multiple paths. The seam isn't obvious in code review — the gradient def looks identical to before — but the rendering is per-element. Inline comment now explains why.
 - The user's "we should codify this" observation about screenshot hygiene was the right shape — it'd otherwise drift into "always keep" because deletes are friction-y. Default-delete with explicit-keep makes the deliberate path the easier one.
 **Next:** Nothing queued.
+
+---
+## 2026-06-05 — TASK-031: aid-station CSV import/export (+ cutoff, warm food, notes, scroll-to-editor)
+
+**Task:** Started as a "wdyt?" design chat (2026-06-04) about importing aid stations from a CSV; promoted to TASK-031 after the user answered six scoping questions. Design recorded in `knowledge/whiteboard/csv-aid-station-import.md`. Grew through the session as the user added a distinct **Warm food** service, full **notes** support, and **scroll-the-editor-into-view** — all folded into the one PR while it was unmerged.
+
+**What I did:**
+- New pure `AidCsv.elm` — `parse` + `toCsv`. Hand-rolled RFC-4180 tokenizer (`String.foldl` state machine) handling quoted fields, doubled quotes, CRLF/LF/CR, UTF-8 BOM, `,`/`;` delimiters, decimal comma. Lenient: header-or-positional column mapping; only `name` + distance required; `distance_km`/`distance_mi` (and `km`/`mi`/`miles`) picks the unit → metres on ingest; malformed *required* field drops the row, malformed *optional* field → warning + fallback (`rest` defaults from `AthleteProfile.aidStyleSecondsPerStation`). Returns `{ stations, errors, warnings }` for a preview.
+- `Types.AidStation` gained `cutoff : Maybe Int` (elapsed seconds from start). Back-compat `D.oneOf [field, succeed Nothing]` decoder — no `.trail` version bump (same trick as `services`/`notes`).
+- Race page: **Import CSV** (`File.Select` → `File.toString` → parse → preview panel → replace-with-confirm; `assignAidIds` continues `aidStationSeq` so a later manual add can't collide; plan is km-indexed so replace never orphans it) and **Export CSV** (`AidCsv.toCsv` via the existing `Download.file` port).
+- 6th `Service` variant **WarmFood** (label "Warm food", 🍲, key `warm_food`). Compiler forced all five service functions; also updated the JS `SERVICE_EMOJI`/`SERVICE_LABEL` maps in `leaflet-element.js` (the one spot the compiler can't see).
+- Full **notes**: notes were already parsed/exported/persisted but never shown or editable (manual form hardcoded `notes = ""`), so imports *looked* dropped. Added a notes textarea to the aid form and surfaced `aid.notes` in the aid list, import preview, **km table**, **section table**, and the per-km + per-section planning pages.
+- New minimal `Dom.elm` port (`scrollIntoView` only — skipped the rest of the reference `DomEvents` surface). Fires on Add/Edit; JS defers one `requestAnimationFrame` so Elm has rendered the form first. Form has a stable id + `scroll-mt-4`.
+
+**What I verified:**
+- `npx elm make src/Main.elm --output=/dev/null` → `Success!`
+- `npm run build` → `Success` (14 modules — the test harness is *not* bundled; `main.js` imports only `Main.elm`).
+- `node scripts/smoke-aid-csv.mjs` → `PASS` (47 checks) driving the **real compiled** `AidCsv.parse`/`toCsv` via a `Platform.worker` harness (`src/AidCsvHarness.elm`): happy path, miles conversion, partial import + correct row numbers, BOM/CRLF/quoting/doubled-quotes, `;` + decimal comma, warm-food tokens (`soup`/`Hot Food` → `warm_food`, distinct from `food`), notes survival, `toCsv → parse` round-trip, and the shipped `samples/aid-stations-example.csv`.
+- `npm run smoke` (storage) → `PASS` — cutoff field didn't regress IDB, incl. UTMB-size.
+- Dev server boots (index + Elm `main.js` both HTTP 200); `scrollIntoView` present in the production bundle (port reachable → wired into `app.ports`); `scroll-mt-4` generated.
+- **UI click-through done by the user** — the one gate I can't automate (no headless browser in the repo). User confirmed "good to be merged."
+
+**What changed in the repo:** PR #53, squash-merged `422d118`, branch deleted. New: `AidCsv.elm`, `AidCsvHarness.elm`, `Dom.elm`, `scripts/smoke-aid-csv.mjs`, `samples/aid-stations-example.csv`. Edited: `Types.elm`, `Main.elm`, `leaflet-element.js`, `main.js`, `package.json` (+`smoke:aidcsv`).
+
+**What I learned / gotchas:**
+- **Verifying pure Elm logic from Node, faithfully.** The repo's prior pattern (`profile-trace.mjs`) re-implements logic in JS — tests a *copy*. For the parser I instead compiled a `Platform.worker` harness with `elm make`, evaluated the IIFE via `new Function(code).call(scope)` to capture `this.Elm`, and drove the real ports from a node script. Tests the actual shipped code without a browser. Worth reusing for future pure modules.
+- **Port + render ordering.** Elm schedules its render rAF during `update` (before the port message reaches JS), so a single `requestAnimationFrame` in the JS handler runs *after* the form is in the DOM. No double-rAF needed.
+- **"Dropped" was a display gap, not data loss.** Check the full path (parse → store → display) before assuming an import bug. Here parse/encode/persist were fine; the field was just never rendered and the form hardcoded it empty.
+- **cutoff is elapsed-from-start, not clock time** — no race start-time-of-day field exists, so clock-time cutoffs can't compute margin. Deferred.
+
+**Next:** Nothing queued. Candidate follow-ups (not promoted): clock-time cutoffs + race start-time field; margin-vs-cutoff warnings in planning; miles in the *manual* form; paste-a-table import (parser already supports it). Backlog parking-lot "Race-organiser bulk-import" struck — shipped by this task.

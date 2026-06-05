@@ -196,8 +196,11 @@ optional, with `rest` defaulting to the active profile's
 
 ## Follow-ups
 
-- **TASK-031** (this) — `feat/task-031-aid-csv-import`. Acceptance criteria
-  in `planning/CURRENT.md`.
+- **TASK-031 — shipped 2026-06-05**, PR #53 merged `422d118`. Delivered more
+  than the original cut: CSV import/export, `cutoff`, a distinct **Warm food**
+  service, full **notes** support (editable + shown across the aid list,
+  import preview, and km/section planning views), and smooth-scroll the editor
+  into view on open. See journal 2026-06-05 + `planning/DONE.md`.
 - Deferred: clock-time cutoffs (needs a race start-time field); margin-vs-cutoff
   warnings in the planning view; miles support in the *manual* form (CSV only
   for now); paste-a-table input affordance (parser already supports it).
