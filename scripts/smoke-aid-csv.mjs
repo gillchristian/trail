@@ -161,6 +161,7 @@ const run = async () => {
     check('rest survives (7.5 min = 450s)', result.stations[1].restSeconds === 450, String(result.stations[1].restSeconds))
     check('services survive', eqJson(result.stations[0].services, ['water', 'food']))
     check('cutoff survives', eqJson(result.stations.map((x) => x.cutoff), [9000, 20700]))
+    check('notes survive (incl. embedded comma)', result.stations[0].notes === 'bring, poles', result.stations[0].notes)
     check('export has header', exported.split(/\r?\n/)[0] === 'name,distance_km,rest_min,services,cutoff,notes')
     check('comma name is quoted in export', /"bring, poles"/.test(exported), exported)
   }

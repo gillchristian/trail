@@ -128,6 +128,7 @@ type alias AidForm =
     , restMinutes : String
     , cutoffText : String -- elapsed cutoff "h:mm" / "h:mm:ss"; "" = none
     , services : List Service
+    , notesText : String
     , error : Maybe String
     }
 
@@ -291,6 +292,7 @@ type Msg
     | AidSetDistanceKm String
     | AidSetRestMinutes String
     | AidSetCutoff String
+    | AidSetNotes String
     | AidToggleService Service
     | AidSubmit
     | AidDelete String
@@ -619,6 +621,9 @@ update msg model =
 
         AidSetCutoff s ->
             ( updateAidForm (\f -> { f | cutoffText = s, error = Nothing }) model, Cmd.none )
+
+        AidSetNotes s ->
+            ( updateAidForm (\f -> { f | notesText = s, error = Nothing }) model, Cmd.none )
 
         AidToggleService s ->
             ( updateAidForm (\f -> { f | services = toggleService s f.services }) model, Cmd.none )
@@ -1787,6 +1792,7 @@ emptyAidForm editingId =
     , restMinutes = "2"
     , cutoffText = ""
     , services = [ Types.Water ]
+    , notesText = ""
     , error = Nothing
     }
 
@@ -1800,6 +1806,7 @@ aidFormFromExisting aid =
     , restMinutes = String.fromInt (aid.restSeconds // 60)
     , cutoffText = aid.cutoff |> Maybe.map AidCsv.formatClock |> Maybe.withDefault ""
     , services = aid.services
+    , notesText = aid.notes
     , error = Nothing
     }
 
@@ -1900,7 +1907,7 @@ validateAidForm form race =
                                                 , distance = absolute
                                                 , restSeconds = restMin * 60
                                                 , services = form.services
-                                                , notes = ""
+                                                , notes = String.trim form.notesText
                                                 , cutoff = cutoff
                                                 }
 
@@ -3727,6 +3734,11 @@ viewPreviewRow index aid =
                            )
                     )
                 ]
+            , if String.isEmpty aid.notes then
+                text ""
+
+              else
+                p [ class "text-xs text-slate-400 truncate" ] [ text aid.notes ]
             ]
         , if List.isEmpty aid.services then
             text ""
@@ -3822,6 +3834,11 @@ viewAidRow allAids totalDistance index aid =
 
                 Nothing ->
                     text ""
+            , if String.isEmpty aid.notes then
+                text ""
+
+              else
+                p [ class "mt-1 text-xs text-slate-400 whitespace-pre-line" ] [ text aid.notes ]
             , if List.isEmpty aid.services then
                 text ""
 
@@ -3947,6 +3964,16 @@ viewAidForm form race =
             [ p [ class "text-xs text-slate-500 uppercase tracking-wider" ] [ text "Services" ]
             , div [ class "flex flex-wrap gap-2" ]
                 (List.map (serviceChip form.services) allServices)
+            ]
+        , field "Notes (optional)"
+            [ textarea
+                [ A.value form.notesText
+                , A.placeholder "Crew access, drop-bag here, what to grab…"
+                , A.rows 2
+                , onInput AidSetNotes
+                , inputClass
+                ]
+                []
             ]
         , case form.error of
             Just err ->
@@ -4932,8 +4959,15 @@ viewKmRow race km result stops notes cumulative =
                     div [ class "space-y-1" ]
                         (List.map
                             (\a ->
-                                div [ class "text-amber-300" ]
-                                    [ text ("★ " ++ a.name ++ " · " ++ formatRest a.restSeconds) ]
+                                div []
+                                    [ div [ class "text-amber-300" ]
+                                        [ text ("★ " ++ a.name ++ " · " ++ formatRest a.restSeconds) ]
+                                    , if String.isEmpty a.notes then
+                                        text ""
+
+                                      else
+                                        div [ class "text-slate-400 whitespace-pre-line" ] [ text a.notes ]
+                                    ]
                             )
                             stops
                             ++ (if String.isEmpty notes then
@@ -5075,8 +5109,14 @@ sectionsWithCumulative race results sections =
                     case section.followedByAid of
                         Just aid ->
                             Html.tr [ class "border-t border-slate-800 bg-slate-950/40" ]
-                                ([ Html.td [ class "px-4 py-2 text-xs text-amber-300" ]
-                                    [ text ("★ " ++ aid.name) ]
+                                ([ Html.td [ class "px-4 py-2 text-xs align-top" ]
+                                    [ div [ class "text-amber-300" ] [ text ("★ " ++ aid.name) ]
+                                    , if String.isEmpty aid.notes then
+                                        text ""
+
+                                      else
+                                        div [ class "text-slate-400 whitespace-pre-line mt-0.5" ] [ text aid.notes ]
+                                    ]
                                  , emptyCell
                                  , emptyCell
                                  , emptyCell
@@ -5506,6 +5546,11 @@ viewSectionDetails race section containedKms results sectionSeconds sectionPace 
                                     )
                                     aid.services
                                 )
+                        , if String.isEmpty aid.notes then
+                            text ""
+
+                          else
+                            p [ class "text-sm text-slate-300 whitespace-pre-line" ] [ text aid.notes ]
                         , a
                             [ Route.href (Route.RaceDetail race.id)
                             , class "inline-block text-xs text-amber-300 hover:text-amber-200 underline"
@@ -6143,8 +6188,15 @@ viewKmForm model race km result kp stopsInKm =
                 , div [ class "space-y-1" ]
                     (List.map
                         (\a ->
-                            div [ class "text-sm text-amber-300" ]
-                                [ text ("★ " ++ a.name ++ " · " ++ formatFloat 2 (a.distance / 1000) ++ " km · " ++ formatRest a.restSeconds) ]
+                            div [ class "text-sm" ]
+                                [ div [ class "text-amber-300" ]
+                                    [ text ("★ " ++ a.name ++ " · " ++ formatFloat 2 (a.distance / 1000) ++ " km · " ++ formatRest a.restSeconds) ]
+                                , if String.isEmpty a.notes then
+                                    text ""
+
+                                  else
+                                    div [ class "text-slate-400 whitespace-pre-line" ] [ text a.notes ]
+                                ]
                         )
                         stopsInKm
                     )
