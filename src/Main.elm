@@ -22,6 +22,7 @@ import Browser.Events
 import Browser.Navigation as Nav
 import Csv
 import Dict exposing (Dict)
+import Dom
 import Download
 import File exposing (File)
 import File.Select as Select
@@ -599,10 +600,14 @@ update msg model =
             ( { model | pendingDelete = Nothing }, Cmd.none )
 
         OpenAddAid ->
-            ( { model | aidEditor = AidOpen (emptyAidForm Nothing) }, Cmd.none )
+            ( { model | aidEditor = AidOpen (emptyAidForm Nothing) }
+            , Dom.scrollIntoView aidFormDomId
+            )
 
         OpenEditAid aid ->
-            ( { model | aidEditor = AidOpen (aidFormFromExisting aid) }, Cmd.none )
+            ( { model | aidEditor = AidOpen (aidFormFromExisting aid) }
+            , Dom.scrollIntoView aidFormDomId
+            )
 
         CloseAid ->
             ( { model | aidEditor = AidClosed }, Cmd.none )
@@ -1781,6 +1786,11 @@ readFile file =
 
 
 -- AID FORM HELPERS
+
+
+aidFormDomId : String
+aidFormDomId =
+    "aid-station-form"
 
 
 emptyAidForm : Maybe String -> AidForm
@@ -3879,7 +3889,7 @@ viewAidForm form race =
             else
                 "New aid station"
     in
-    div [ class "rounded-2xl bg-slate-900 border border-slate-800 p-5 space-y-4" ]
+    div [ A.id aidFormDomId, class "rounded-2xl bg-slate-900 border border-slate-800 p-5 space-y-4 scroll-mt-4" ]
         [ div [ class "flex items-baseline justify-between" ]
             [ h3 [ class "text-base font-semibold text-slate-100" ] [ text title_ ]
             , button

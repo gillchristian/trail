@@ -231,6 +231,14 @@ app.ports.pickImageFilePort.subscribe(() => {
   input.click()
 })
 
+app.ports.scrollIntoView.subscribe((id) => {
+  // Defer to the next frame so Elm has rendered the target element
+  // (e.g. the aid-station form that just opened) before we scroll.
+  requestAnimationFrame(() => {
+    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  })
+})
+
 // ============================================================
 // Service worker registration (production only).
 //
