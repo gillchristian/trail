@@ -69,6 +69,7 @@ raceIdToString (RaceId s) =
 type Service
     = Water
     | Food
+    | WarmFood
     | Medical
     | WC
     | DropBag
@@ -76,7 +77,7 @@ type Service
 
 allServices : List Service
 allServices =
-    [ Water, Food, Medical, WC, DropBag ]
+    [ Water, Food, WarmFood, Medical, WC, DropBag ]
 
 
 serviceToString : Service -> String
@@ -87,6 +88,9 @@ serviceToString s =
 
         Food ->
             "food"
+
+        WarmFood ->
+            "warm_food"
 
         Medical ->
             "medical"
@@ -106,6 +110,9 @@ serviceFromString s =
 
         "food" ->
             Just Food
+
+        "warm_food" ->
+            Just WarmFood
 
         "medical" ->
             Just Medical
@@ -129,6 +136,9 @@ serviceLabel s =
         Food ->
             "Food"
 
+        WarmFood ->
+            "Warm food"
+
         Medical ->
             "Medical"
 
@@ -147,6 +157,9 @@ serviceIcon s =
 
         Food ->
             "🍌"
+
+        WarmFood ->
+            "🍲"
 
         Medical ->
             "⛑"
@@ -169,6 +182,7 @@ type alias AidStation =
     , restSeconds : Int -- planned rest at the station
     , services : List Service
     , notes : String
+    , cutoff : Maybe Int -- cutoff as elapsed seconds from start; Nothing = no cutoff
     }
 
 
@@ -448,12 +462,18 @@ encodeAidStation a =
         , ( "restSeconds", E.int a.restSeconds )
         , ( "services", E.list (serviceToString >> E.string) a.services )
         , ( "notes", E.string a.notes )
+        , ( "cutoff", maybeInt a.cutoff )
         ]
 
 
 maybeString : Maybe String -> Value
 maybeString =
     Maybe.map E.string >> Maybe.withDefault E.null
+
+
+maybeInt : Maybe Int -> Value
+maybeInt =
+    Maybe.map E.int >> Maybe.withDefault E.null
 
 
 decodeRace : Decoder Race
@@ -534,14 +554,15 @@ coreBuilder id name date location url notes cover dist =
 
 decodeAidStation : Decoder AidStation
 decodeAidStation =
-    D.map6
-        (\id name distance rest services notes ->
+    D.map7
+        (\id name distance rest services notes cutoff ->
             { id = id
             , name = name
             , distance = distance
             , restSeconds = rest
             , services = services
             , notes = notes
+            , cutoff = cutoff
             }
         )
         (D.field "id" D.string)
@@ -554,6 +575,7 @@ decodeAidStation =
             ]
         )
         (D.oneOf [ D.field "notes" D.string, D.succeed "" ])
+        (D.oneOf [ D.field "cutoff" (D.nullable D.int), D.succeed Nothing ])
 
 
 serviceDecoder : Decoder Service

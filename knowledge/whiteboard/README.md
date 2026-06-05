@@ -83,3 +83,5 @@ context and limited patience.
   profiles with race plans without breaking historical records.
 - [Training-mode vs. planner](training-as-analysis.md) — should the app
   ingest training runs for analysis, or stay strictly a race-planning tool?
+- [CSV aid-station import](csv-aid-station-import.md) — bulk-import aid
+  stations from a CSV file / pasted table; format, merge semantics, preview.
