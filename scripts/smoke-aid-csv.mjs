@@ -195,6 +195,24 @@ const run = async () => {
     check('distinct from food', eqJson(result.stations[3].services, ['food', 'warm_food']))
   }
 
+  // --- J: crew-access category + aliases ---
+  {
+    const csv = [
+      'name,distance_km,services',
+      'A,5,crew',
+      'B,10,assistance permitted',
+      'C,15,Crew Access',
+      'D,18,water|crew',
+    ].join('\n')
+    const { result } = await call({ op: 'parse', csv, totalDistance: 20000, defaultRestSeconds: 180 })
+    console.log('J: crew-access category + aliases')
+    check('4 stations, no warnings', result.stations.length === 4 && result.warnings.length === 0, JSON.stringify(result.warnings))
+    check('"crew" -> crew', eqJson(result.stations[0].services, ['crew']))
+    check('"assistance permitted" -> crew', eqJson(result.stations[1].services, ['crew']))
+    check('"Crew Access" -> crew (case-insensitive)', eqJson(result.stations[2].services, ['crew']))
+    check('combined with water', eqJson(result.stations[3].services, ['water', 'crew']))
+  }
+
   console.log('')
   if (failures === 0) {
     console.log('PASS — all aid-csv checks green')

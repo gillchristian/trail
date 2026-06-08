@@ -105,6 +105,7 @@ const SERVICE_EMOJI = {
   medical: '⛑',
   wc: '🚻',
   drop_bag: '🎒',
+  crew: '🤝',
 }
 
 const SERVICE_LABEL = {
@@ -114,6 +115,7 @@ const SERVICE_LABEL = {
   medical: 'Medical',
   wc: 'WC',
   drop_bag: 'Drop bag',
+  crew: 'Crew access',
 }
 
 function iconForMarker(m) {
