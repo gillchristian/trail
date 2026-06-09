@@ -7,6 +7,8 @@ Append-only. Newest at the bottom. Each entry is a snapshot for future-me with n
 ```
 ---
 ## YYYY-MM-DD HH:MM — <short heading>
+   (HH:MM may be dropped only if the heading text alone makes the entry
+   findable from a DONE.md pointer — multi-entry days usually need it)
 
 **Task:** TASK-NNN (or "scaffolding" / "exploration" / "blocker triage")
 **What I did:** 1–3 sentences.
@@ -950,7 +952,7 @@ Fix: new `chunkByXExtent : Float -> List (Float, Float) -> List (List (Float, Fl
 - `npm run perf:trace -- samples/cocodona_250.gpx 10` → parse 24.7 ms, cumDist 4.1 ms, simplify 19.0 ms, total 47.8 ms. UTMB: total 34.3 ms. Both well under 100 ms in pure Elm-mirror JS; the on-device parse is slower due to Elm Regex.find iteration and IDB write, but the algorithm itself isn't the bottleneck.
 - No code references to deleted files remain. Journal mentions are historical (acceptable; journal is append-only).
 - `npm run build` exit 0 (doc-only changes outside of `package.json`'s scripts hash, which doesn't affect the bundle).
-**What changed in the repo:** PR #43, merged `<sha>`. 15 file deletes, 1 file move, 4 file edits (brief, roadmap, planning files, journal), 1 new file (`scripts/profile-trace.mjs`), 1 package.json line.
+**What changed in the repo:** PR #43, merged `8449767` (sha backfilled 2026-06-09; was an unfilled placeholder). 15 file deletes, 1 file move, 4 file edits (brief, roadmap, planning files, journal), 1 new file (`scripts/profile-trace.mjs`), 1 package.json line.
 **What I learned:**
 - The user explicitly asked about perf testing. Answer was "no, we don't have any" — `scripts/profile-trace.mjs` is now the first one. It's an algorithm-side mirror, not a full end-to-end perf test (which would need browser instrumentation), but it answers questions like "is `Gpx.simplify` the slow part?" without booting the app.
 - The "aggressive" option for cleanup wasn't actually destructive — the brief refs to deleted mockups were one-liners describing visual intent, and the canonical reference is now the implementation itself.

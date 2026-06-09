@@ -22,7 +22,7 @@ discussion from scratch.
 | Area | Purpose | Stability |
 |---|---|---|
 | `reference/project-brief.md` | What we're building | Stable, rarely changes |
-| `decisions/` (ADRs) | Decisions made, with rationale | Permanent, immutable |
+| `decisions/` (ADRs) | Decisions made, with rationale | Permanent record; content stays, status may flip to superseded |
 | `planning/BACKLOG.md` | Decided work, ordered | Active queue |
 | `whiteboard/` | Discussions in flight | Ephemeral; entries may be promoted, archived, or left as-is |
 

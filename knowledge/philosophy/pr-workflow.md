@@ -7,8 +7,8 @@ How work flows from "task picked" to "merged into master."
 1. **`master` is sacred.** After the initial `Batman` commit, no direct pushes to `master`. Every change reaches `master` via a PR I open and merge myself.
 2. **One PR = one logical unit of work.** A PR corresponds to something I'd be willing to call out in a changelog. Usually one task in `CURRENT.md`, occasionally a tight cluster of related tasks.
 3. **Branch off latest `master`.** Always `git fetch` and rebase/branch from up-to-date `master` before starting.
-4. **Iterate freely on the branch.** Commit early and often. Local CI (tests + types + lint) must pass before opening the PR.
-5. **Merge my own PRs.** Solo repo — once local CI is green and the PR description is complete, merge it. Prefer `--squash` for cleanliness unless the branch history is intentionally meaningful.
+4. **Iterate freely on the branch.** Commit early and often. Local CI (the commands in `reference/local-ci.md`) must pass before opening the PR.
+5. **Merge my own PRs.** Solo repo — once local CI is green and the PR description is complete, merge it. Always `--squash`: the brief lists the branch → PR → squash-merge cycle as a hard constraint.
 
 ## Author identity
 
@@ -33,21 +33,29 @@ Examples: `feat/task-007-user-auth`, `fix/task-012-trailing-slash-redirect`, `ch
 1. **Pull the task** into `planning/CURRENT.md`. Write acceptance criteria.
 2. **Branch:** `git checkout -b feat/task-NNN-slug`.
 3. **Implement, committing as I go.** Each commit leaves the branch in a sane state.
-4. **Run local CI:**
-   - Tests: project-specific command (recorded in `reference/local-ci.md` once defined).
-   - Type-check: project-specific.
-   - Lint/format: project-specific.
-   - Manual smoke test where applicable (the `verification.md` gates still apply).
+4. **Run local CI:** the commands in `reference/local-ci.md` (type-check, build, smoke harnesses), plus a manual smoke test where applicable (the `verification.md` gates still apply).
 5. **If CI fails, fix on the branch.** Don't open a red PR.
 6. **Open the PR** with `gh pr create`:
    - Title: imperative, ≤ 72 chars, mirrors the task title.
    - Body: see template below. **No Claude-attribution footer.**
-7. **Merge** with `gh pr merge --squash --delete-branch` (or `--merge` if the multi-commit history is genuinely useful to keep).
-8. **Update planning:**
-   - Move the task from `CURRENT.md` to `DONE.md` with the PR number and merge commit sha.
-   - Write the journal entry, quoting the PR URL and the merge commit.
-9. **Sync local `master`:** `git checkout master && git pull --ff-only`.
+7. **Merge** with `gh pr merge --squash --delete-branch`.
+8. **Sync local `master`:** `git checkout master && git pull --ff-only`.
+9. **Close the task** with a small follow-up PR (see below).
 10. **Pick the next task.**
+
+## The close PR
+
+Post-merge bookkeeping can't land on `master` directly (Rule 1 has no
+exceptions), so it ships as its own tiny PR immediately after the task PR:
+
+- Branch: `docs/task-NNN-close`. Title: `docs: close TASK-NNN (<short>, merged <sha>)`.
+- Contents: move the task from `CURRENT.md` to `DONE.md` (with PR number +
+  merge sha), tick it off in `BACKLOG.md`, append the journal entry quoting
+  the PR URL and merge commit.
+- This is the one PR class that carries no acceptance criteria of its own —
+  it documents the task that just merged. Merge it the same way (squash).
+- When the next task is already known, the close PR may also pull it into
+  `CURRENT.md` — closing and orienting in one step.
 
 ## PR description template
 

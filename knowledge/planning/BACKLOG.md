@@ -1,6 +1,10 @@
 # Backlog
 
-Ordered. Top item is next. Promote into `CURRENT.md` when started.
+Ordered. The top *unchecked* item is next. Promote into `CURRENT.md` when started.
+
+Conventions:
+- Completed tasks stay here, checked `[x]` with their PR number — the Active section doubles as a one-line shipping index. The full record lives in `DONE.md`.
+- TASK ids are global and monotonically increasing across all of `planning/`: next id = highest id appearing anywhere (Active, parking lot, Proposals, DONE) + 1.
 
 ## Active
 

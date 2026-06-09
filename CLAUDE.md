@@ -18,7 +18,8 @@
 - `knowledge/planning/` — `CURRENT.md` (one active task), `BACKLOG.md` (queue), `DONE.md` (archive).
 - `knowledge/progress/` — `journal.md` (append-only log), `blockers.md` (things needing the user).
 - `knowledge/decisions/` — ADRs.
-- `knowledge/reference/` — `project-brief.md` (what we're building), `glossary.md`.
+- `knowledge/reference/` — `project-brief.md` (what we're building), `glossary.md`, `local-ci.md`.
+- `knowledge/whiteboard/` — open discussions that haven't earned an ADR or a backlog task yet; index in its README.
 
 ## Project status pointer
 
