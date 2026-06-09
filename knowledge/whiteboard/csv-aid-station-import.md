@@ -205,9 +205,9 @@ optional, with `rest` defaulting to the active profile's
   warnings in the planning view; miles support in the *manual* form (CSV only
   for now); paste-a-table input affordance (parser already supports it).
 
-- Refines backlog parking-lot item *"Race-organiser bulk-import (paste a
-  list of aid stations with distances)"* — if promoted, reframe that item to
-  cover paste **and** CSV via the shared parser.
-- If built, the pure parser + matching export are unit-testable and worth an
-  ADR only if the format becomes a published contract; otherwise a backlog
-  task + journal entry suffice.
+- (Historical, pre-resolution notes:) this entry originally refined the
+  parking-lot item *"Race-organiser bulk-import (paste a list of aid stations
+  with distances)"* — that item was struck when TASK-031 shipped; a future
+  paste-a-table affordance can reuse `AidCsv.parse` as-is. No ADR was needed:
+  the CSV format is lenient by design, not a published contract — the smoke
+  harness (`scripts/smoke-aid-csv.mjs`) pins the behavior instead.
