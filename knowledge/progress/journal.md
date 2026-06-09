@@ -1045,3 +1045,16 @@ spots, `leaflet-element.js` is the manual checklist item, smoke locks the CSV
 tokens in.
 
 **Next:** Nothing queued. Pick the next task from `BACKLOG.md`.
+
+---
+## 2026-06-09 17:33 — TASK-033: knowledge-base tidy (review findings)
+
+**Task:** TASK-033 — first half of a user request: review/tidy `knowledge/`, then split framework from project-specific content and extract it with pluggable features (TASK-034).
+**What I did:** Ran a systematic review of the knowledge base — four dimensions (cross-reference integrity, internal consistency, staleness vs git history, framework soundness) plus a framework-vs-project classification of every file; 35 raw findings, each adversarially verified, 18 confirmed / 17 refuted. Fixed the confirmed set: created `reference/local-ci.md` (the "once defined" file three docs pointed at was never created — the real gates lived only in journal prose), dropped the phantom "lint" step from CI phrasing, removed `pr-workflow.md`'s `--merge` escape hatch (contradicted the brief's hard squash constraint; 0 merge commits in 58 anyway), codified the `docs/task-NNN-close` bookkeeping-PR convention (Rule 1 made post-merge planning updates technically impossible — practice existed, doc didn't), backfilled DONE/journal placeholders, removed a duplicate DONE stub, added a CURRENT.md entry template, documented BACKLOG's checked-in-place + TASK-id conventions, populated the glossary (empty for 32 tasks), added `whiteboard/` to CLAUDE.md's quick map, rewrote stale CSV-whiteboard follow-ups past-tense.
+**What I verified:**
+- All four local-ci gates run before documenting them: `npx elm make src/Main.elm --output=/dev/null` → "Success! Compiled 2 modules."; `npm run build` → "✓ built in 977ms"; `npm run smoke` → "SMOKE PASSED"; `npm run smoke:aidcsv` → "PASS — all aid-csv checks green".
+- Shas against `git log`: PR #43 = `8449767`, TASK-015 = PR #18 `b451e1e`.
+- Grep sweep: no unintended `<sha>` / `PR #N` / "once defined" / "types + lint" / `--merge` remain; every knowledge-path reference resolves (only the intentional `decisions/NNNN-slug.md` template pattern).
+**What changed in the repo:** PR #57, merged `de1b946`. 12 files, +128/−33, docs only.
+**What I learned:** The refuted findings were as valuable as the confirmed ones — three "bugs" (checked-in-place BACKLOG, point-in-time whiteboard entries, deleted screenshot refs) turned out to be designed conventions that were simply undocumented. The fix for an undocumented convention is to write it down, not to "repair" the files. Also: the close-PR convention had been practiced since TASK-031 but documented nowhere — exactly the kind of gap that bites a memoryless future session.
+**Next:** TASK-034 — framework/project split + extraction with pluggable delivery modules. Design panel (3 adversarial lenses) running; criteria from its output.
