@@ -1072,3 +1072,13 @@ tokens in.
 **What changed in the repo:** PR #59, merged `bc0214f`. 15 files, +709/−167. Four philosophy docs register as git renames; delivery.md diverged too far from pr-workflow.md for default rename detection (`--follow --find-renames=30%` recovers the lineage).
 **What I learned:** The dry-run-as-verification pattern (have a fresh agent literally follow SETUP.md in a temp dir) caught real gaps that inspection missed — notably that nothing said whether a recorded override can defeat a manifest hard constraint. Also: a mechanical instance-free grep needs word boundaries from day one; "Co-Authored-By trailers" contains "trail".
 **Next:** Nothing active. The framework is adoptable elsewhere by copying `knowledge/framework/` + following SETUP.md; publishing it as its own repo is the user's call. Product work resumes from BACKLOG parking lot / Proposals.
+
+---
+## 2026-06-09 18:18 — TASK-035: the labyrinth principle
+
+**Task:** TASK-035 — user follow-up to the framework session: Videla's "Notes on the synthesis of labyrinths" partly defines the philosophy; include the idea, not the article.
+**What I did:** Added principle 7 to `framework/principles.md` — "Record the maze, not just the exit": dead ends and the reasoning at each fork are part of every artifact's deliverable; prescription says what, description says why. The framework already practiced this piecemeal (journal "failed attempts are the most useful entries", ADR "alternatives considered", whiteboard's whole purpose) but never named the shared value. Added a "Paths not taken" bullet to `working-style.md`'s communication section with the article's own elocutio caveat folded in (amplify dead ends that carried a lesson, abbreviate the rest — curate, don't dump). Article kept at `reference/labyrinth.md` on the instance side; the framework cites the published work by author/title so copies stay self-contained. Framework bumped v1 → v2 in both stamp locations — first real exercise of the upstream-change convention.
+**What I verified:** instance-free guard → "CLEAN"; `reference/labyrinth.md` exists and all new cross-references resolve; local CI: elm make "Success!", build "✓ built in 979ms", smoke "SMOKE PASSED", smoke:aidcsv "PASS".
+**What changed in the repo:** PR #61, merged `af65751`. 7 files, +97/−12.
+**What I learned:** Deliberately cited the principle by *name* in working-style.md, not by number — minutes after verifying nothing cites principle numbers, I nearly introduced the first numeric citation myself. Renumbering-safe references are a one-word habit.
+**Next:** Nothing active. Product work resumes from BACKLOG parking lot / Proposals.
