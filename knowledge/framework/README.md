@@ -1,6 +1,6 @@
 # The knowledge framework
 
-**Framework v1 (2026-06-09).** A file-based working system for autonomous
+**Framework v2 (2026-06-09).** A file-based working system for autonomous
 agent sessions: pick one task, verify it honestly, deliver it per the
 project's rules, write down what happened — so a future session with zero
 memory can pick up exactly where this one stopped.

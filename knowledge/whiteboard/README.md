@@ -44,7 +44,8 @@ If an entry here gets decided, the path forward is one of:
 3. When the topic is resolved (or explicitly tabled), update the
    **Resolution** section at the bottom.
 4. If the resolution produces work or an ADR, link out from the entry; do
-   not delete the entry — the trail of thinking is the value.
+   not delete the entry — the trail of thinking is the value (the idea behind
+   this whole area: `../reference/labyrinth.md`).
 
 ## Entry structure
 
