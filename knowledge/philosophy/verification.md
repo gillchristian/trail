@@ -13,7 +13,7 @@ For every task, before marking it complete:
 5. **Type/lint/format clean.** Run the project's checkers. Fix what they flag; don't suppress without a reason logged in the journal entry.
 6. **No new TODOs left behind.** If a TODO is necessary, it goes in `BACKLOG.md` as a real task, not as a comment buried in code.
 7. **Committed.** One commit per logical change, with a message that explains *why*. No `Co-Authored-By: Claude ...` trailer — commits are authored by the user only. Working tree clean before next task.
-8. **PR opened and merged.** Every change to `master` (after the initial `Batman` commit) goes through a PR I open and merge myself. Local CI (tests + types + lint) must pass before I open the PR. Details in `pr-workflow.md`.
+8. **PR opened and merged.** Every change to `master` (after the initial `Batman` commit) goes through a PR I open and merge myself. Local CI (the commands in `reference/local-ci.md`) must pass before I open the PR. Details in `pr-workflow.md`.
 
 ## How to verify without me lying to myself
 

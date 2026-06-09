@@ -19,7 +19,7 @@ Every working session follows the same shape:
 2. **Plan the task** — Write the acceptance criteria into `planning/CURRENT.md` before touching code.
 3. **Branch** — `git checkout master && git pull --ff-only && git checkout -b <kind>/task-NNN-slug` (see `philosophy/pr-workflow.md` for naming).
 4. **Execute** — Implement, committing as I go. Commits authored by the user only — no Claude credit.
-5. **Verify** — Run the gates defined in `philosophy/verification.md`. Run local CI (tests + types + lint). If any fail, fix before moving on.
+5. **Verify** — Run the gates defined in `philosophy/verification.md`. Run local CI (the commands in `reference/local-ci.md`). If any fail, fix before moving on.
 6. **PR** — `gh pr create` with the template in `pr-workflow.md`. Merge it (`gh pr merge --squash --delete-branch`).
 7. **Log** — Append a one-paragraph entry to `progress/journal.md` with timestamp, PR number, merge sha, what was verified, and what's next.
 8. **Advance** — Move task to `DONE.md`, sync `master`, pull the next task into `CURRENT.md`.
@@ -40,5 +40,6 @@ If I ever feel stuck or unsure, the answer is in `philosophy/when-stuck.md` — 
 - `progress/blockers.md` — Things that genuinely require user input — surface at session end.
 - `decisions/INDEX.md` — Pointers to ADRs.
 - `reference/glossary.md` — Project-specific terms.
+- `reference/local-ci.md` — The actual local CI commands behind loop step 5.
 - `reference/project-brief.md` — What the project actually is (filled in once user describes it).
 - `whiteboard/README.md` — How the whiteboard area works; index of open discussions.
