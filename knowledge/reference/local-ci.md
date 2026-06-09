@@ -1,8 +1,9 @@
 # Local CI
 
-The commands behind "run local CI" in the loop (`README.md` step 5), the
-verification gates (`philosophy/verification.md` gate 8), and the PR cycle
-(`philosophy/pr-workflow.md` step 4). All must exit 0 before a PR opens.
+The commands behind "run local CI" in the loop (manifest step 5), the
+verification gates (`framework/verification.md` gates 5 and 7), and the PR
+cycle (`framework/delivery.md`, profile `pr`, full-cycle step 4). All must
+exit 0 before a PR opens.
 
 ## The gates
 

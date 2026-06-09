@@ -9,7 +9,7 @@ Walk down this ladder when blocked. Don't skip rungs.
 1. **Re-read the task.** Open `planning/CURRENT.md`. Did I drift from the acceptance criteria? Often the answer is "yes, I'm solving a problem the task didn't ask me to solve."
 2. **Re-read recent journal entries.** `progress/journal.md` (last ~5 entries). Did past-me leave a hint? Did I already try this and learn something?
 3. **Read the code.** Not the code I'm writing — the code around it. Most "I don't know how X works" questions are answered by reading 50 more lines of existing code.
-4. **Read the docs.** For external libraries/APIs, fetch fresh docs via context7. Training data is stale; published docs are not.
+4. **Read the docs.** For external libraries/APIs, fetch fresh documentation with whatever docs tooling the environment provides (e.g. a context7 MCP server, or the published docs themselves). Training data is stale; published docs are not.
 5. **Reduce the problem.** Build the smallest possible reproduction. If I can't reproduce the bug in isolation, my mental model is wrong somewhere.
 6. **Try the boring option.** When choosing between a clever path and an obvious path, pick obvious. The boring option is reversible; the clever one usually isn't.
 7. **Time-box and pivot.** If 30 minutes of focused effort hasn't moved the needle, stop. Write down (a) what I tried, (b) what I observed, (c) what I currently believe, (d) what would unblock me. Move that to `progress/blockers.md` and pick a different task from the backlog.
@@ -23,8 +23,8 @@ Walk down this ladder when blocked. Don't skip rungs.
 | Test failing for unclear reasons | Reduce. Print actual vs expected at the failure point. Don't tweak the test until it passes — find the bug. |
 | Cannot reproduce locally | Don't proceed on faith. Log it as a blocker and work on something else. |
 | Picking between two equivalent approaches | Pick the one that's easier to undo. Note the alternative in the ADR. |
-| Stuck in a refactor rabbit hole | Revert. Resume from a clean state. The original task probably didn't need the refactor. |
-| Tool/permission/environment failure | One retry with diagnostics. If still failing, log to `blockers.md` and pivot. Do not bypass safety checks (e.g. `--no-verify`). |
+| Stuck in a refactor rabbit hole | Stop and restore the files I changed back to their pre-rabbit-hole state — within my delivery profile's policy (`delivery.md`; under `none`, never wipe files via VCS commands). The original task probably didn't need the refactor. |
+| Tool/permission/environment failure | One retry with diagnostics. If still failing, log to `blockers.md` and pivot. Do not bypass safety checks (e.g. hooks, `--no-verify`). |
 
 ## What I will *not* do when stuck
 

@@ -5,7 +5,7 @@ How I pace myself across a long autonomous session.
 ## Cadence
 
 - **Task size target:** 15–60 minutes of work each. Larger means split it; smaller means batch related ones.
-- **Commit cadence:** at least one commit per task. Often more — any time the working tree is in a "this is better than before" state, commit.
+- **Checkpoint cadence:** at least one checkpoint per task — what a checkpoint is (a commit, or a journal note recording the tree state) comes from the delivery mode in `delivery.md`. Any time the working tree is in a "this is better than before" state, checkpoint.
 - **Journal cadence:** one entry per task minimum. Plus an entry any time I change direction, hit a surprise, or make a non-obvious decision.
 
 ## Scope discipline
@@ -17,7 +17,7 @@ How I pace myself across a long autonomous session.
 ## Reading > writing
 
 - For the first hour on any new area, read more than I write. Skim the directory, open the closest analogous file, understand the conventions before contributing.
-- When I think I know what a library does, I check anyway via context7 if I'm about to depend on a specific API.
+- When I think I know what a library does, I check anyway (e.g. via a docs MCP server) if I'm about to depend on a specific API.
 
 ## Anti-patterns to actively resist
 
@@ -29,17 +29,16 @@ How I pace myself across a long autonomous session.
 
 ## Bug-screenshot hygiene
 
-When the user pastes a screenshot into `samples/` to report a bug, treat
-it as a transient artifact tied to that bug's lifecycle:
+When the user drops a screenshot into the project's scratch area to report a
+bug, treat it as a transient artifact tied to that bug's lifecycle:
 
-- Reference it from the task / PR / journal during the fix.
-- Delete it in the same PR that lands the fix (or as a fast follow-up).
-- A screenshot that's still referenced by *durable* docs (the brief, an
-  ADR, a still-active task) sticks around — `samples/aid-station.png`
-  earned its keep that way. Anything ephemeral does not.
+- Reference it from the task / delivery record / journal during the fix.
+- Delete it when the fix lands (or as a fast follow-up).
+- A screenshot that's still referenced by *durable* docs (the brief, an ADR, a
+  still-active task) sticks around. Anything ephemeral does not.
 
-The default is "delete with the fix." Keeping is the deliberate
-exception, justified inline in the PR description.
+The default is "delete with the fix." Keeping is the deliberate exception,
+justified in the delivery record.
 
 ## Energy management (mine, not literal)
 
@@ -51,4 +50,4 @@ exception, justified inline in the PR description.
 - **Journal entries:** terse but specific. Include command output verbatim when it matters. Past-me writes for future-me, who has no memory of this session.
 - **ADRs:** capture the decision, the alternatives, and *why* I chose what I did. Three short paragraphs is plenty.
 - **Code comments:** only when the *why* is non-obvious. The code itself shows the *what*.
-- **Commit messages:** subject line is the verb + object; body is the *why* if it's not trivial.
+- **Commit messages** (when my delivery mode commits): subject line is the verb + object; body is the *why* if it's not trivial. Conventions in `delivery.md`.
