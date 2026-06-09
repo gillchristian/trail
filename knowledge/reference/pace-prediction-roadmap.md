@@ -315,7 +315,7 @@ Things I'd want the user to weigh in on before committing tasks:
 
 ## 10. Suggested task breakdown for `BACKLOG.md`
 
-Sized per `philosophy/working-style.md` (15–60 minutes each unless flagged L for "split when picked up"). Order is roughly value-per-effort.
+Sized per `framework/working-style.md` (15–60 minutes each unless flagged L for "split when picked up"). Order is roughly value-per-effort.
 
 **Foundation — low cost, high value, no Strava needed:**
 
