@@ -51,3 +51,4 @@ justified in the delivery record.
 - **ADRs:** capture the decision, the alternatives, and *why* I chose what I did. Three short paragraphs is plenty.
 - **Code comments:** only when the *why* is non-obvious. The code itself shows the *what*.
 - **Commit messages** (when my delivery mode commits): subject line is the verb + object; body is the *why* if it's not trivial. Conventions in `delivery.md`.
+- **Paths not taken:** every artifact above earns its keep by recording the forks — what was tried or considered, and why it lost. The exit path alone teaches nothing (`principles.md`: record the maze, not just the exit). Curate, don't dump: amplify the dead ends that carried a lesson, abbreviate the ones that didn't.

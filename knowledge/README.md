@@ -22,7 +22,7 @@ even bookkeeping (that's what the close PR is for).
 - **Squash-only.** A hard constraint from the brief; `--merge` is not an option.
 - **Root commit:** the initial `Batman` commit (subject "Batman", no parents)
   is the only direct commit to `master`, ever.
-- **Framework copy:** v1 — and this repo is the **canonical upstream**
+- **Framework copy:** v2 — and this repo is the **canonical upstream**
   (`gillchristian/trail` → `knowledge/framework/`). Framework files stay
   instance-free: before merging any framework-touching PR, run
   `grep -riE '\btrail\b|\belm\b|batman|gillchristian|coros|samples/' knowledge/framework/`
@@ -58,7 +58,8 @@ not in asking the user.
   need the user — surface at session end).
 - **decisions/** — ADRs + `INDEX.md` (template + criteria live there).
 - **reference/** — `project-brief.md` (product intent — wins conflicts),
-  `glossary.md`, `local-ci.md`, the cadence specs, `pace-prediction-roadmap.md`,
+  `glossary.md`, `local-ci.md`, `labyrinth.md` (the article behind the
+  record-the-maze principle), the cadence specs, `pace-prediction-roadmap.md`,
   `archive/`.
 - **whiteboard/** — discussions in flight; conventions + index in its README.
 - **philosophy/** — tombstone only; the docs moved into `framework/`
