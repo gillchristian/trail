@@ -27,7 +27,6 @@ Conventions:
 - [x] TASK-028 — Home page two-section split: "Plans" (no `actualSplits`) and "Executions" (linked). Find better naming if "Plans / Executions" doesn't feel right; the cut is linked-actual vs. not. Section headers + empty states. — (S) — ✓ PR #37
 - [x] TASK-029 — Chunked SVG profile path so the elevation chart renders end-to-end on long tracks (Cocodona 250 stops mid-track at 10 m/px). Browser SVG single-path rendering limit; not in Elm. — (S) — ✓ PR #41
 - [x] TASK-030 — Populate plan-table Pace / Time / Current-sum from `Predictor.predict` at intensity = 1.0 when `race.plan.targetSeconds = Nothing`, so a freshly-uploaded race shows a sensible plan immediately. Display-only; commit happens on first slider interaction. — (S) — ✓ PR #42
-
 ## Parking lot
 
 - **Section-overlap bug.** `Planning.sectionsForRace` uses an overlap test (`km.distStart < b && km.distEnd > a`) when assigning kms to sections. A km that straddles an aid distance is placed in *both* adjacent sections, so `sectionSeconds`, section-card "Time" stat, and section-table cum column all double-count that km. Discovered while scoping TASK-025; the fix wants careful thought about pro-rating and was deferred. Section-card Δ vs plan still has the moving-vs-clock apples-to-oranges bug at the section level; fixing that cleanly needs the section-overlap fix first.
