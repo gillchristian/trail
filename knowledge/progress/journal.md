@@ -1000,3 +1000,46 @@ Also added a "Bug-screenshot hygiene" section to `knowledge/philosophy/working-s
 - **cutoff is elapsed-from-start, not clock time** — no race start-time-of-day field exists, so clock-time cutoffs can't compute margin. Deferred.
 
 **Next:** Nothing queued. Candidate follow-ups (not promoted): clock-time cutoffs + race start-time field; margin-vs-cutoff warnings in planning; miles in the *manual* form; paste-a-table import (parser already supports it). Backlog parking-lot "Race-organiser bulk-import" struck — shipped by this task.
+
+## 2026-06-09 — TASK-032: "Crew access" aid-station service
+
+**Task:** Add a 7th `Service` category for stations where a runner's *personal
+crew* may meet and assist them — a distinct crew-logistics planning signal,
+independent of drop-bag / food / medical. Asked for by the user 2026-06-05;
+scope locked in `CURRENT.md` (promoted via `cf6b3bf`).
+
+**What I did:**
+- `Types.Service` gained `Crew`. The compiler forced updates to `allServices`,
+  `serviceToString` (`"crew"`), `serviceFromString`, `serviceLabel`
+  ("Crew access"), `serviceIcon` (🤝). Manual-form chips and every services
+  render site follow `allServices` automatically — no `Main.elm` changes.
+- `AidCsv.serviceFromToken` maps the crew/assistance token family → `Crew`:
+  `crew`, `crew access`, `crew allowed`, `crew point`, `crew permitted`,
+  `support crew`, `assistance`, `assistance permitted`, `assistance allowed`,
+  `personal assistance` (case/punctuation-insensitive via the existing
+  normalizer). Unknown tokens still warn.
+- `leaflet-element.js` `SERVICE_EMOJI`/`SERVICE_LABEL` gained `crew` — the one
+  spot the Elm compiler can't see (same gotcha as TASK-031's warm food).
+- `scripts/smoke-aid-csv.mjs` gained section J: crew-access category +
+  aliases.
+
+**What I verified (2026-06-09, pre-merge):**
+- `npx elm make src/Main.elm --output=/dev/null` → `Success!`, exit 0.
+- `npm run build` → `✓ built in 933ms`.
+- `npm run smoke` → `SMOKE PASSED · IndexedDB schema + save/load/delete
+  round-trips work, including UTMB-size payloads.`
+- `npm run smoke:aidcsv` → `PASS — all aid-csv checks green`, incl. new
+  section J: `"crew" -> crew`, `"assistance permitted" -> crew`,
+  `"Crew Access" -> crew (case-insensitive)`, `combined with water`.
+- User reviewed the branch and said it was ready to merge.
+
+**What changed in the repo:** PR #55, squash-merged `9f4a54f`, branch deleted.
+Edited: `Types.elm`, `AidCsv.elm`, `leaflet-element.js`,
+`scripts/smoke-aid-csv.mjs` (+ `CURRENT.md` promote).
+
+**What I learned / gotchas:** Nothing new — this was the warm-food playbook
+(TASK-031) replayed for a new variant: Elm compiler drives the exhaustive
+spots, `leaflet-element.js` is the manual checklist item, smoke locks the CSV
+tokens in.
+
+**Next:** Nothing queued. Pick the next task from `BACKLOG.md`.
