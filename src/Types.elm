@@ -73,11 +73,12 @@ type Service
     | Medical
     | WC
     | DropBag
+    | Crew
 
 
 allServices : List Service
 allServices =
-    [ Water, Food, WarmFood, Medical, WC, DropBag ]
+    [ Water, Food, WarmFood, Medical, WC, DropBag, Crew ]
 
 
 serviceToString : Service -> String
@@ -101,6 +102,9 @@ serviceToString s =
         DropBag ->
             "drop_bag"
 
+        Crew ->
+            "crew"
+
 
 serviceFromString : String -> Maybe Service
 serviceFromString s =
@@ -122,6 +126,9 @@ serviceFromString s =
 
         "drop_bag" ->
             Just DropBag
+
+        "crew" ->
+            Just Crew
 
         _ ->
             Nothing
@@ -148,6 +155,9 @@ serviceLabel s =
         DropBag ->
             "Drop bag"
 
+        Crew ->
+            "Crew access"
+
 
 serviceIcon : Service -> String
 serviceIcon s =
@@ -169,6 +179,9 @@ serviceIcon s =
 
         DropBag ->
             "🎒"
+
+        Crew ->
+            "🤝"
 
 
 

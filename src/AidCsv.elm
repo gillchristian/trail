@@ -513,6 +513,36 @@ serviceFromToken raw =
         "bag" ->
             Just DropBag
 
+        "crew" ->
+            Just Crew
+
+        "crew access" ->
+            Just Crew
+
+        "crew allowed" ->
+            Just Crew
+
+        "crew point" ->
+            Just Crew
+
+        "crew permitted" ->
+            Just Crew
+
+        "support crew" ->
+            Just Crew
+
+        "assistance" ->
+            Just Crew
+
+        "assistance permitted" ->
+            Just Crew
+
+        "assistance allowed" ->
+            Just Crew
+
+        "personal assistance" ->
+            Just Crew
+
         _ ->
             Nothing
 
