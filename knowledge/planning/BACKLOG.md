@@ -45,17 +45,17 @@ Conventions:
 
 ## Proposals (not yet promoted — see `knowledge/reference/pace-prediction-roadmap.md`)
 
-The roadmap doc covers the why and the trade-offs. These entries are the *chunks* that would come out of it if approved. Do not promote into Active without an explicit go-ahead from the user.
+The roadmap doc covers the why and the trade-offs. These entries are the *chunks* that came out of it. Most shipped (struck through with their PR below); only **TASK-022** (calibration) remains unpromoted — do not promote it into Active without an explicit go-ahead from the user.
 
-- **TASK-014 — Course summary card additions.** Equivalent flat distance + elevation density label, shown on race index/overview. (S, no Strava needed.)
-- **TASK-015 — Per-km segment classification by grade.** Colour tag in the planning table derived from `Km.slope`. (S.)
-- **TASK-016 — Planned-vs-actual upload (manual `.gpx`).** Snap to course, compute actual splits at planned km boundaries, render diff column. **High-leverage, fully local.** (M.)
-- **TASK-017 — Profile data model + IDB store + settings page.** Hand-set fields, preset picker (Mid-pack / Strong mid-pack / Sub-elite), one global active profile. (M.)
-- **TASK-018 — `Predictor.predict` module (Layer B).** Pure function; climb + descent + runnable + aid; takes profile + intensity. Unit-tested. Depends on TASK-017. (M.)
-- **TASK-019 — Bidirectional aggressiveness slider on the planning page.** Intensity ↔ target time, inverse via bisection of the predictor. Depends on TASK-018. (M.)
-- **TASK-020 — Confidence indicator surfacing on predictor output.** Annotated by profile source. (S.)
-- **TASK-021 — Strava streams parser.** Reconstruct a usable `Gpx.Track`-shaped value from cadence's streams response (keyed-object form, see spec §4.4). Pure Elm decoder + transform; takes JSON, produces `{ points, cumDist, totalDist }`. Local-only — works on any streams JSON, whether from cadence or a manual dump. (M.)
-- **TASK-022 — Calibration from past activities.** Fit `vmh`, fatigue slope, optional HR bands. Surface "what changed and why." Depends on TASK-021 (streams parser) + TASK-024 (auth wiring). (L — split when picked up.)
+- ~~**TASK-014 — Course summary card additions.**~~ **Shipped.** Equivalent flat distance + elevation density label on race index/overview. PR #16.
+- ~~**TASK-015 — Per-km segment classification by grade.**~~ **Shipped.** Colour tag in the planning table derived from `Km.slope`. PR #18, merged `b451e1e`.
+- ~~**TASK-016 — Planned-vs-actual upload (manual `.gpx`).**~~ **Shipped.** Snap to course, compute actual splits at planned km boundaries, render diff column. `ActualGpx.elm`. PR #19.
+- ~~**TASK-017 — Profile data model + IDB store + settings page.**~~ **Shipped.** Hand-set fields, preset picker (Beginner / Mid-pack / Strong mid-pack / Sub-elite), one global active profile. `AthleteProfile.elm`, `#/profile`. PR #20.
+- ~~**TASK-018 — `Predictor.predict` module (Layer B).**~~ **Shipped.** Pure function; climb + descent + runnable + aid; takes profile + intensity. `Predictor.elm`. PR #21.
+- ~~**TASK-019 — Bidirectional aggressiveness slider on the planning page.**~~ **Shipped.** Intensity ↔ target time, inverse via bisection of the predictor. PR #22.
+- ~~**TASK-020 — Confidence indicator surfacing on predictor output.**~~ **Shipped.** Annotated by profile source. PR #23.
+- ~~**TASK-021 — Strava streams parser.**~~ **Shipped.** Reconstructs an `ActualGpx.ActualTrack` from cadence's keyed-object streams response (spec §4.4). Pure Elm decoder + transform. `StravaStreams.elm`. PR #24.
+- **TASK-022 — Calibration from past activities.** Fit `vmh`, fatigue slope, optional HR bands. Surface "what changed and why." Depends on TASK-021 (streams parser) + TASK-024 (auth wiring), both shipped. (L — split when picked up.) **← the one proposal still open.**
 - ~~**TASK-023 — Decision: OAuth helper or stay manual.**~~ **Resolved 2026-05-15.** Decision: extend `cadence`'s backend. Spec at `knowledge/reference/cadence-backend-spec.md`; cadence shipped all 5 PRs. Addendum 1 (broaden OAuth scope to `profile:read_all` for `max_heartrate` / `weight` / `ftp` / `measurement_preference`) drafted at `knowledge/reference/cadence-backend-spec-addendum-1-profile-scope.md` — pending hand-off to a cadence session.
 - ~~**TASK-024 — Strava OAuth integration in trail.**~~ **Shipped.** v1 (PR #25): token storage + Connect/Disconnect. b (PR #26): activity picker + streams fetch + persist via `StravaStreams.parse` → `ActualGpx.computeSplits`.
 
