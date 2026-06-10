@@ -16,8 +16,11 @@
 
 ## Active
 
-_(none — the 2026-06-09 framework session is fully closed: TASK-033 tidy
-(PR #57), TASK-034 extraction (PR #59), TASK-035 labyrinth principle
-(PR #61, merged `af65751`, framework now v2). Next session: pick from
-`BACKLOG.md` parking lot, or Proposals with explicit user go-ahead. To adopt
-the framework elsewhere: copy `knowledge/framework/`, follow its `SETUP.md`.)_
+_(none — no task started. The 2026-06-10 doc-vs-code audit queued three
+doc-fix tasks at the top of `BACKLOG.md` Active: **TASK-036** (ship-status
+sync), **TASK-037** (`project-brief.md` + `glossary.md` rewrite, incl. the VMH
+definition error), **TASK-038** (ADR / local-ci / MORNING accuracy fixes). Pick
+one with a user go-ahead — TASK-036 is the cheapest, TASK-037 the most
+load-bearing. See journal 2026-06-10 08:18. Prior session (2026-06-09
+framework): TASK-033/034/035 closed, framework now v2; PR #63 merged
+`616797a`.)_

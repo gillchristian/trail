@@ -1082,3 +1082,43 @@ tokens in.
 **What changed in the repo:** PR #61, merged `af65751`. 7 files, +97/−12.
 **What I learned:** Deliberately cited the principle by *name* in working-style.md, not by number — minutes after verifying nothing cites principle numbers, I nearly introduced the first numeric citation myself. Renumbering-safe references are a one-word habit.
 **Next:** Nothing active. Product work resumes from BACKLOG parking lot / Proposals.
+
+---
+## 2026-06-10 08:18 — Doc-vs-code audit → queued TASK-036/037/038
+
+**Task:** User request after the framework session — re-review the code so the
+docs stay accurate (code is the source of truth), then queue the fixes.
+**What I did:** Ran an 11-area doc-vs-code audit as a verification workflow
+(one auditor per doc area + a reverse auditor for undocumented features; every
+raw finding re-checked by two independent skeptics told to refute it; a
+completeness critic swept for unread docs). 54 raw findings → **39 confirmed,
+5 split-vote (adjudicated by hand), 10 refuted**. Grouped the confirmed set
+into three doc-fix tasks and queued them in `BACKLOG.md` Active (unchecked),
+each carrying its file:line evidence inline:
+- **TASK-036** — ship-status sync: the predictor/Strava track shipped, but the
+  roadmap header, cadence spec + addendum, BACKLOG's own Proposals section, and
+  a whiteboard doc still frame TASK-014..021 / 024 / 026 as pending.
+- **TASK-037** — `project-brief.md` + `glossary.md` rewrite: "No backend, ever"
+  is now false; three shipped features undocumented; **VMH defined wrong**
+  (glossary says flat km/h, code uses it as vertical m/h of climb).
+- **TASK-038** — ADR-0002/0003 + cadence-spec + local-ci + MORNING accuracy
+  fixes (un-normalized slope-factor table, nonexistent "Reset plan", streams
+  `data` nesting, undocumented global-Elm prereq, dev port 5174 not 5173, …).
+**What I verified:** Docs-only change; ran all four local-CI gates green —
+`npx elm make … --output=/dev/null` → "Success!", `npm run build` →
+"✓ built in 939ms", `npm run smoke` → "SMOKE PASSED", `npm run smoke:aidcsv`
+→ "PASS — all aid-csv checks green". Next TASK id confirmed 036 (highest
+existing = TASK-035).
+**What changed in the repo:** PR #63, merged `616797a` (the queueing); this
+close PR carries the journal entry + the CURRENT.md orientation note.
+**What I learned:** The refuted/split findings mattered as much as the
+confirmed ones — the roadmap's *appendix* predictor formulas do match the code
+(refuted), so only the status *headers* are stale, not the math; and the
+roadmap §10 "suggested task breakdown" is explicitly aspirational, so listing
+shipped tasks there isn't a defect. The raw audit output was a transient
+workflow artifact (temp dir, GC'd), so the durable record is the inline
+evidence in the three backlog entries — not a saved report. If the full
+39-item detail is ever wanted, re-run the audit or capture it to `reference/`.
+**Next:** Three doc-fix tasks queued; none pulled into `CURRENT.md` pending a
+user go-ahead on which to start. TASK-036 is the cheapest win (pure
+status-flips); TASK-037 fixes the most load-bearing doc (the brief).
