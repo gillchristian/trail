@@ -1206,3 +1206,55 @@ fixes. All claims already verified this session; criteria in CURRENT.md. Note:
 the `Planning.elm:323` *code comment* repeats ADR-0003's un-normalized
 slope-factor error — TASK-038 is docs-only so I'll log it as a parking-lot
 follow-up rather than touch `src/`.
+
+---
+## 2026-06-10 08:52 — TASK-038: ADR/CI/MORNING accuracy fixes (audit queue cleared)
+
+**Task:** TASK-038 — last of three 2026-06-10 doc-vs-code audit fixes. Clears
+the BACKLOG Active queue.
+**What I did:** Fixed concrete technical inaccuracies across six docs, each
+claim verified against code first. ADR-0003: the slope-factor properties table
+listed *un-normalized* `exp(3.5·|s+0.05|)` values (f(+0.10) shown as 1.687) and
+implied symmetry about 0 — replaced with the normalized values that match
+`Planning.slopeFactor` (f(+0.10)=1.419, f(−0.10)=1.000=flat) and stated the
+real symmetry axis s=−0.05; dropped the nonexistent "Reset plan" row (only
+per-km `ResetKmToAuto` exists) and corrected the all-Manual row (the committed
+target is *kept*, not replaced by the sum); noted the slope divisor is the
+window length (last km partial) not a fixed 1000 m + the independent-rounding
+drift. ADR-0002: `sym` is auto-derived from services (`symbolForAid`; no UI
+picker; no-services default "Flag, Blue" not Restaurant), `<desc>` example fixed
+to `buildDesc`'s real `Km X · services · Rest m:ss` form, removed the
+nonexistent "Aid N" name fallback. cadence-spec + addendum: streams example now
+shows the `{"data":[…]}` per-key nesting `StravaStreams.streamData` actually
+decodes (a client built from the old flat-array example couldn't decode the
+real response); env var `VITE_BACKEND_URL`; "fields flow through to settings"
+reframed (trail has no `/api/athlete` client yet); "§14.2" citation repointed
+from the roadmap (no §14) to `archive/trail_race_planner_spec.md`. local-ci.md:
+added a Prerequisites section (global Elm 0.19.1 — not an npm dep, so
+`npm install` alone can't run gates 1/2/4 — plus the Node v22 `.nvmrc` pin) and
+scoped the storage-smoke claim to the v1 `races` store. MORNING.md: frozen
+2026-05-15 historical banner, dev port 5174, parking lot is mid-BACKLOG, stale
+nvm-22 caveat refreshed.
+**What I verified:** Recomputed the slope factors via node (f values + symmetry
+about −0.05 confirmed). Code-checked every claim: `ResetKmToAuto` only
+(`Main.elm:860`); `effectiveTargetSeconds` returns the committed `Just s`
+(`Main.elm:6511`); `slope = (eleEnd-eleStart)/distance` window-length
+(`Planning.elm`); `symbolForAid` else→"Flag, Blue" (`GpxExport.elm:112`);
+`buildDesc` format; `streamData` decodes `field key (field "data" …)`
+(`StravaStreams.elm`); `VITE_BACKEND_URL` (`main.js:16`); no `/api/athlete` in
+`StravaApi`; archive spec §14.2 exists, roadmap has none; `.nvmrc`=v22, elm
+absent from `package.json`. Local CI green — elm make "Success!", build "✓ built
+in 975ms", smoke "SMOKE PASSED", smoke:aidcsv "PASS".
+**What changed in the repo:** PR #69, merged `9529c01`. 6 docs + CURRENT
+criteria. This close PR carries DONE/BACKLOG-tick/journal, empties CURRENT (audit
+queue cleared), and queues one parking-lot follow-up.
+**What I learned:** The slope-factor table was wrong in an instructive way — it
+mixed normalized rows (f(0), f(−0.05)) with un-normalized ones (f(+0.10),
+f(±0.20)), which is exactly how the "either way / symmetric about 0" error crept
+in. The `Planning.elm:323` *code comment* has the identical mistake; kept
+TASK-038 docs-only and queued the one-line comment fix to the parking lot rather
+than smuggle a `src/` change into a docs task. Goal met: all three audit doc-fix
+tasks (036/037/038) shipped + closed; BACKLOG Active is empty.
+**Next:** Nothing active. BACKLOG Active is clear. Future work: parking lot
+(incl. the new slope-comment fix + the older section-overlap bug) or the lone
+open Proposal TASK-022 (predictor calibration) — needs explicit user go-ahead.
