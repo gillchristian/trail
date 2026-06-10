@@ -1163,3 +1163,46 @@ formulas match the code, so only the *status* framing was stale, not the math.
 **Next:** TASK-037 — rewrite `project-brief.md` + `glossary.md` (incl. the VMH
 definition fix: glossary says flat km/h, code uses vertical m/h of climb).
 Criteria already in CURRENT.md.
+
+---
+## 2026-06-10 08:44 — TASK-037: brief + glossary rewrite
+
+**Task:** TASK-037 — second of three 2026-06-10 doc-vs-code audit fixes.
+**What I did:** Rewrote the two most load-bearing reference docs to match the
+code. `project-brief.md`: the "No backend, ever" / "No backend / multi-user /
+sync" constraints (which the live Strava integration flatly contradicted) now
+carry the roadmap's agreed hybrid wording — Layer 0 fully local, Layer 1
+opt-in Strava sync via the shared `cadence` backend (which holds no trail
+state, offline-degrading). Added a "Features shipped beyond the original list"
+section (plan-vs-actual + HR, athlete profile + predictor, aid CSV); fixed
+feature 10 (map is the `<trail-map>` custom element, *not* a JS port) and the
+stack drifts (`Browser.application` not `.element`; IDB ~100 lines / 2 stores
+not ~50 / 1; km-only is a UI rule — CSV import accepts `distance_mi`).
+`glossary.md`: **VMH was defined backwards** — "flat-ground speed (km/h)" — when
+the code uses `verticalRateVmh` as a vertical *climb* rate (m ascent/hour),
+`climb = gain / (VMH × intensity)`. Redefined it, added **flat trail pace**
+(`flatTrailPaceSecPerKm`) as the genuinely-flat rate it was confused with, and
+added the user-visible card terms (distance category S/M/L/XL, elevation
+density, flat-equivalent distance).
+**What I verified:** Code is the source of truth — confirmed every claim before
+writing: `Browser.application` (`Main.elm:83`), two object stores in 256-line
+`src/main.js`, `<trail-map>` via `customElements.define` (`leaflet-element.js:217`),
+`distance_mi`/`miles` in `AidCsv.elm`, `verticalRateVmh` "m of climb per hour"
+(`AthleteProfile.elm:47`) used as `gain/(vmh*i)` (`Predictor.elm:114`),
+`distanceCategory`/`elevationDensity`/`equivalentFlatKm` in `Main.elm`. Local
+CI all green — elm make "Success!", build "✓ built in 1.01s", smoke "SMOKE
+PASSED", smoke:aidcsv "PASS".
+**What changed in the repo:** PR #67, merged `73b206f`. 2 docs (brief, glossary)
++ CURRENT criteria. This close PR carries DONE/BACKLOG-tick/journal and orients
+TASK-038.
+**What I learned:** The VMH error was the sharpest find of the audit — a future
+session sizing a climb-rate field off the glossary would have built the wrong
+model (treating a vertical-ascent-rate as a flat ground speed). The fix names
+both rates explicitly so they can't be conflated again. Kept "kilometre" →
+"kilometer" American spelling to match the brief's existing usage rather than
+introduce a second spelling in one doc.
+**Next:** TASK-038 — ADR-0002/0003 + cadence-spec + local-ci + MORNING accuracy
+fixes. All claims already verified this session; criteria in CURRENT.md. Note:
+the `Planning.elm:323` *code comment* repeats ADR-0003's un-normalized
+slope-factor error — TASK-038 is docs-only so I'll log it as a parking-lot
+follow-up rather than touch `src/`.
