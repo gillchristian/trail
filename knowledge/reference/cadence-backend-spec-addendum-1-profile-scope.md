@@ -61,13 +61,13 @@ Deploying the scope change does **not** automatically broaden the scope of exist
 For the single-user system this means:
 
 1. Deploy lands.
-2. User visits cadence UI (or trail UI once TASK-024 ships). Existing session still works for the activity endpoints — no breakage.
+2. User visits cadence UI (or trail UI — TASK-024 has shipped, PR #25/#26). Existing session still works for the activity endpoints — no breakage.
 3. `/api/athlete` keeps returning SummaryAthlete (no `max_heartrate`) for that user until they re-auth. That's fine — trail's calibration UX will prompt re-auth when it actually needs those fields.
 4. When the user clicks "Connect Strava" again, Strava notices the requested scope set differs from the previously granted set and shows an *incremental consent* page asking specifically for profile access. User accepts.
 5. New tokens issued with combined scope. `SetTokens` upserts the row by `athlete_id`. **All sessions for that athlete now resolve to upgraded tokens** because `GetTokensBySession` joins on `athlete_id` — no session-row migration needed.
 6. Next `/api/athlete` call returns DetailedAthlete shape.
 
-No frontend code change required in cadence (its existing "Connect Strava" link already goes through `/auth/strava`). Trail's TASK-024 will hit the same endpoint.
+No frontend code change required in cadence (its existing "Connect Strava" link already goes through `/auth/strava`). Trail's TASK-024 (shipped) hits the same endpoint.
 
 ### 4. (Optional, deferred) Persist scope per token
 

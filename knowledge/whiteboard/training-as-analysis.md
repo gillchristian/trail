@@ -88,7 +88,7 @@ plans?* If the sentence is tortured or speculative, the feature stays out.
 
 ## Follow-ups
 
-- TASK-026 — show HR data on linked actuals. Queued in BACKLOG.
+- TASK-026 — show HR data on linked actuals. **Shipped** (PR #35).
 - No ADR drafted. If we later want to lock the "analysis must sharpen
   planning" rule formally, an ADR is the right place — but for now it
   lives in this whiteboard entry and in the project brief's existing

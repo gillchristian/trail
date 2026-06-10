@@ -1,6 +1,10 @@
 # Spec: extending cadence's backend to serve trail
 
-**Status:** proposal — not yet greenlit.
+**Status:** implemented — greenlit (2026-05-15) and shipped. cadence merged all
+five PRs (§12); trail consumes the backend via `StravaApi.elm` + `StravaStreams.elm`
+(TASK-024 PR #25, TASK-024b PR #26). Kept as the design + interface record. One
+follow-up scope change is still pending on the cadence side — see Addendum 1
+(`cadence-backend-spec-addendum-1-profile-scope.md`).
 **Companion to:** `pace-prediction-roadmap.md` §6 (Strava integration phasing) and §8 (local-first tension).
 **Audience:** an agent working inside `~/dev/cadence/` once the user has approved this direction. The §12 brief at the bottom is the hand-off prompt; everything above it is context.
 
@@ -249,13 +253,14 @@ All additive + idempotent guard via the `migrations` table that's already there.
 
 ## 9. Trail-side changes (informational, not part of the cadence spec)
 
-For completeness — what trail has to build to consume this:
+For completeness — what trail had to build to consume this. **All of it shipped**
+in TASK-024 (PR #25) + TASK-024b (PR #26):
 
-- `Settings.stravaSessionToken : Maybe String` stored in IDB under a `settings` keyval.
-- HTTP client wrapper that adds the auth header to every backend call.
-- 401 handler → clear token from IDB → show "Reconnect Strava" UI.
-- `BACKEND_URL` env var (Vite) so dev points at localhost:3001 and prod at the Fly URL.
-- All this is captured in `pace-prediction-roadmap.md` TASK-024.
+- `Settings.stravaSessionToken : Maybe String` stored in IDB under a `settings` keyval. ✓
+- HTTP client wrapper that adds the auth header to every backend call. ✓ (`StravaApi.elm`)
+- 401 handler → clear token from IDB → show "Reconnect Strava" UI. ✓
+- `BACKEND_URL` env var (Vite) so dev points at localhost:3001 and prod at the Fly URL. ✓
+- All this was captured in `pace-prediction-roadmap.md` TASK-024.
 
 ---
 

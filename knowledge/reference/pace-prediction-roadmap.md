@@ -1,19 +1,24 @@
 # Pace Prediction Roadmap
 
-**Status:** proposal — exploration only, nothing committed.
+**Status:** largely implemented — the predictor + athlete-profile + Strava-sync
+arc shipped (TASK-014..021 + 024/024b; see `planning/DONE.md`). Only **TASK-022**
+(calibration from past activities) remains open. Kept as the design record: the
+*why* and the trade-offs behind what was built.
 **Source:** `archive/trail_race_planner_spec.md` (an exploration the user did with another agent — archived 2026-05-18), cross-referenced against the current codebase, ADR-0003, and two adjacent projects (`strava-mcp`, `cadence`).
 
-This doc is the *plan*. It does not change code. When/if individual chunks are approved, each one gets a real task in `BACKLOG.md` and an ADR in `decisions/`.
+This doc *was* the plan; most of it is now built. The sections below are kept in
+their original proposal voice where that voice is still the clearest record of
+the reasoning — but the status header above is authoritative on what shipped.
 
 ---
 
 ## 0. TL;DR
 
-- The current pace engine (Tobler distribution, ADR-0003) answers a narrow question well: *given a target total time, how should it split across kms?* It does **not** predict what the target should be, doesn't model the athlete, and doesn't learn.
-- The spec proposes layering a **Layer B time predictor** (component-based: climb time + descent time + runnable + aid) on top, with **athlete profiles** holding the coefficients, and an **aggressiveness slider** that maps bidirectionally between "intensity" and "predicted total time."
-- Most of the predictor's value is **gated on past-activity data** (climb rate, sustainable HR by duration, Riegel fade exponent). Without data, it falls back to population tiers and the result is fuzzy. That argues for a **two-phase build**: profiles + slider with hand-set defaults first, **then** Strava ingestion to fit those defaults.
-- The "no backend ever" constraint in `project-brief.md` is the real architectural tension. Recommendation: ship a fully-local Phase 1 (manual GPX/CSV upload from Strava), then re-evaluate the OAuth helper question once the friction is felt.
-- The actual-vs-planned comparison (already in the parking lot) is the **highest-leverage near-term feature** — it's useful even with zero predictor work, and the data it captures (per-km actual times) is the same data the predictor would later use for calibration.
+- The distributor (Tobler distribution, ADR-0003) answers a narrow question well: *given a target total time, how should it split across kms?* It does **not** predict what the target should be, doesn't model the athlete, and doesn't learn — so we layered a predictor on top of it rather than changing it.
+- That **Layer B time predictor** (component-based: climb time + descent time + runnable + aid) **shipped** as `Predictor.predict` (`src/Predictor.elm`), fed by **athlete profiles** that hold the coefficients (`AthleteProfile.elm`, settings at `#/profile`) and driven by a bidirectional **aggressiveness slider** mapping between "intensity" and "predicted total time" (TASK-018/019/020).
+- Most of the predictor's value is **gated on past-activity data** (climb rate, sustainable HR by duration, Riegel fade exponent). Without data it falls back to population tiers and the result is fuzzy. That argued for a **two-phase build**: profiles + slider with hand-set defaults first, **then** Strava ingestion to fit those defaults. Phase 1 shipped; the data-driven fit (**TASK-022 — calibration**) is the one piece still open.
+- The "no backend ever" constraint in `project-brief.md` was the real architectural tension. It was **resolved as a hybrid** (§8): Layer 0 stays fully local; Layer 1 is opt-in Strava sync via the `cadence` backend (TASK-024/024b shipped). The constraint's wording in the brief is corrected by TASK-037.
+- The actual-vs-planned comparison **shipped as TASK-016** (PR #19) — useful even with zero predictor work, and the per-km actual times it captures are exactly the data **TASK-022** will use for calibration.
 
 ---
 
@@ -72,7 +77,7 @@ The cleanest mental model: **predictor** and **distributor** are different probl
 
 ```
 ┌────────────────────────────────────┐         ┌──────────────────────────────┐
-│  PREDICTOR (proposed, Layer B)     │  seed   │  DISTRIBUTOR (current)       │
+│  PREDICTOR (shipped, Layer B)      │  seed   │  DISTRIBUTOR (current)       │
 │  course + profile + intensity      │  ─────▶ │  target_total + locks → kms  │
 │  → predicted total time +          │  total  │  (Tobler, ADR-0003)          │
 │    per-km / per-section splits     │         │                              │
@@ -83,7 +88,7 @@ The cleanest mental model: **predictor** and **distributor** are different probl
 
 The output of the predictor flows into the distributor as a seed value. The user can accept it, modify it, or ignore it entirely (input a number from intuition). The distributor doesn't care where the target came from.
 
-**Implication for current code:** `Planning.distribute` doesn't change. We add a `Predictor.predict` function alongside it. The two are composed by the UI, not by Elm types.
+**How it landed in the code:** `Planning.distribute` didn't change. We added a `Predictor.predict` function alongside it (`src/Predictor.elm`). The two are composed by the UI, not by Elm types — exactly as sketched here.
 
 ---
 
@@ -293,7 +298,7 @@ The shape we landed on (option 3 from the prior version):
 - **Layer 0 — fully local.** All race storage, plan editing, GPX export, `.trail` round-trip, manual GPX upload for actual-vs-planned. Works offline forever. The promise of the original brief.
 - **Layer 1 — opt-in Strava sync.** Requires a session token in IDB and the cadence backend reachable. Surfaces: link a race to a Strava activity, fetch streams for actual-vs-planned, calibrate the profile from past activities. Without the backend reachable, these UI surfaces show a "not connected" state and the app's Layer 0 features keep working.
 
-`project-brief.md` will be updated to reflect this when TASK-024 lands (see §10). The update should say: *"Local-first. Layer 0 features (planning, storage, export) work fully offline. Layer 1 (Strava sync) is an opt-in enhancement that needs the cadence backend; the app degrades gracefully when it's unreachable."*
+TASK-024 has since landed (PR #25/#26), so the brief now needs this update — tracked as **TASK-037**. The agreed wording: *"Local-first. Layer 0 features (planning, storage, export) work fully offline. Layer 1 (Strava sync) is an opt-in enhancement that needs the cadence backend; the app degrades gracefully when it's unreachable."*
 
 The implementation discipline: **no UI surface that exists only when the backend is reachable**. Strava sync is always *additive* to a fully-local experience.
 
@@ -401,8 +406,8 @@ return 1 + slope * max(0, t - threshold)
 
 ## 12. What this doc is and isn't
 
-**This is:** a proposal, written so a future session (or the user) can pick it apart, agree with parts, and reject parts. The structure mirrors how the spec would land in this codebase, not how an external paper would describe the math.
+**This was:** a proposal, written so a future session (or the user) could pick it apart, agree with parts, and reject parts. The structure mirrors how the spec would land in this codebase, not how an external paper would describe the math. Most of it was then agreed and built — see the status header at the top and `planning/DONE.md` (TASK-014..021, 024/024b); the sections kept their proposal voice because that voice is still the clearest record of the reasoning.
 
-**This is not:** a commitment to build any of it. Nothing here changes code or `CURRENT.md`. When/if individual sections are approved, they become proper tasks with acceptance criteria and (for the non-trivial ones) ADRs.
+**What's still open:** only **TASK-022** (calibration from past activities). Everything else here shipped as a proper task with acceptance criteria (and, where non-trivial, an ADR).
 
 **Sources cross-referenced:** the spec doc itself, ADR-0003, `src/Planning.elm`, `project-brief.md`, `strava-mcp/src/strava/client.ts` (for what the Strava API actually returns), `cadence/server/handlers/*.go` (for what a working OAuth + backfill loop looks like).
