@@ -12,7 +12,7 @@ Trail's roadmap (`pace-prediction-roadmap.md` §7 — calibration) wants those f
 
 | Field | Trail use |
 |---|---|
-| `max_heartrate` | Anchor the HR zone model in `pace-prediction-roadmap.md` §14.2 (LTHR ≈ 95% of max for trained runners). |
+| `max_heartrate` | Anchor the HR zone model in `archive/trail_race_planner_spec.md` §14.2 (LTHR ≈ 95% of max for trained runners). *(The roadmap has no §14; the HR-zone model lives in the archived spec.)* |
 | `weight` | Reserve for future power-curve heuristics (Stryd-style). Not load-bearing. |
 | `ftp` | Bike-only on Strava, but if the user has it set we can ignore it gracefully. |
 | `measurement_preference` | Currently moot for trail (km-only per `project-brief.md`), but useful if cadence ever needs it. |
@@ -116,7 +116,7 @@ curl -s -i "http://localhost:3001/api/athlete" -H "Authorization: Bearer $TOKEN"
 
 - Strava's developer console (Authorization Callback Domain settings) doesn't require a scope-list declaration at app-config level — scope is purely per-request. No console change needed.
 - If the Strava app is ever configured for a different OAuth audience (e.g. multi-user), `profile:read_all` is sensitive (returns name, age, weight, etc.). Currently single-user and personal use, so fine.
-- Trail's IDB doesn't need to change. The session token model is unchanged. The new profile fields, when they appear, simply flow through to trail's settings page.
+- Trail's IDB doesn't need to change. The session token model is unchanged. Note: trail has **no `/api/athlete` client yet** — its `StravaApi` only does activities / streams / search — so these profile fields don't currently flow anywhere. They become consumable when **TASK-022** (calibration) builds the athlete fetch + profile seeding.
 
 ## Hand-off brief for the cadence agent
 
