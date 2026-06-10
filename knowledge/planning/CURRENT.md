@@ -16,33 +16,37 @@
 
 ## Active
 
-### TASK-036 — Sync ship-status across the planning + reference docs
+### TASK-037 — Rewrite `project-brief.md` + `glossary.md` to match shipped reality
 
-**Source:** BACKLOG (queued by the 2026-06-10 doc-vs-code audit) — user
-go-ahead 2026-06-10 to clear all three audit doc-fix tasks (036/037/038).
-**Branch:** `docs/task-036-ship-status-sync`
+**Source:** BACKLOG (2026-06-10 doc-vs-code audit) — user go-ahead 2026-06-10 to
+clear all three audit doc-fix tasks (036/037/038). TASK-036 closed (PR #65,
+`7b8455f`).
+**Branch:** `docs/task-037-brief-glossary-rewrite`
 **Acceptance criteria:**
-- [x] `reference/pace-prediction-roadmap.md` status header (line 3) no longer
-  reads "proposal — exploration only, nothing committed"; §0/§2 (+ §12) no longer
-  frame the predictor + athlete model as proposed/distributor-only (`Predictor.predict`
-  ships at `src/Predictor.elm:53`); the line-296 promise to update the brief
-  "when TASK-024 lands" reflects that TASK-024 shipped (PR #25/#26) and the
-  brief rewrite is now tracked (TASK-037).
-- [x] `reference/cadence-backend-spec.md` status header (line 3) no longer
-  reads "not yet greenlit"; §9 "what trail has to build" reflects that it is
-  built (`StravaApi`/`StravaStreams`, TASK-024/024b).
-- [x] `reference/cadence-backend-spec-addendum-1-profile-scope.md` lines 64/70
-  no longer treat trail's TASK-024 as unshipped (the addendum's own
-  cadence-side status stays pending — that scope change is genuinely unshipped).
-- [x] `BACKLOG.md` Proposals: TASK-014..021 struck through + PR-annotated to
-  match the TASK-023/024 convention; only TASK-022 (calibration) left open.
-- [x] `whiteboard/training-as-analysis.md:91` no longer frames TASK-026 (HR on
-  actuals) as "Queued" — it shipped (PR #35).
-- [x] Local CI green (4 gates: elm make "Success!", build "✓ built in 935ms",
-  smoke "SMOKE PASSED", smoke:aidcsv "PASS"); grep confirms no stale "not yet
-  greenlit" / "exploration only" / "Queued in BACKLOG" status strings remain in
-  live docs.
-**Notes:** Docs-only, status-sync only. Out of scope: rewriting the brief/glossary
-(TASK-037) and the roadmap appendix formulas (audit confirmed they match the
-code — refuted finding). The roadmap §10 task breakdown is explicitly
-aspirational, so listing shipped tasks there isn't a defect.
+- [ ] **Brief — backend constraint.** "No backend, ever" (line 13) and "No
+  backend / multi-user / sync" (line 28) corrected to the roadmap's agreed
+  Layer-0 (offline) / Layer-1 (opt-in Strava sync via cadence) wording
+  (`pace-prediction-roadmap.md:296`); the live Strava integration no longer
+  contradicts the brief.
+- [ ] **Brief — undocumented shipped features.** Add the three: plan-vs-actual
+  splits + HR via `ActualGpx` (TASK-016/026); athlete profile + `Predictor` at
+  `#/profile` (TASK-017/018/019/020); aid-station CSV import/export via `AidCsv`
+  (TASK-031).
+- [ ] **Brief — feature 10 + minor drifts.** Map shipped as the `<trail-map>`
+  custom element, *not* a JS port (line 56); CSV accepts miles via
+  `distance_mi` (vs "km only", line 31 — qualify, keep the UI-display km-only
+  intent); `Browser.application` not `.element` (line 38); IDB port is ~100
+  lines / 2 stores (races + settings), not ~50 / 1 (line 41).
+- [ ] **Glossary — VMH fixed.** Line 29 ("flat-ground speed … km/h") is wrong:
+  code uses `verticalRateVmh` = vertical metres/hour of climb
+  (`src/AthleteProfile.elm:47`, used as `gain / (vmh*i)` in `Predictor.elm:114`);
+  the flat rate is the separate `flatTrailPaceSecPerKm`. Redefine VMH as
+  vertical climb rate; add/clarify the flat-pace term.
+- [ ] **Glossary — omitted user-visible terms.** Add distance category (S/M/L/XL),
+  elevation density, flat-equivalent distance (all shown on race cards).
+- [ ] Local CI green (4 gates). Brief still wins conflicts with planning
+  (CLAUDE.md) — so any contradiction surfaced gets the brief's wording.
+**Notes:** Docs-only. The brief is the most load-bearing doc (wins conflicts).
+Keep the "miles" fix precise: CSV *import* accepts `distance_mi`, but the app
+displays km only — don't overstate. Out of scope: ADR/CI/MORNING accuracy
+(TASK-038).

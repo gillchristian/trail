@@ -1122,3 +1122,44 @@ evidence in the three backlog entries — not a saved report. If the full
 **Next:** Three doc-fix tasks queued; none pulled into `CURRENT.md` pending a
 user go-ahead on which to start. TASK-036 is the cheapest win (pure
 status-flips); TASK-037 fixes the most load-bearing doc (the brief).
+
+---
+## 2026-06-10 08:36 — TASK-036: ship-status sync across docs
+
+**Task:** TASK-036 — first of three 2026-06-10 doc-vs-code audit fixes (user
+go-ahead to clear all of 036/037/038).
+**What I did:** Flipped stale "still a proposal" framing in the docs to match
+shipped reality. `pace-prediction-roadmap.md`: status header → "largely
+implemented (only TASK-022 open)"; §0 bullets + §2 diagram/"how it landed" +
+§12 "what this doc is" rewritten from proposed→shipped; §8 line-296 promise to
+update the brief "when TASK-024 lands" now records that TASK-024 shipped
+(PR #25/#26) and the brief rewrite is tracked by TASK-037.
+`cadence-backend-spec.md`: header → "implemented" (cadence shipped all 5 PRs;
+trail consumes via `StravaApi`/`StravaStreams`); §9 trail-side list marked
+built. Addendum-1: the two spots treating trail's TASK-024 as unshipped flipped
+(its *own* cadence-side scope change stays pending — genuinely unshipped).
+BACKLOG Proposals: TASK-014..021 struck through + PR-annotated to match the
+TASK-023/024 convention, leaving only TASK-022. `training-as-analysis.md`:
+TASK-026 no longer "Queued" (PR #35).
+**What I verified:** Code is the source of truth, so I confirmed the claims
+before editing: `Predictor.predict : Profile -> Race -> List Km -> Float ->
+Prediction` at `src/Predictor.elm:53`; `StravaApi.elm` exposes
+`fetchActivities`/`fetchStreams` against the live cadence endpoints. Grep:
+no `not yet greenlit` / `exploration only, nothing committed` / `Queued in
+BACKLOG` / `proposed, Layer B` strings remain in live docs (only the task
+descriptions quote them as evidence). Local CI all green — `elm make` →
+"Success!", `npm run build` → "✓ built in 935ms", `npm run smoke` → "SMOKE
+PASSED", `npm run smoke:aidcsv` → "PASS — all aid-csv checks green".
+**What changed in the repo:** PR #65, merged `7b8455f`. 6 files (docs only):
+the two cadence specs, the roadmap, BACKLOG, whiteboard, + CURRENT criteria.
+This close PR carries DONE/BACKLOG-tick/journal and orients TASK-037 into
+CURRENT.
+**What I learned:** Kept the addendum's top-level status pending on purpose —
+the *trail* TASK-024 it references shipped, but the addendum is about a
+cadence-side `profile:read_all` scope change that's still awaiting hand-off to
+a cadence session (per BACKLOG TASK-023 note). Flipping the whole header would
+have over-claimed. The audit's refuted findings held: the roadmap appendix
+formulas match the code, so only the *status* framing was stale, not the math.
+**Next:** TASK-037 — rewrite `project-brief.md` + `glossary.md` (incl. the VMH
+definition fix: glossary says flat km/h, code uses vertical m/h of climb).
+Criteria already in CURRENT.md.
