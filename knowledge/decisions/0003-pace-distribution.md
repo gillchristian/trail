@@ -20,12 +20,13 @@ f(s) = exp(3.5 · |s + 0.05|) / exp(3.5 · 0.05)
      = exp(3.5 · |s + 0.05| - 0.175)
 ```
 
-Properties:
-- `f(0) = 1.000` (flat = baseline pace)
-- `f(-0.05) ≈ 0.839` (fastest at 5 % downhill — Tobler's optimum)
-- `f(+0.10) ≈ 1.687` (10 % climb is 69 % slower)
-- `f(-0.10) ≈ 1.191` (10 % descent past optimum, modestly slower than flat)
-- `f(±0.20) ≈ 2.397` (20 % grade either way ~ 2.4× flat)
+Properties — the function is **symmetric about `s = −0.05`** (its minimum), *not* about 0, so an X % climb and an X % descent are **not** equally costly. Normalised values (these match `Planning.slopeFactor`, not the raw `exp(3.5·|s+0.05|)`):
+- `f(0)     = 1.000` (flat = baseline pace)
+- `f(-0.05) ≈ 0.839` (the minimum — fastest, at 5 % downhill, Tobler's optimum)
+- `f(-0.10) = 1.000` (10 % downhill costs the same as flat — it sits as far *below* the −5 % optimum as flat sits *above* it)
+- `f(+0.10) ≈ 1.419` (10 % climb is ~42 % slower than flat)
+- `f(-0.20) ≈ 1.419` (20 % downhill == 10 % uphill, by the symmetry about −5 %)
+- `f(+0.20) ≈ 2.014` (20 % climb ~ 2× flat)
 
 This is *Tobler's hiking function* repurposed: Coros's own algorithm is undocumented, and Tobler is the most widely-cited physiologically-motivated curve. The user already named "Naismith- or Tobler-style" themselves.
 
@@ -62,10 +63,9 @@ If `budget_for_auto ≤ 0` (locked + aid rest already exceeds target), Auto kms 
 | ------------------------------------- | --------------------------------------------------------- |
 | Enters / changes total target time    | Re-distribute across all Auto kms.                        |
 | Edits one km's pace/time              | That km becomes `Manual`. Re-distribute remaining Auto.   |
-| Resets a km to Auto                   | Re-distribute including it.                               |
+| Resets a km to Auto                   | That km rejoins the Auto pool and the budget re-distributes. (`ResetKmToAuto` — the per-km "Reset to auto (GAP)" button; there is **no** all-kms "reset plan" action.) |
 | Changes an aid station's rest time    | Re-distribute Auto kms.                                   |
-| Edits *every* km to Manual            | Target time becomes derived (= sum). No re-distribution.  |
-| Hits "Reset plan"                     | All kms → Auto; target preserved.                         |
+| Edits *every* km to Manual            | No Auto kms left to re-distribute. The committed target is **kept** as-is (it is *not* replaced by the sum); the current-sum-vs-target row just shows whatever gap remains. (`effectiveTargetSeconds`, `src/Main.elm`.) |
 
 The total-time row always shows **current sum vs target**, with the diff highlighted when non-zero. The user is never surprised by hidden re-balancing.
 
@@ -87,5 +87,6 @@ A "section" is the contiguous span between two consecutive aid stations (or star
 ## Consequences
 
 - The math is purely local — no solver, no iteration. Reorienting on user edits is O(n).
-- The slope `s` per km uses `(ele_end - ele_start) / 1000 m`. This *underweights* rolling terrain inside a km (e.g. up 50m then back down 50m looks flat). For night 1 we accept this; a follow-up can switch to "GAP using elevation gain + loss separately" if real planning feels off.
+- The slope `s` per km uses `(ele_end − ele_start) / window_length` — the window's *actual* length, not a fixed 1000 m (every full km is ~1000 m, but the last, partial km is divided by its own shorter length). This *underweights* rolling terrain inside a window (e.g. up 50 m then back down 50 m looks flat). For night 1 we accept this; a follow-up can switch to "GAP using elevation gain + loss separately" if real planning feels off.
+- Auto-km times are rounded to whole seconds **independently**, so their sum can differ from the exact `budget_for_auto` by a few seconds. The "current sum vs target" row can therefore show a small (±few s) gap even with nothing manually locked — that's rounding, not a distribution error.
 - The "current sum ≠ target" diff in the UI is intentional. We never silently re-balance the user's manual entries.

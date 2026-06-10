@@ -1,6 +1,13 @@
 # Trail — morning triage
 
-End-of-night summary. Read this first.
+> **⚠️ Historical snapshot — frozen 2026-05-15.** This is the hand-off note from
+> the original overnight build (the first 10 PRs). It is **not** maintained as
+> the project's live state — for that, read `CLAUDE.md` →
+> `knowledge/README.md` → `knowledge/planning/CURRENT.md`. A few facts below were
+> corrected in the 2026-06-10 doc audit (TASK-038); the rest stands as a
+> point-in-time record of that morning.
+
+End-of-night summary (the morning after the overnight build).
 
 ## Feedback pass (after your morning notes)
 
@@ -42,7 +49,7 @@ Stack ended up exactly as ADR-0001 proposed: Elm + Tailwind + Vite + a few tiny 
 ```sh
 npm install   # if you haven't recently
 npm run dev
-# open http://localhost:5173
+# open http://localhost:5174   (dev server port, per package.json)
 ```
 
 Then drop `samples/20k_oh_meu_deus.gpx` onto the index page (or click *Choose a file*). You should land on a race detail with the 1:1 profile drawn in.
@@ -87,9 +94,9 @@ Concrete things to click through to confirm I didn't break anything I couldn't b
 
 ## Known caveats / parking-lot items
 
-(Backlog parking lot at the bottom of [`knowledge/planning/BACKLOG.md`](knowledge/planning/BACKLOG.md) is the canonical list. Highlights:)
+(Backlog parking lot — the **mid-file** section of [`knowledge/planning/BACKLOG.md`](knowledge/planning/BACKLOG.md), between Active and Proposals — is the canonical list. Highlights:)
 
-- **No browser-driven E2E test** in CI. `npm run smoke` covers the JS-side storage layer only. jsdom 29 doesn't load on Node 20.15 (transitive ESM/CJS bug); fix is `nvm use 22` if we want headless Elm tests later.
+- **No browser-driven E2E test** in CI. _(Refreshed 2026-06-10.)_ Local CI is the four gates in [`knowledge/reference/local-ci.md`](knowledge/reference/local-ci.md): `npm run smoke` covers the JS-side `races` storage round-trip and `npm run smoke:aidcsv` drives the **real compiled** `AidCsv` parser through a `Platform.worker` harness. Node is now pinned to v22 via `.nvmrc`, so the old "needs `nvm use 22` for jsdom" caveat is moot. A full browser-driven Elm E2E still doesn't exist.
 - **Tobler descents** may feel slow on aggressive technical descenders. ADR-0003 calls out the "descent aggressiveness slider" follow-up if it's wrong in practice.
 - **Coros GPX format** is an *assumption* (ADR-0002). Real-watch validation pending.
 - **Per-km card "ghost-wave" rendering** is only on the main race-detail profile, not on the per-km mini cards. Adding it there is easy; skipped to keep the card visually quiet.

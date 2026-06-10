@@ -156,8 +156,15 @@ Proposed handler:
 GET /api/activities/{id}/streams?keys=time,distance,latlng,altitude,heartrate,velocity_smooth,grade_smooth
 
 → 200 application/json
-   { "time": [ ... ], "distance": [ ... ], "latlng": [[lat,lng], ...],
-     "altitude": [ ... ], "heartrate": [ ... ], ... }
+   Strava `key_by_type=true` shape — each key maps to an OBJECT with a `data`
+   array (NOT a bare array). This nesting is load-bearing: `StravaStreams.parse`
+   decodes `D.field key (D.field "data" inner)` (`src/StravaStreams.elm`), so a
+   client built against a flat-array example would fail to decode.
+   { "time":      { "data": [ ... ] },
+     "distance":  { "data": [ ... ] },
+     "latlng":    { "data": [[lat,lng], ...] },
+     "altitude":  { "data": [ ... ] },
+     "heartrate": { "data": [ ... ] }, ... }
 ```
 
 Requirements:
@@ -259,7 +266,7 @@ in TASK-024 (PR #25) + TASK-024b (PR #26):
 - `Settings.stravaSessionToken : Maybe String` stored in IDB under a `settings` keyval. ✓
 - HTTP client wrapper that adds the auth header to every backend call. ✓ (`StravaApi.elm`)
 - 401 handler → clear token from IDB → show "Reconnect Strava" UI. ✓
-- `BACKEND_URL` env var (Vite) so dev points at localhost:3001 and prod at the Fly URL. ✓
+- `VITE_BACKEND_URL` env var (Vite) so dev points at localhost:3001 and prod at the Fly URL — read in `src/main.js`, defaulting to `http://localhost:3001`. ✓
 - All this was captured in `pace-prediction-roadmap.md` TASK-024.
 
 ---
