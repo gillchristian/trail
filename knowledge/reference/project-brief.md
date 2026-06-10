@@ -10,7 +10,7 @@ The user runs trail races — a 20k next weekend, plus 110k and 130k targets lat
 
 ## Hard constraints
 
-- **Local-first.** Works fully offline after first load. No backend, ever. Data lives in the browser.
+- **Local-first (hybrid, since the Strava work).** Layer 0 — all planning, storage, GPX/`.trail` export, and manual actual-run upload — works fully offline after first load; data lives in the browser (IndexedDB). Layer 1 — Strava sync — is an opt-in enhancement that needs the shared `cadence` backend reachable; every Layer-1 surface degrades gracefully to "not connected" and never blocks a Layer-0 flow. (The brief originally said "No backend, ever"; that was softened deliberately when the Strava arc shipped — see `pace-prediction-roadmap.md` §8. cadence holds no trail data; it's an OAuth + read-only Strava proxy only.)
 - **Persistence.** Races + plans must survive reload. UTMB-size GPX (~80k lines) must fit comfortably → IndexedDB.
 - **Performance target.** Parse + render UTMB-size GPX (~26k track points) without freezing the UI. 20k races (~3k points) should feel instant.
 - **Type safety.** "If it compiles it works." Custom types model impossible-states-impossible (`State = Empty | Parsing | Failed | Loaded`).
@@ -25,20 +25,20 @@ The user runs trail races — a 20k next weekend, plus 110k and 130k targets lat
 
 ## Out of scope
 
-- No backend / multi-user / sync.
+- No trail-owned backend; no multi-user; no server-side storage of races / plans / profiles — all of it stays in the browser. (The opt-in Strava sync rides the shared `cadence` backend for OAuth + a read-only Strava proxy only; it stores no trail state. See the local-first constraint above.)
 - No social / sharing features.
 - No paid map providers (no Mapbox token).
-- No miles unit — kilometers only.
-- No live activity tracking — this is *planning*, not *recording*.
+- Kilometers only in the UI. (CSV *import* accepts a `distance_mi` / `miles` column for organiser convenience and converts to km on import — TASK-031 — but nothing is ever displayed in miles.)
+- No live activity tracking — this is *planning*, not *recording*. (Linking a *completed* run for plan-vs-actual is analysis, not tracking — see `whiteboard/training-as-analysis.md`.)
 
 ## Stack
 
 Locked in as ADR-0001:
 
-- **Elm 0.19.1** — single-page app, `Browser.element` (or `Browser.application` once we add routing).
+- **Elm 0.19.1** — single-page app, `Browser.application` with a hand-rolled hash router (added in TASK-002; the original `Browser.element` plan was upgraded the moment routing landed).
 - **Tailwind v4** via `@tailwindcss/vite`.
 - **Vite 6** with `vite-plugin-elm`.
-- **IndexedDB** via a tiny JS port (no library dep needed; ~50 lines of vanilla JS).
+- **IndexedDB** via a tiny JS port (no library dep; ~100 lines of vanilla JS in `src/main.js`, two object stores — `races` and a `settings` keyval added at DB v2 for the athlete profile + Strava token, TASK-017).
 - **Service worker** (vanilla; no Workbox) for offline shell + opportunistic tile cache.
 - **Reused from Crest:** `Gpx.elm` verbatim — regex parser, Haversine distances, iterative Douglas-Peucker, elevation-gain-loss with 2m noise threshold. Iterative DP already proven on UTMB-size data.
 
@@ -53,7 +53,17 @@ Locked in as ADR-0001:
 7. `.trail` project file export/import (full round-trip).
 8. Gamified visual pass — UTMB-DNA + own personality.
 9. **Offline-first** (PWA manifest + SW + cache strategy) — high priority per user.
-10. Real-world map view (Leaflet + OSM via JS port) — last, nice-to-have.
+10. Real-world map view (Leaflet + OSM) — shipped as a `<trail-map>` **custom element** (`src/leaflet-element.js`), deliberately *not* an Elm/JS port: Elm renders `Html.node "trail-map"` with `track`/`markers` attributes and Leaflet lives entirely on the JS side. Was last / nice-to-have.
+
+## Features shipped beyond the original list
+
+These came out of the pace-prediction roadmap and the parking lot, not the original ten. All shipped:
+
+11. **Plan-vs-actual** — link a completed run (manual `.gpx` upload *or* Strava streams), snap to course, compute per-km actual splits at the planned boundaries, render a diff column; per-km **average HR** on linked actuals. (`ActualGpx.elm`, `StravaStreams.elm`; TASK-016 / 026.)
+12. **Athlete profile + pace predictor** — a global athlete profile (`#/profile`, `AthleteProfile.elm`) feeds `Predictor.predict` (component-based climb/descent/runnable/aid time) and a bidirectional aggressiveness slider (intensity ↔ predicted finish) with a confidence band. (TASK-017..020.)
+13. **Aid-station CSV import/export** — lenient organiser-table import + re-importable export, via `AidCsv.elm`. (TASK-031.)
+
+Strava sync (the Layer-1 enhancement powering 11–12's Strava path) connects through the `cadence` backend — opt-in, offline-degrading. (TASK-024/024b; `cadence-backend-spec.md`.)
 
 ## Visual direction
 
