@@ -1381,3 +1381,30 @@ wasn't in the original scope but is clearly entailed.
 **Next:** TASK-041 — fix the `Planning.elm` `slopeFactor` docstring (un-normalized
 values). Trivial, comment-only; recomputed the values (f(+0.10)=1.419, symmetric
 about −0.05). Oriented in CURRENT.md. Branch `fix/task-041-slopefactor-comment`.
+
+---
+## 2026-06-15 13:19 — TASK-041: slopeFactor docstring fix (batch task 3/5)
+
+**Task:** TASK-041 — correct the un-normalized values in the `slopeFactor`
+docstring (the follow-up TASK-038 queued, held back because it touches `src/`).
+**What I did:** Recomputed the normalized factors via node (f(0)=1.000,
+f(−0.05)=0.839, f(+0.10)=1.419, f(−0.10)=1.000, f(+0.20)=2.014, f(−0.20)=1.419),
+then rewrote the docstring: symmetric about s=−0.05 (not "either way" about 0),
+f(+0.10)≈1.42 / f(+0.20)≈2.01 / f(−0.20)≈1.42. Kept the already-correct f(0)=1.0
+and s=−0.05-minimum lines. `grep -rniE "1\.69|2\.40|either way|1\.687" src/`
+confirmed these two lines were the only stale copies.
+**What I verified:** Comment-only diff (`git diff` showed just the 3 docstring
+lines). All five gates green: type-check `Success!`, build `✓ built in 858ms`,
+smoke `SMOKE PASSED`, smoke:aidcsv `PASS`, smoke:sections `PASS` (slopeFactor's
+body is untouched, so behavior — and the section/aid smokes — are unchanged).
+**What changed in the repo:** PR #76, merged `c580bdf`. `src/Planning.elm` only.
+This close PR moves it to DONE, ticks BACKLOG, orients TASK-042.
+**What I learned:** Nothing surprising — recomputing (rather than trusting
+ADR-0003 transitively) means the docstring and the ADR now both trace to the
+same fresh computation. The doc-drift trio (036/037/038) plus this finally retire
+the un-normalized 1.69/2.40 numbers everywhere.
+**Next:** TASK-042 — print-friendly planning table. Scoped from `viewPlanTable`
+(`Main.elm:4082`) + `app.css` (Tailwind v4, `print:` variants available).
+Approach: `print:hidden` chrome + `@media print` table restyle + a `window.print()`
+port button. Visual acceptance needs a human (env can't render print preview) —
+flagged. Branch `feat/task-042-print-plan`.
