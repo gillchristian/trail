@@ -1286,3 +1286,50 @@ lot + Proposals annotations), `CURRENT.md` (TASK-039 oriented), this entry.
 but different functions (no conflict; rebase between). 022 is Large → split into
 sub-tasks when oriented.
 **Next:** Implement TASK-039 on `fix/task-039-section-overlap`.
+
+---
+## 2026-06-15 12:57 — TASK-039: section-overlap double-count fix
+
+**Task:** TASK-039 — first of the five-task batch. Fix the section-overlap
+double-count in `Planning.sectionsForRace`.
+**What I did:** `sectionsForRace` grouped kms into sections with an overlap test
+`km.distStart < b && km.distEnd > a`. A 1 km window straddling an aid distance
+`b` matched it for both the section ending at `b` and the one starting at `b`,
+so its index landed in two `kmIndices` lists and `sumKmField` (which ignored its
+`a`/`b` args) summed its gain/loss twice. Blast radius confirmed by reading the
+consumers first: `sectionSeconds` (`Main.elm:5060`/`5236`), the cum column
+`runningAfterSection` (`5071`), `section.gain`/`.loss` (`5109-5110`/`5357-5360`),
+`containedKms` (`5234`), `sectionActualSeconds` (`6332`), and section-mode CSV
+(`Csv.elm:188`). Fix: group each km into the single section whose half-open
+`[a, b)` interval contains its **midpoint** `(distStart+distEnd)/2` — a clean
+partition. Dropped `sumKmField`'s now-unused `a`/`b` params; rewrote both
+misleading comments (the old one *claimed* center-based assignment the code
+never did).
+**What I verified:** New `npm run smoke:sections` (`src/SectionsHarness.elm` +
+`scripts/smoke-sections.mjs`, mirroring `AidCsvHarness`) drives the REAL compiled
+`Planning.sectionsForRace` and asserts, across straddle / on-boundary / no-aid /
+gain+loss scenarios: clean partition (flattened `kmIndices` == `[0..n-1]`), Σ
+section gain/loss == course totals, Σ section distance == total. All 20 checks →
+`PASS — all section-partition checks green`. **Failure case proven:** temporarily
+reverting the filter to the overlap test made scenario A fail exactly as
+predicted (`[[0,1],[1,2,3],[3,4]]`, Σ gain 700 not 500) and D (350/560 not
+250/400) while on-boundary + no-aid stayed green — so the test catches the bug
+and the fix touches only straddle behavior. Full local CI green: elm make
+`Success!`, build `✓ built in 853ms`, smoke `SMOKE PASSED`, smoke:aidcsv `PASS`,
+smoke:sections `PASS`.
+**What changed in the repo:** PR #72, merged `633e263`. `src/Planning.elm` (fix),
+`src/SectionsHarness.elm` + `scripts/smoke-sections.mjs` + `package.json` (new
+gate), `knowledge/decisions/0004-section-km-attribution.md` + INDEX, `local-ci.md`
++ manifest (5th gate). This close PR (`docs/task-039-close`) moves it to DONE,
+ticks BACKLOG, and orients TASK-040.
+**What I learned:** Reviewing the diff before committing caught a duplicated
+comment block — my "revert to overlap to prove the test fails, then restore" dance
+left two copies of the new comment (the revert removed only the filter, not the
+comment; the restore re-added it). Collapsed to one and re-ran the gates. The
+midpoint partition also unblocks the still-parked section-card Δ-vs-plan fix.
+Chose midpoint over pro-rating (ADR-0004): per-km plan seconds are indivisible
+and pro-rating gain/loss honestly needs the elevation re-sampled at the split —
+not worth it for planning.
+**Next:** TASK-040 — separate `gpxText` into its own IDB row. Oriented in
+CURRENT.md (studied `main.js`/`Storage.elm`/`Types.elm` + the 14 saveRace sites
+to scope it). Branch `refactor/task-040-gpx-store`.
