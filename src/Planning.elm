@@ -452,18 +452,33 @@ sectionsForRace opts =
         |> List.indexedMap
             (\i ( ( a, b ), aid ) ->
                 let
+                    -- Each km belongs to exactly one section, chosen by its
+                    -- midpoint: the half-open interval [a, b) that contains the
+                    -- km's center. This partitions the kms across sections — a km
+                    -- straddling an aid distance lands in one section, not both —
+                    -- so the gain/loss sums here, and the seconds callers sum over
+                    -- `kmIndices`, never double-count it. (The old test
+                    -- `km.distStart < b && km.distEnd > a` put a straddling km in
+                    -- both adjacent sections.)
                     kmsInRange =
                         opts.kms
-                            |> List.filter (\km -> km.distStart < b && km.distEnd > a)
+                            |> List.filter
+                                (\km ->
+                                    let
+                                        mid =
+                                            (km.distStart + km.distEnd) / 2
+                                    in
+                                    mid >= a && mid < b
+                                )
 
                     indices =
                         List.map .index kmsInRange
 
                     rangeGain =
-                        sumKmField (\km -> km.gain) a b kmsInRange
+                        sumKmField .gain kmsInRange
 
                     rangeLoss =
-                        sumKmField (\km -> km.loss) a b kmsInRange
+                        sumKmField .loss kmsInRange
                 in
                 { index = i
                 , label =
@@ -499,11 +514,14 @@ sectionStartLabel aids index =
         |> Maybe.withDefault "Start"
 
 
-sumKmField : (Km -> Float) -> Float -> Float -> List Km -> Float
-sumKmField field _ _ kms =
-    -- Pro-rate would be more correct for kms straddling an aid-station
-    -- distance, but for v1 we sum the full km value when its center
-    -- falls inside the range. Close enough for planning.
+sumKmField : (Km -> Float) -> List Km -> Float
+sumKmField field kms =
+    -- `kms` is this section's slice of the midpoint partition built in
+    -- `sectionsForRace`, so every km is counted in exactly one section.
+    -- Pro-rating a straddling km's value across the aid boundary would be
+    -- marginally more accurate, but per-km plan seconds are indivisible and
+    -- the elevation would need re-deriving at the split point; whole-km
+    -- attribution by midpoint is the simpler, reversible choice (TASK-039).
     List.foldl (\km acc -> acc + field km) 0 kms
 
 
