@@ -320,8 +320,9 @@ elevationGainLoss eles =
     f(s) = exp(3.5 * |s + 0.05| - 0.175)
 
 f(0) = 1.0 (flat = baseline pace). f peaks downward at s = -0.05
-(slight downhill, fastest). 10 % uphill ≈ 1.69×; 20 % grade either
-way ≈ 2.40×. See ADR-0003.
+(slight downhill, fastest) and is symmetric about that axis — not
+about 0. So f(+0.10) ≈ 1.42 while f(-0.10) = 1.0, and f(+0.20) ≈ 2.01
+while f(-0.20) ≈ 1.42. See ADR-0003.
 
 -}
 slopeFactor : Float -> Float
