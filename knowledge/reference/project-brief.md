@@ -25,8 +25,8 @@ The user runs trail races — a 20k next weekend, plus 110k and 130k targets lat
 
 ## Out of scope
 
-- No trail-owned backend; no multi-user; no server-side storage of races / plans / profiles — all of it stays in the browser. (The opt-in Strava sync rides the shared `cadence` backend for OAuth + a read-only Strava proxy only; it stores no trail state. See the local-first constraint above.)
-- No social / sharing features.
+- No trail-owned backend; no *server-side* multi-user; no server-side storage of races / plans / profiles — all of it stays in the browser. (The opt-in Strava sync rides the shared `cadence` backend for OAuth + a read-only Strava proxy only; it stores no trail state. See the local-first constraint above.)
+- No *server-side* social / sharing features — no accounts, no hosted documents, no real-time co-editing. (Softened the same way "No backend, ever" was for Strava: **async, file-based, single-document collaboration** — export a `.trail`, a coach annotates it, you merge it back via three-way merge — *is* in scope as a Layer-0 feature, riding the existing `.trail` round-trip with no backend and no accounts. See ADR-0009 / `coach-collab-spec.md`.)
 - No paid map providers (no Mapbox token).
 - Kilometers only in the UI. (CSV *import* accepts a `distance_mi` / `miles` column for organiser convenience and converts to km on import — TASK-031 — but nothing is ever displayed in miles.)
 - No live activity tracking — this is *planning*, not *recording*. (Linking a *completed* run for plan-vs-actual is analysis, not tracking — see `whiteboard/training-as-analysis.md`.)

@@ -16,34 +16,33 @@
 
 ## Active
 
-_(none — the **section-level clock-time fix just shipped** (TASK-045, PR #86,
-`08c9a66`; ADR-0008): section Time/Cum (table + card) and the section-mode CSV
-are now clock time (moving + the aid rest taken in that section), so the section
-**Δ vs plan** is clock-vs-clock — the section lift of TASK-025, unblocked by
-TASK-039's partition. New `Planning.sectionAidRest` + extended `smoke:sections`.
+### TASK-046 — Brief nuance: file-based collaboration is in scope (Layer 0)
 
-Calibration's two **core continuous rates** are both data-driven: **TASK-043**
-climb rate `vmh` (PR #80, `819e9dc`; confirmed on the user's real data — 616 m/h)
-and **TASK-044** flat-trail pace (PR #82, `a76db2e`). Both via the pure
-`Calibration` module + the `smoke:calibration` gate + the transparent `#/profile`
-panel; ADRs 0006/0007.
+**Source:** BACKLOG (coach-collaboration epic, spec §0) / user request
+**Branch:** docs/task-046-brief-collab-scope
+**Acceptance criteria:**
+- [ ] `reference/project-brief.md` *Out of scope* is nuanced (not deleted) the
+  same way "No backend, ever" was softened for Strava: async, file-based,
+  single-document collaboration (export → annotate → merge) is in scope as a
+  Layer-0 feature; server-side multi-user, accounts, hosted documents stay out.
+  (Verify by reading the two affected lines + the new nuance.)
+- [ ] The nuance points at ADR-0009 so the reasoning is one hop away.
+- [ ] Docs-only — no `src/` touched (verify `git diff --name-only`).
+**Notes:** First task of the coach-collab epic; no open questions (the decision
+is settled in ADR-0009/spec §0). The two lines to nuance are "No social /
+sharing features" and "No multi-user" in the *Out of scope* section.
 
-**Calibration paused here by the user (2026-06-15).** The two core continuous
-rates are the agreed stopping point; the remaining fits stay queued and should
-be promoted only on a fresh go-ahead. They step up in complexity / scope (and
-several are data-gated):
-- **Descent technique** — feasible from existing data (descent kms vs the
-  flat×Tobler baseline → implied multiplier), but `descentSkill` is an *enum*,
-  so calibration means snapping a fitted multiplier to the nearest level (new
-  wrinkle vs. the continuous vmh/pace fits).
-- **Fatigue slope / climb-fatigue `k`** — need time-binning + a curve fit over
-  long runs (`pace(t)`, `vmh(t)`); more involved than the realized-rate fits.
-- **Riegel `k`, sustainable-HR-by-duration, decoupling** — *new predictor
-  capabilities* (no profile field today) and data-gated (multiple race
-  distances / HR streams across durations).
+---
 
-Still queued: parking-lot items (light/dark; multi-language). Three manual checks
-remain recommended (headless env can't do them): browser round-trip after the
-TASK-040 IDB migration; print-preview of the TASK-042 table; and a section
-table/card eyeball with a **linked actual** for TASK-045 (clock Time, Actual − Time
-= Δ, monotonic Cum ending at total clock).)_
+## Standing reminders (not active tasks)
+
+- **Calibration is paused (user, 2026-06-15).** The two core continuous rates
+  shipped (TASK-043 vmh, TASK-044 flat pace); the harder roadmap §7 fits
+  (descent / fatigue / Riegel / sustainable-HR / decoupling) stay queued —
+  promote only on a fresh go-ahead.
+- **Three manual checks recommended** (headless env can't do them): browser
+  round-trip after the TASK-040 IDB migration; print-preview of the TASK-042
+  table; section table/card with a **linked actual** for TASK-045 (clock Time,
+  Actual − Time = Δ, monotonic Cum ending at total clock).
+- **After TASK-046:** the epic continues with TASK-047 (WI-1), where **Q1**
+  (courseHash input + mismatch behavior) must be resolved with the user first.
