@@ -16,42 +16,26 @@
 
 ## Active
 
-### TASK-044 — Calibrate flat-trail-pace from runnable kms
+_(none — calibration's two **core continuous rates** are now both data-driven:
+**TASK-043** climb rate `vmh` (PR #80, `819e9dc`; confirmed on the user's real
+data — 616 m/h) and **TASK-044** flat-trail pace (PR #82, `a76db2e`). Both via
+the pure `Calibration` module + the `smoke:calibration` gate + the transparent
+`#/profile` panel; ADRs 0006/0007.
 
-**Source:** Second split of TASK-022 (calibration); user go-ahead to continue
-2026-06-15 — after TASK-043 (vmh) shipped (PR #80) and the user confirmed it on
-their real data (616 m/h fitted from 3 linked runs; they liked the transparency).
-**Branch:** `feat/task-044-flat-pace-calibration`
+**Checkpoint with the user before the remaining calibration fits** — they step
+up in complexity / scope and several are data-gated, so they want a priority
+call rather than autopilot:
+- **Descent technique** — feasible from existing data (descent kms vs the
+  flat×Tobler baseline → implied multiplier), but `descentSkill` is an *enum*,
+  so calibration means snapping a fitted multiplier to the nearest level (new
+  wrinkle vs. the continuous vmh/pace fits).
+- **Fatigue slope / climb-fatigue `k`** — need time-binning + a curve fit over
+  long runs (`pace(t)`, `vmh(t)`); more involved than the realized-rate fits.
+- **Riegel `k`, sustainable-HR-by-duration, decoupling** — *new predictor
+  capabilities* (no profile field today) and data-gated (multiple race
+  distances / HR streams across durations).
 
-**Goal.** Calibrate `flatTrailPaceSecPerKm` (the predictor's runnable-km input)
-from linked runs — the sibling fit to TASK-043's vmh, same data path + the same
-transparent opt-in panel.
-
-**Approach.** Extend `Calibration.elm` with `fitFlatPace : List Run -> Maybe
-FlatPaceFit`. A **runnable km** is one the predictor itself treats as runnable —
-`abs slope < 0.04` (`Predictor.elm:98-105`) — with a positive recorded time and
-distance. Realized pace = `Σ runnable seconds / Σ runnable distance (km)`
-(distance-weighted; mirrors vmh's realized-rate method, no Tobler/intensity
-back-out — ADR-0007). Add a second row to the existing calibrate panel on
-`#/profile`: fitted pace (M:SS/km) + current + Apply (`CalibrateFlatPace` sets
-`flatTrailPaceSecPerKm` + persists). The pace field is derived from the profile
-(`formatMmss prof.flatTrailPaceSecPerKm`), so Apply reflects immediately.
-
-**Acceptance criteria:**
-- [ ] `Calibration.fitFlatPace` returns the distance-weighted realized pace over
-  runnable kms (`abs slope < 0.04`) across linked runs, contributing counts, and
-  `Nothing` for no runnable data.
-- [ ] `smoke:calibration` extended for `fitFlatPace` (known-input pace, the
-  slope-band cut, no/zero-time skip, no-data null) over the real compiled fn.
-- [ ] The panel shows the flat-pace fit alongside vmh, each with its own Apply;
-  the contributors line covers runs feeding either fit.
-- [ ] Wiring verified headlessly (build, panel/Msg in bundle); UI click flagged
-  for a manual check (the user already confirmed the vmh path on real data).
-- [ ] ADR-0007 for the flat-pace fit (runnable = predictor band; raw realized
-  pace; Tobler-normalization considered + deferred).
-- [ ] All local-CI gates green.
-
-**Notes.** Completes the two core predictor rates (climb + flat) from real data.
-Further fits (climb-fatigue `k`, Riegel, sustainable-HR, descent, decoupling —
-roadmap §7) stay queued/data-gated. The orient rides in the task PR (CURRENT was
-empty post-batch; no prior close PR to carry it).
+Also still queued: parking-lot items (section-card **Δ-vs-plan** fix — unblocked
+by TASK-039; light/dark; multi-language). Two manual checks remain recommended
+(headless env can't do them): browser round-trip after the TASK-040 IDB
+migration; print-preview of the TASK-042 table.)_

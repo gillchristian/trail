@@ -1492,3 +1492,38 @@ risky part (the math) the well-verified part.
 calibration) + the further roadmap §7 fits + parking-lot items, each needing only
 selection (calibration fits want a per-fit user go-ahead). Surfacing the two
 recommended manual checks + the queued calibration work to the user.
+
+---
+## 2026-06-15 14:18 — TASK-044: flat-trail-pace calibration (core rates done)
+
+**Task:** TASK-044 — second calibration fit; user said "continue on the
+recalibration" after TASK-043 (and confirmed vmh on their real data: 616 m/h).
+**What I did:** Added `Calibration.fitFlatPace` — over runnable kms (the
+predictor's own band, `abs slope < 0.04`, `Predictor.elm:98`) with a positive
+distance + recorded time, `pace = Σ distance / Σ time` (s/km). Same realized-rate
+method as vmh. Extended the harness/smoke to carry per-km slope+distance and
+return both fits (made the harness `gain` decoder optional so flat-only specs
+parse). Restructured the `#/profile` panel into two rows via a shared `calibRow`
+(climb rate + flat pace), each with its own Apply (`CalibrateFlatPace` sets +
+persists `flatTrailPaceSecPerKm`; the pace field is derived from the profile so
+it reflects immediately). Generalized `calibrationContributors` to "runs feeding
+*either* fit." ADR-0007.
+**What I verified:** `smoke:calibration` now 27 checks over BOTH compiled fits —
+flat: paces 379/300/480/380 s/km for known inputs, the strict `<0.04` band cut
+(0.04 excluded), zero-time + zero-distance skip, no-data null, a both-fits-coexist
+case. type-check `Success!`, build `✓`, smoke/aidcsv/sections green. Built bundle
+carries the "Flat pace" row + both `/km` renderings (the `CalibrateFlatPace`
+constructor is optimized away as a union tag — expected; the wiring type-checks).
+**What changed in the repo:** PR #82, merged `a76db2e`. `Calibration.elm`,
+`CalibrationHarness.elm`, `smoke-calibration.mjs`, `Main.elm`, ADR-0007 + INDEX +
+`local-ci.md`. This close PR moves it to DONE, ticks BACKLOG, clears CURRENT.
+**Decision — checkpoint here.** The two core *continuous* rates (climb + flat)
+are the cleanest, highest-value fits and are done. The remaining roadmap §7 fits
+each carry a real complication: descent skill is an *enum* (calibration = snap a
+fitted multiplier to a level); fatigue/climb-fatigue need time-binning + a curve
+fit; Riegel/HR/decoupling are *new predictor capabilities* + data-gated. That's a
+genuine scope/priority step-up, so I'm pausing to ask the user rather than
+autopiloting into them — `CURRENT.md` records the options.
+**Next:** Await the user's call on the harder fits (descent / fatigue / Riegel /
+HR / decoupling) vs. pausing calibration. Other ready work: the section-card
+Δ-vs-plan fix (now unblocked), parking-lot items.
