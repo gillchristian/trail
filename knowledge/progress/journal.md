@@ -1333,3 +1333,51 @@ not worth it for planning.
 **Next:** TASK-040 — separate `gpxText` into its own IDB row. Oriented in
 CURRENT.md (studied `main.js`/`Storage.elm`/`Types.elm` + the 14 saveRace sites
 to scope it). Branch `refactor/task-040-gpx-store`.
+
+---
+## 2026-06-15 13:14 — TASK-040: gpxText in its own IDB row (v3 + migration)
+
+**Task:** TASK-040 — batch task 2 of 5. Stop re-shipping the ~3 MB GPX on every
+plan/aid edit.
+**What I did:** Reading first confirmed the shape + a trap: `RaceSaved` decodes
+the save echo as a full `Race` and rebuilds the track/kms caches from
+`race.gpxText`, and the edit sites return `model` unchanged (they *rely* on that
+echo) — so a light echo can't simply drop gpxText. And site 1476, named
+`newRace`, is actually the **SliderCommit edit** (the headline hot path), not a
+creation. Final split: 2 creation sites (`.trail` + GPX import) vs 12 edits.
+Implementation: new `gpx` IDB store (`{id, gpxText}`), DB v2→v3 with an
+`onupgradeneeded` cursor migration that moves inline GPX out of each races row.
+`Types`: extracted `raceMetaFields` shared by `encodeRace` (appends gpxText) and
+new `encodeRaceMeta` (omits it) so they can't drift; decoder defaults gpxText to
+`""`. `Storage`: new `saveRaceMeta` port. `main.js`: `loadAllRaces` joins gpx
+back; `saveRace` (full) writes both stores + echoes full; `saveRaceMeta` (light)
+writes only the races row; `deleteRace` clears both (no orphan). `Main`:
+`RaceSaved` refills gpxText from the in-model race when the echo omits it; routed
+the 12 edit sites to the light save.
+**What I verified:** Rewrote `smoke-storage.mjs` into a faithful v3 mirror of
+`main.js` — 24 checks: split (races row has no gpxText, gpx row holds it), full
++ light save, **light save leaves the gpx row untouched** (the win), orphan-free
+delete, and **v2→v3 migration** of a 2.29 MB GPX → `SMOKE PASSED`. Type-check
+`Success!`, build `✓ built in 882ms` (compiles main.js), smoke:aidcsv `PASS`,
+smoke:sections `PASS`. Confirmed the compiled bundle emits the new
+`storageSaveMeta` port (so the JS `subscribe` binds — wiring is real, not just
+type-checked); dev server boots `HTTP 200`. **Gap, stated honestly:** the
+human browser round-trip (import→edit→reload) wasn't run — the project can't
+drive the compiled Elm bundle from Node (the smoke's standing limitation), so
+storage has always shipped on the JS-mirror smoke. The migration runs in an
+atomic versionchange tx (a mid-migration error aborts → v2 data intact), and the
+smoke tests that exact code, so the risk is bounded; flagged a manual browser
+pass as the recommended final check in the PR.
+**What changed in the repo:** PR #74, merged `a922894`. `Types.elm`,
+`Storage.elm`, `main.js`, `Main.elm` (the split), `smoke-storage.mjs` (rewrite),
+ADR-0005 + INDEX + `local-ci.md`. This close PR moves it to DONE, ticks BACKLOG,
+orients TASK-041.
+**What I learned:** Two reading-caught traps (the echo dependency + the
+mis-named `newRace` slider-commit site) would each have been a data/behavior bug
+if I'd routed by variable name or dropped the echo. The shared `raceMetaFields`
+list is the durable guard against the two encoders drifting. Also added
+`deleteRace` two-store cleanup (orphan GPX) — a gap the split introduced that
+wasn't in the original scope but is clearly entailed.
+**Next:** TASK-041 — fix the `Planning.elm` `slopeFactor` docstring (un-normalized
+values). Trivial, comment-only; recomputed the values (f(+0.10)=1.419, symmetric
+about −0.05). Oriented in CURRENT.md. Branch `fix/task-041-slopefactor-comment`.

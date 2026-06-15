@@ -16,58 +16,35 @@
 
 ## Active
 
-### TASK-040 — Separate `gpxText` into its own IDB row
+### TASK-041 — Fix the `Planning.elm` `slopeFactor` docstring
 
-**Source:** BACKLOG parking lot, promoted 2026-06-15 (batch task 2 of 5; TASK-039
-shipped — PR #72, `633e263`).
-**Branch:** `refactor/task-040-gpx-store`
+**Source:** BACKLOG parking lot, promoted 2026-06-15 (batch task 3 of 5; TASK-039
+PR #72 `633e263`, TASK-040 PR #74 `a922894` shipped).
+**Branch:** `fix/task-041-slopefactor-comment`
 
-**Problem.** `Race.gpxText : String` (`Types.elm:222`) holds the raw GPX (~3 MB
-for a UTMB-size track). It is encoded inline in the race JSON (`Types.elm:313`)
-and the whole race object is the value in the `races` IDB store. So **every**
-`Storage.saveRace (encodeRace …)` — 14 call sites in `Main.elm`, almost all
-plan/aid/metadata/actual edits — re-ships that 3 MB across the port and rewrites
-it to IDB, even though the GPX never changes after import. PR #29 only papered
-over the drag case (`SliderInput` is live-only, the comment at `Main.elm:1413`;
-`SliderCommit` still writes the whole thing).
+**Problem.** The `slopeFactor` docstring (`Planning.elm`, ~lines 318-324) repeats
+the un-normalized values TASK-038 already corrected in ADR-0003: it says
+"10 % uphill ≈ 1.69×; 20 % grade either way ≈ 2.40×". The actual normalized
+`slopeFactor s = e ^ (3.5 * |s + 0.05| − 0.175)` gives (recomputed via node):
+f(0)=1.000, f(−0.05)=0.839 (min), f(+0.10)=**1.419** (not 1.69), f(−0.10)=1.000,
+f(+0.20)=**2.014**, f(−0.20)=**1.419**. The curve is symmetric about **s = −0.05**,
+not "either way" about 0. This was deliberately held out of docs-only TASK-038
+because it touches `src/` (the journal for TASK-038 queued it).
 
-**Approach (to confirm while building).** Add a second object store `gpx` keyed
-by race id (DB v2 → v3). `gpxText` is **immutable after import** (set only in
-`buildDraftRace`/`.trail` import; no edit path), so:
-- the `races` row carries the race *minus* `gpxText`;
-- the `gpx` row (`{ id, gpxText }`) is written **once** at import and never again;
-- on load, JS joins `gpxText` back into each race before sending to Elm (the
-  decoder at `Types.elm:512` still requires the field — keep it that way);
-- plan/aid/meta/actual saves use a light port that writes only the `races` row —
-  no `gpxText` in the payload — so the 3 MB never crosses the port on an edit;
-- import/`.trail`-import uses a full save that writes both stores.
-- v2 → v3 `onupgradeneeded` migrates existing inline-`gpxText` races into the
-  `gpx` store (no data loss). `.trail` file format is unaffected — `gpxText`
-  still travels in the export envelope; only IDB layout changes (no `.trail`
-  version bump). Capture the schema/migration choice in an ADR.
+**Approach.** Comment-only edit to the docstring. Keep the correct parts (`f(0)=1.0`,
+"peaks downward at s = −0.05"). Replace the wrong magnitudes/symmetry with the
+recomputed values, matching ADR-0003's corrected table. No behavior change.
 
 **Acceptance criteria:**
-- [ ] New `gpx` object store, `DB_VERSION` 2 → 3, `onupgradeneeded` creates it
-  (`src/main.js`).
-- [ ] **Migration:** a race stored under v2 (inline `gpxText`) survives the
-  upgrade — its GPX moves into the `gpx` store, intact (~3 MB round-trips byte
-  for byte), and still loads + parses.
-- [ ] **The win:** a plan-only save (slider commit, aid add/edit/delete, target
-  commit, metadata edit, actual link/unlink) writes only the `races` row; the
-  `gpx` row is not rewritten and `gpxText` is absent from the light save payload.
-- [ ] On load, `gpxText` is re-attached so the Elm decoder succeeds and GPX
-  export (`GpxExport`) + profile parse (`Gpx.parseGPX race.gpxText`) still work.
-- [ ] A freshly imported race (both `.gpx` and `.trail`) persists, and after a
-  reload the track + plan + aid stations are intact.
-- [ ] `scripts/smoke-storage.mjs` (the hand-copied mirror of `main.js`'s IDB
-  logic) updated to the v3 schema and extended: store creation, v2 → v3
-  migration, plan-only-save-leaves-gpx-untouched, load-join round-trip with a
-  real ~3 MB GPX. `npm run smoke` green.
-- [ ] All five local-CI gates green + a **manual app round-trip** (import → edit
-  plan → reload → data intact), output/observation quoted in the journal.
-- [ ] ADR for the two-store schema + migration.
+- [ ] Docstring states f(+0.10) ≈ 1.42 (not 1.69×), and the curve is symmetric
+  about s = −0.05 — e.g. f(−0.20) ≈ 1.42 vs f(+0.20) ≈ 2.01 — instead of
+  "20 % either way ≈ 2.40×".
+- [ ] `f(0) = 1.0` and the s = −0.05 minimum framing kept (already correct).
+- [ ] Values agree with ADR-0003 and a fresh recomputation.
+- [ ] All five local-CI gates green (comment-only — no behavior change; the
+  `slopeFactor` body and the `smoke:sections`/`smoke:aidcsv` results are
+  unchanged).
 
-**Notes.** Keep `race.gpxText` in the Elm model (don't thread GPX out of the
-record) — only the *persistence* path splits. The smoke is a copy of `main.js`,
-not an import of it, so both files must move together (a drift here is exactly
-what TASK-038 cleaned up in the CI docs).
+**Notes.** `src`-touching but trivial. Also re-grep for any *other* stale
+"1.69"/"2.40"/"either way" copies in `src/` while here, but don't expand scope
+beyond the slope-factor comment.
