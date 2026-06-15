@@ -9,11 +9,12 @@ exit 0 before a PR opens.
 
 - **Elm 0.19.1 installed globally / on `PATH`.** It is *not* an npm dependency
   of this project — `npm install` will **not** provide it. Gate 1 (`elm make`)
-  and gate 2 (`vite-plugin-elm` during the build) both need `elm`, and gates 4
-  and 5 shell out to `npx --no-install elm make` (`scripts/smoke-aid-csv.mjs`,
-  `scripts/smoke-sections.mjs`), which by design will not auto-download it. So
-  with only `npm install` done, gates 1, 2, 4, and 5 all fail until Elm is on
-  `PATH`. Install via `npm i -g elm` (pin 0.19.1) or the platform binary.
+  and gate 2 (`vite-plugin-elm` during the build) both need `elm`, and gates 4,
+  5, and 6 shell out to `npx --no-install elm make` (`scripts/smoke-aid-csv.mjs`,
+  `scripts/smoke-sections.mjs`, `scripts/smoke-calibration.mjs`), which by design
+  will not auto-download it. So with only `npm install` done, gates 1, 2, 4, 5,
+  and 6 all fail until Elm is on `PATH`. Install via `npm i -g elm` (pin 0.19.1)
+  or the platform binary.
 - **Node pinned to v22** via `.nvmrc` (`nvm use`); the smoke harnesses run on it.
 
 ## The gates
@@ -25,6 +26,7 @@ exit 0 before a PR opens.
 | Storage smoke | `npm run smoke` | IndexedDB round-trips for the v3 schema: the `races`/`gpx` split (GPX in its own row), full vs light (meta) save, orphan-free delete, and the **v2 → v3 migration** of inline `gpxText` — including UTMB-size payloads (`scripts/smoke-storage.mjs`; ADR-0005). **Scope:** still does not cover the `settings` store (athlete profile / Strava token). Mirrors `main.js`'s IDB logic (can't import it), so the two must stay in sync. |
 | Aid-CSV smoke | `npm run smoke:aidcsv` | `AidCsv.parse`/`toCsv` behavior via the compiled `Platform.worker` harness (`scripts/smoke-aid-csv.mjs` + `src/AidCsvHarness.elm`). |
 | Section-partition smoke | `npm run smoke:sections` | `Planning.sectionsForRace` assigns each km to exactly one section by midpoint, so section gain/loss/Time/cum (and section-mode CSV) never double-count a km straddling an aid distance (`scripts/smoke-sections.mjs` + `src/SectionsHarness.elm`; ADR-0004). Regression guard for the TASK-039 overlap bug. |
+| Calibration smoke | `npm run smoke:calibration` | `Calibration.fitVmh` fits the gain-weighted climb rate over climb kms across linked runs, applies the climb-gain threshold, skips kms with no/zero time, and returns `Nothing` for no data (`scripts/smoke-calibration.mjs` + `src/CalibrationHarness.elm`; ADR-0006). |
 
 Plus the manual smoke test where the task touches UI behavior — the
 `verification.md` gates ("it runs", "it does the thing") are not satisfied by
