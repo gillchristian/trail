@@ -73,3 +73,58 @@ html, body, #app {
     animation: none;
   }
 }
+
+/* ---------------------------------------------------------------- */
+/* Print: the plan table on paper (TASK-042)                        */
+/* ---------------------------------------------------------------- */
+/* App chrome carries Tailwind's `print:hidden`; the printable plan  */
+/* (race header + table) is wrapped in `.plan-print`. Here we make   */
+/* what survives legible black-on-white and paginate the table.     */
+@media print {
+  html, body, #app {
+    background: #fff !important;
+    height: auto !important;
+    color-scheme: light;
+  }
+
+  /* Let the plan span the page, not the centered dark app column. */
+  .plan-print {
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Everything inside the plan prints black-on-white. */
+  .plan-print,
+  .plan-print * {
+    color: #000 !important;
+    background: transparent !important;
+    border-color: #999 !important;
+    box-shadow: none !important;
+    overflow: visible !important;
+  }
+
+  /* A real table grid with readable padding; compact font to fit width. */
+  .plan-print table {
+    border-collapse: collapse !important;
+    width: 100% !important;
+    font-size: 11px !important;
+  }
+  .plan-print th,
+  .plan-print td {
+    border: 1px solid #999 !important;
+    padding: 4px 8px !important;
+  }
+
+  /* Repeat the header row on each page; keep a row whole across a break. */
+  .plan-print thead {
+    display: table-header-group;
+  }
+  .plan-print tr {
+    break-inside: avoid;
+  }
+
+  @page {
+    margin: 1.5cm;
+  }
+}
