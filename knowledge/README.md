@@ -38,7 +38,7 @@ even bookkeeping (that's what the close PR is for).
 3. **Branch** — `git checkout master && git pull --ff-only && git checkout -b <kind>/task-NNN-<slug>`.
 4. **Execute** — implement, committing as I go (conventions in `framework/delivery.md`).
 5. **Verify** — gates in `framework/verification.md`; local CI commands in
-   `reference/local-ci.md` (type-check, build, both smoke harnesses).
+   `reference/local-ci.md` (type-check, build, the smoke harnesses).
 6. **PR** — `gh pr create` (template in `delivery.md`), then
    `gh pr merge --squash --delete-branch`.
 7. **Log** — journal entry with PR number, merge sha, and quoted verification output.
