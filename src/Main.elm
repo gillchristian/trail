@@ -318,6 +318,7 @@ type Msg
     | ExportCsvSections
     | ExportGpxForCoros
     | ExportProjectFile
+    | PrintPlan
       -- metadata edit
     | OpenMetaEdit
     | CloseMetaEdit
@@ -985,6 +986,9 @@ update msg model =
 
                 Nothing ->
                     ( model, Cmd.none )
+
+        PrintPlan ->
+            ( model, Dom.print () )
 
         OpenMetaEdit ->
             case currentRace model of
@@ -2055,7 +2059,7 @@ title route =
 
 viewHeader : Route -> Html Msg
 viewHeader route =
-    div [ class "px-6 py-4 border-b border-slate-800/60 bg-slate-950/95 backdrop-blur sticky top-0 z-30" ]
+    div [ class "px-6 py-4 border-b border-slate-800/60 bg-slate-950/95 backdrop-blur sticky top-0 z-30 print:hidden" ]
         [ div [ class "max-w-screen-2xl mx-auto flex items-center gap-4" ]
             [ a
                 [ Route.href Route.Index
@@ -2161,7 +2165,7 @@ viewLogo =
 
 viewFooter : Html msg
 viewFooter =
-    div [ class "px-6 py-4 text-xs text-slate-500 border-t border-slate-800/60 bg-slate-950" ]
+    div [ class "px-6 py-4 text-xs text-slate-500 border-t border-slate-800/60 bg-slate-950 print:hidden" ]
         [ div [ class "max-w-screen-2xl mx-auto" ]
             [ text "Local-first. Your GPX never leaves the browser." ]
         ]
@@ -4100,12 +4104,14 @@ viewPlanTable model race =
         currentSum =
             Dict.foldl (\_ r acc -> acc + r.seconds) 0 results + aidRest
     in
-    div [ class "max-w-screen-2xl mx-auto mt-8 space-y-6 px-6" ]
+    div [ class "max-w-screen-2xl mx-auto mt-8 space-y-6 px-6 plan-print" ]
         [ viewPlanCrumb race
         , viewPlanHeader race
-        , viewPlanTargetPanel race aidRest currentSum model.targetTimeText
-        , viewPredictorStrip model race kms
-        , viewActualRunStrip model race
+        , div [ class "space-y-6 print:hidden" ]
+            [ viewPlanTargetPanel race aidRest currentSum model.targetTimeText
+            , viewPredictorStrip model race kms
+            , viewActualRunStrip model race
+            ]
         , viewPlanTabs race model.planTableMode
         , case model.planTableMode of
             ByKm ->
@@ -4569,7 +4575,7 @@ viewActualRunStrip model race =
 
 viewPlanCrumb : Race -> Html Msg
 viewPlanCrumb race =
-    div [ class "text-sm text-slate-400 flex items-center gap-2" ]
+    div [ class "text-sm text-slate-400 flex items-center gap-2 print:hidden" ]
         [ a [ Route.href Route.Index, class "hover:text-slate-100" ] [ text "Races" ]
         , span [ class "text-slate-700" ] [ text "/" ]
         , a [ Route.href (Route.RaceDetail race.id), class "hover:text-slate-100" ] [ text race.name ]
@@ -4688,7 +4694,7 @@ planStat label value note =
 
 viewPlanTabs : Race -> TableMode -> Html Msg
 viewPlanTabs _ mode =
-    div [ class "flex items-center justify-between gap-3 flex-wrap" ]
+    div [ class "flex items-center justify-between gap-3 flex-wrap print:hidden" ]
         [ div [ class "flex items-center gap-1 bg-slate-900 border border-slate-800 rounded-lg p-1" ]
             [ tabButton "By km" (mode == ByKm) (SetPlanTableMode ByKm)
             , tabButton "By section" (mode == BySection) (SetPlanTableMode BySection)
@@ -4705,6 +4711,11 @@ viewPlanTabs _ mode =
                 , class "px-3 py-1.5 text-sm border border-slate-700 rounded-md hover:bg-slate-800 text-slate-200 flex items-center gap-2"
                 ]
                 [ text "Download CSV" ]
+            , button
+                [ onClick PrintPlan
+                , class "px-3 py-1.5 text-sm border border-slate-700 rounded-md hover:bg-slate-800 text-slate-200 flex items-center gap-2"
+                ]
+                [ text "Print" ]
             , p [ class "text-xs text-slate-500" ]
                 [ text "Tap a row to edit a km in detail." ]
             ]
