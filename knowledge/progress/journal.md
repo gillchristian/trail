@@ -1527,3 +1527,15 @@ autopiloting into them — `CURRENT.md` records the options.
 **Next:** Await the user's call on the harder fits (descent / fatigue / Riegel /
 HR / decoupling) vs. pausing calibration. Other ready work: the section-card
 Δ-vs-plan fix (now unblocked), parking-lot items.
+
+---
+## 2026-06-15 14:23 — Calibration paused (user decision)
+
+Asked the user how far to take calibration after the two core rates (vmh +
+flat) shipped. **They chose to pause here.** So the remaining roadmap §7 fits
+(descent technique, fatigue/climb-fatigue curves, Riegel-k, sustainable-HR,
+decoupling) stay queued and unpromoted — do not start them without a fresh
+go-ahead. `CURRENT.md` updated from "checkpoint pending" to "paused by user."
+Nothing active. Ready work when the user returns: the section-card Δ-vs-plan
+fix (unblocked by TASK-039's partition), other parking-lot items, or the two
+recommended manual checks (TASK-040 browser round-trip, TASK-042 print preview).

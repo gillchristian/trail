@@ -22,9 +22,10 @@ data — 616 m/h) and **TASK-044** flat-trail pace (PR #82, `a76db2e`). Both via
 the pure `Calibration` module + the `smoke:calibration` gate + the transparent
 `#/profile` panel; ADRs 0006/0007.
 
-**Checkpoint with the user before the remaining calibration fits** — they step
-up in complexity / scope and several are data-gated, so they want a priority
-call rather than autopilot:
+**Calibration paused here by the user (2026-06-15).** The two core continuous
+rates are the agreed stopping point; the remaining fits stay queued and should
+be promoted only on a fresh go-ahead. They step up in complexity / scope (and
+several are data-gated):
 - **Descent technique** — feasible from existing data (descent kms vs the
   flat×Tobler baseline → implied multiplier), but `descentSkill` is an *enum*,
   so calibration means snapping a fitted multiplier to the nearest level (new
