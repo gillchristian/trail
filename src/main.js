@@ -7,8 +7,9 @@ import { Elm } from './Main.elm'
 // ============================================================
 
 const DB_NAME = 'trail'
-const DB_VERSION = 2
+const DB_VERSION = 3
 const RACES_STORE = 'races'
+const GPX_STORE = 'gpx'
 const SETTINGS_STORE = 'settings'
 const ACTIVE_PROFILE_KEY = 'activeProfile'
 const STRAVA_TOKEN_KEY = 'stravaSessionToken'
@@ -17,13 +18,35 @@ const BACKEND_URL =
 
 const dbPromise = new Promise((resolve, reject) => {
   const req = indexedDB.open(DB_NAME, DB_VERSION)
-  req.onupgradeneeded = () => {
+  req.onupgradeneeded = (event) => {
     const db = req.result
+    const tx = event.target.transaction
     if (!db.objectStoreNames.contains(RACES_STORE)) {
       db.createObjectStore(RACES_STORE, { keyPath: 'id' })
     }
     if (!db.objectStoreNames.contains(SETTINGS_STORE)) {
       db.createObjectStore(SETTINGS_STORE, { keyPath: 'key' })
+    }
+    // v3: GPX text moves into its own row so plan/aid edits don't re-ship or
+    // rewrite the ~3 MB string (TASK-040 / ADR-0005). Upgrading from v2, split
+    // each existing race: copy gpxText into the gpx store, strip it from the
+    // races row. On a fresh DB the races store is empty, so the cursor is a
+    // no-op and only the (empty) gpx store gets created.
+    if (!db.objectStoreNames.contains(GPX_STORE)) {
+      db.createObjectStore(GPX_STORE, { keyPath: 'id' })
+      const racesStore = tx.objectStore(RACES_STORE)
+      const gpxStore = tx.objectStore(GPX_STORE)
+      racesStore.openCursor().onsuccess = (e) => {
+        const cursor = e.target.result
+        if (!cursor) return
+        const race = cursor.value
+        if (race && typeof race.gpxText === 'string') {
+          gpxStore.put({ id: race.id, gpxText: race.gpxText })
+          const { gpxText, ...meta } = race
+          cursor.update(meta)
+        }
+        cursor.continue()
+      }
     }
   }
   req.onsuccess = () => resolve(req.result)
@@ -33,20 +56,49 @@ const dbPromise = new Promise((resolve, reject) => {
 async function loadAllRaces() {
   const db = await dbPromise
   return new Promise((resolve, reject) => {
-    const tx = db.transaction(RACES_STORE, 'readonly')
-    const req = tx.objectStore(RACES_STORE).getAll()
-    req.onsuccess = () => resolve(req.result || [])
-    req.onerror = () => reject(req.error)
+    const tx = db.transaction([RACES_STORE, GPX_STORE], 'readonly')
+    const racesReq = tx.objectStore(RACES_STORE).getAll()
+    const gpxReq = tx.objectStore(GPX_STORE).getAll()
+    tx.oncomplete = () => {
+      const gpxById = new Map((gpxReq.result || []).map((g) => [g.id, g.gpxText]))
+      // Re-attach gpxText so the Elm decoder sees a full race. '' if a gpx
+      // row is somehow missing — degrade (no profile) rather than crash.
+      const races = (racesReq.result || []).map((r) => ({
+        ...r,
+        gpxText: gpxById.get(r.id) ?? '',
+      }))
+      resolve(races)
+    }
+    tx.onerror = () => reject(tx.error)
   })
 }
 
+// Full save: import / new race. Writes the GPX row (once) + the races row
+// (without gpxText), and echoes the full race (with gpxText + the assigned
+// id) back so Elm can add the brand-new race to its model.
 async function saveRace(race) {
   const db = await dbPromise
   const withId = { ...race, id: race.id || crypto.randomUUID() }
+  const { gpxText, ...meta } = withId
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction([RACES_STORE, GPX_STORE], 'readwrite')
+    tx.objectStore(RACES_STORE).put(meta)
+    tx.objectStore(GPX_STORE).put({ id: withId.id, gpxText: gpxText ?? '' })
+    tx.oncomplete = () => resolve(withId)
+    tx.onerror = () => reject(tx.error)
+  })
+}
+
+// Light save: plan/aid/metadata edit. The payload already omits gpxText
+// (Elm's encodeRaceMeta), so this touches only the races row — the ~3 MB GPX
+// neither crosses the port nor gets rewritten. Echoes the meta race back;
+// RaceSaved refills gpxText from the in-model race.
+async function saveRaceMeta(race) {
+  const db = await dbPromise
   return new Promise((resolve, reject) => {
     const tx = db.transaction(RACES_STORE, 'readwrite')
-    tx.objectStore(RACES_STORE).put(withId)
-    tx.oncomplete = () => resolve(withId)
+    tx.objectStore(RACES_STORE).put(race)
+    tx.oncomplete = () => resolve(race)
     tx.onerror = () => reject(tx.error)
   })
 }
@@ -54,8 +106,10 @@ async function saveRace(race) {
 async function deleteRace(id) {
   const db = await dbPromise
   return new Promise((resolve, reject) => {
-    const tx = db.transaction(RACES_STORE, 'readwrite')
+    // Delete both rows so a removed race doesn't orphan its (~3 MB) gpx row.
+    const tx = db.transaction([RACES_STORE, GPX_STORE], 'readwrite')
     tx.objectStore(RACES_STORE).delete(id)
+    tx.objectStore(GPX_STORE).delete(id)
     tx.oncomplete = () => resolve(id)
     tx.onerror = () => reject(tx.error)
   })
@@ -147,6 +201,15 @@ app.ports.storageSave.subscribe(async (race) => {
     app.ports.storageRaceSaved.send(saved)
   } catch (e) {
     app.ports.storageError.send(`save: ${e?.message || e}`)
+  }
+})
+
+app.ports.storageSaveMeta.subscribe(async (race) => {
+  try {
+    const saved = await saveRaceMeta(race)
+    app.ports.storageRaceSaved.send(saved)
+  } catch (e) {
+    app.ports.storageError.send(`saveMeta: ${e?.message || e}`)
   }
 })
 

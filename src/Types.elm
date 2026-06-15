@@ -13,6 +13,7 @@ module Types exposing
     , defaultPlan
     , emptyKmPlan
     , encodeRace
+    , encodeRaceMeta
     , kmPlanFor
     , planFromValue
     , planToValue
@@ -297,33 +298,50 @@ withTargetSeconds t plan =
 -- ENCODE / DECODE
 
 
+{-| The race fields **except** `gpxText`. `encodeRace` appends the (large)
+GPX; `encodeRaceMeta` does not — used for plan/aid/metadata saves that must
+not re-ship the ~3 MB string across the port (it lives in its own IDB store;
+see ADR-0005 / TASK-040). Sharing this list keeps the two encoders in sync.
+-}
+raceMetaFields : Race -> List ( String, Value )
+raceMetaFields r =
+    [ ( "id", E.string (raceIdToString r.id) )
+    , ( "name", E.string r.name )
+    , ( "date", maybeString r.date )
+    , ( "location", E.string r.location )
+    , ( "url", E.string r.url )
+    , ( "notes", E.string r.notes )
+    , ( "coverImage", maybeString r.coverImage )
+    , ( "distance", E.float r.distance )
+    , ( "gain", E.float r.gain )
+    , ( "loss", E.float r.loss )
+    , ( "createdAt", E.int r.createdAt )
+    , ( "aidStations", E.list encodeAidStation r.aidStations )
+    , ( "aidStationSeq", E.int r.aidStationSeq )
+    , ( "plan", planToValue r.plan )
+    , ( "actualSplits"
+      , case r.actualSplits of
+            Just a ->
+                encodeActualSplits a
+
+            Nothing ->
+                E.null
+      )
+    ]
+
+
 encodeRace : Race -> Value
 encodeRace r =
-    E.object
-        [ ( "id", E.string (raceIdToString r.id) )
-        , ( "name", E.string r.name )
-        , ( "date", maybeString r.date )
-        , ( "location", E.string r.location )
-        , ( "url", E.string r.url )
-        , ( "notes", E.string r.notes )
-        , ( "coverImage", maybeString r.coverImage )
-        , ( "distance", E.float r.distance )
-        , ( "gain", E.float r.gain )
-        , ( "loss", E.float r.loss )
-        , ( "gpxText", E.string r.gpxText )
-        , ( "createdAt", E.int r.createdAt )
-        , ( "aidStations", E.list encodeAidStation r.aidStations )
-        , ( "aidStationSeq", E.int r.aidStationSeq )
-        , ( "plan", planToValue r.plan )
-        , ( "actualSplits"
-          , case r.actualSplits of
-                Just a ->
-                    encodeActualSplits a
+    E.object (raceMetaFields r ++ [ ( "gpxText", E.string r.gpxText ) ])
 
-                Nothing ->
-                    E.null
-          )
-        ]
+
+{-| Race JSON without `gpxText`. The persistence layer stores GPX in a
+separate IDB row (written once at import), so plan/aid/metadata edits save
+only this — see ADR-0005.
+-}
+encodeRaceMeta : Race -> Value
+encodeRaceMeta r =
+    E.object (raceMetaFields r)
 
 
 encodeActualSplits : ActualSplits -> Value
@@ -509,7 +527,10 @@ decodeRace =
                 D.map8 partial
                     (D.field "gain" D.float)
                     (D.field "loss" D.float)
-                    (D.field "gpxText" D.string)
+                    -- gpxText is stored in its own IDB row (ADR-0005). JS
+                    -- re-attaches it on load; a light-save echo omits it, and
+                    -- RaceSaved then refills it from the in-model race.
+                    (D.oneOf [ D.field "gpxText" D.string, D.succeed "" ])
                     (D.field "createdAt" D.int)
                     (D.oneOf
                         [ D.field "aidStations" (D.list decodeAidStation)

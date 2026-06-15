@@ -36,3 +36,4 @@ What does this make easy? What does this make hard? What will I have to revisit 
 - [0002 — Aid-station GPX format for Coros Pace Strategy](0002-coros-aid-station-format.md) *(assumption — field-test required)*
 - [0003 — Grade-adjusted pace distribution (Tobler-based)](0003-pace-distribution.md)
 - [0004 — Section km-attribution: midpoint partition, not pro-rating](0004-section-km-attribution.md)
+- [0005 — Store GPX text in its own IndexedDB row](0005-gpx-own-idb-row.md)

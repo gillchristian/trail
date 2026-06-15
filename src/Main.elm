@@ -60,6 +60,7 @@ import Types
         , defaultPlan
         , emptyKmPlan
         , encodeRace
+        , encodeRaceMeta
         , kmPlanFor
         , raceIdFromString
         , raceIdToString
@@ -502,10 +503,24 @@ update msg model =
 
         RaceSaved value ->
             case D.decodeValue Types.decodeRace value of
-                Ok race ->
+                Ok decoded ->
                     let
                         existing =
                             currentRaces model
+
+                        -- A light (meta) save echoes the race without gpxText
+                        -- (it lives in its own IDB row now — TASK-040). Refill
+                        -- it from the in-model race so the track/kms caches below
+                        -- keep working. A full save (new race) carries gpxText
+                        -- and isn't in `existing` yet, so it's used as-is.
+                        race =
+                            if String.isEmpty decoded.gpxText then
+                                findRace decoded.id existing
+                                    |> Maybe.map (\prev -> { decoded | gpxText = prev.gpxText })
+                                    |> Maybe.withDefault decoded
+
+                            else
+                                decoded
 
                         merged =
                             race :: List.filter (\r -> r.id /= race.id) existing
@@ -666,7 +681,7 @@ update msg model =
                                                 , aidStationSeq = race.aidStationSeq + 1
                                             }
                             in
-                            ( model, Storage.saveRace (encodeRace updatedRace) )
+                            ( model, Storage.saveRaceMeta (encodeRaceMeta updatedRace) )
 
                 _ ->
                     ( model, Cmd.none )
@@ -678,7 +693,7 @@ update msg model =
                         updatedRace =
                             { race | aidStations = List.filter (\a -> a.id /= aidId) race.aidStations }
                     in
-                    ( model, Storage.saveRace (encodeRace updatedRace) )
+                    ( model, Storage.saveRaceMeta (encodeRaceMeta updatedRace) )
 
                 Nothing ->
                     ( model, Cmd.none )
@@ -725,7 +740,7 @@ update msg model =
                             }
                     in
                     ( { model | aidImport = AidImportClosed }
-                    , Storage.saveRace (encodeRace updatedRace)
+                    , Storage.saveRaceMeta (encodeRaceMeta updatedRace)
                     )
 
                 _ ->
@@ -777,7 +792,7 @@ update msg model =
                             { race | plan = withTargetSeconds newTarget race.plan }
                     in
                     ( { model | targetTimeText = formatted }
-                    , Storage.saveRace (encodeRace updatedRace)
+                    , Storage.saveRaceMeta (encodeRaceMeta updatedRace)
                     )
 
                 Nothing ->
@@ -830,7 +845,7 @@ update msg model =
                             { race | plan = withKmPlan kmIndex updatedKp race.plan }
                     in
                     ( { model | kmTimeText = formatted }
-                    , Storage.saveRace (encodeRace updatedRace)
+                    , Storage.saveRaceMeta (encodeRaceMeta updatedRace)
                     )
 
                 Nothing ->
@@ -852,7 +867,7 @@ update msg model =
                         updatedRace =
                             { race | plan = withKmPlan kmIndex updatedKp race.plan }
                     in
-                    ( model, Storage.saveRace (encodeRace updatedRace) )
+                    ( model, Storage.saveRaceMeta (encodeRaceMeta updatedRace) )
 
                 Nothing ->
                     ( model, Cmd.none )
@@ -871,7 +886,7 @@ update msg model =
                             { race | plan = withKmPlan kmIndex updatedKp race.plan }
                     in
                     ( { model | kmTimeText = "" }
-                    , Storage.saveRace (encodeRace updatedRace)
+                    , Storage.saveRaceMeta (encodeRaceMeta updatedRace)
                     )
 
                 Nothing ->
@@ -1042,7 +1057,7 @@ update msg model =
                             }
                     in
                     ( { model | metaEditor = MetaClosed }
-                    , Storage.saveRace (encodeRace updatedRace)
+                    , Storage.saveRaceMeta (encodeRaceMeta updatedRace)
                     )
 
                 _ ->
@@ -1089,7 +1104,7 @@ update msg model =
                                     { race | actualSplits = Just actual }
                             in
                             ( { model | actualRunError = Nothing }
-                            , Storage.saveRace (encodeRace updatedRace)
+                            , Storage.saveRaceMeta (encodeRaceMeta updatedRace)
                             )
 
         ClearActualRun rid ->
@@ -1099,7 +1114,7 @@ update msg model =
 
                 Just race ->
                     ( { model | actualRunError = Nothing }
-                    , Storage.saveRace (encodeRace { race | actualSplits = Nothing })
+                    , Storage.saveRaceMeta (encodeRaceMeta { race | actualSplits = Nothing })
                     )
 
         ActualGpxFailed err ->
@@ -1375,7 +1390,7 @@ update msg model =
                                             { race | actualSplits = Just actual }
                                     in
                                     ( { model | stravaPicker = PickerClosed, actualRunError = Nothing }
-                                    , Storage.saveRace (encodeRace updatedRace)
+                                    , Storage.saveRaceMeta (encodeRaceMeta updatedRace)
                                     )
 
         StravaPickerSetSearch rid query ->
@@ -1473,7 +1488,7 @@ update msg model =
                             | sliderDraft = Nothing
                             , targetTimeText = formatHhmm prediction.totalS
                           }
-                        , Storage.saveRace (encodeRace newRace)
+                        , Storage.saveRaceMeta (encodeRaceMeta newRace)
                         )
 
                 _ ->
