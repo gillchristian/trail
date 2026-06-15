@@ -16,21 +16,14 @@
 
 ## Active
 
-### TASK-046 — Brief nuance: file-based collaboration is in scope (Layer 0)
-
-**Source:** BACKLOG (coach-collaboration epic, spec §0) / user request
-**Branch:** docs/task-046-brief-collab-scope
-**Acceptance criteria:**
-- [ ] `reference/project-brief.md` *Out of scope* is nuanced (not deleted) the
-  same way "No backend, ever" was softened for Strava: async, file-based,
-  single-document collaboration (export → annotate → merge) is in scope as a
-  Layer-0 feature; server-side multi-user, accounts, hosted documents stay out.
-  (Verify by reading the two affected lines + the new nuance.)
-- [ ] The nuance points at ADR-0009 so the reasoning is one hop away.
-- [ ] Docs-only — no `src/` touched (verify `git diff --name-only`).
-**Notes:** First task of the coach-collab epic; no open questions (the decision
-is settled in ADR-0009/spec §0). The two lines to nuance are "No social /
-sharing features" and "No multi-user" in the *Out of scope* section.
+_(none — TASK-046 shipped (PR #89, `4896f60`). **Next: TASK-047 (WI-1 —
+`.trail` identity/integrity guard), blocked on Q1** — the courseHash input
+(canonical decoded track vs. raw GPX bytes) and the mismatch behavior
+(hard-block vs. warn-and-allow) are the user's call per spec §7. Q1 has been put
+to the user; write WI-1's acceptance criteria here once it's answered. The rest
+of the epic (TASK-048 course freeze, TASK-049 fork-safe aid ids, TASK-050 WI-3
+three-way merge — gated on Q2–Q5, TASK-051 WI-4 history feed) follows in spec §6
+order.)_
 
 ---
 
