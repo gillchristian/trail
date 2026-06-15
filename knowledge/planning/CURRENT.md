@@ -16,24 +16,42 @@
 
 ## Active
 
-_(none — the five-task batch the user promoted on 2026-06-15 is complete:
-**TASK-039** section-overlap fix (PR #72, `633e263`), **TASK-040** gpxText IDB-row
-split (PR #74, `a922894`), **TASK-041** slopeFactor docstring (PR #76, `c580bdf`),
-**TASK-042** print-friendly plan table (PR #78, `c2d30b4`), and **TASK-043** —
-the first calibration fit, vmh from linked runs (PR #80, `819e9dc`), the first
-slice of the TASK-022 calibration epic. Each shipped via its own PR + close PR;
-ADRs 0004/0005/0006 added; three new local-CI gates (`smoke:sections`,
-`smoke:calibration`, and the expanded `smoke` for the v3 storage migration).
+### TASK-044 — Calibrate flat-trail-pace from runnable kms
 
-Next session — pick from `BACKLOG.md`, all needing nothing more than selection:
-- **TASK-044** — flat-trail-pace calibration (same data path as TASK-043) —
-  queued; the user asked for calibration go-aheads per fit.
-- The further calibration fits in roadmap §7 (climb-fatigue `k`, Riegel,
-  sustainable-HR-by-duration, descent technique, decoupling) — several gated on
-  more data; promote with user appetite.
-- Parking-lot items: the section-card **Δ-vs-plan** moving-vs-clock fix (now
-  unblocked by TASK-039's partition), light/dark toggle, multi-language UI, etc.
+**Source:** Second split of TASK-022 (calibration); user go-ahead to continue
+2026-06-15 — after TASK-043 (vmh) shipped (PR #80) and the user confirmed it on
+their real data (616 m/h fitted from 3 linked runs; they liked the transparency).
+**Branch:** `feat/task-044-flat-pace-calibration`
 
-Two manual checks recommended (the headless env can't do them): a browser
-round-trip after the **TASK-040** IDB migration, and a print-preview of the
-**TASK-042** plan table.)_
+**Goal.** Calibrate `flatTrailPaceSecPerKm` (the predictor's runnable-km input)
+from linked runs — the sibling fit to TASK-043's vmh, same data path + the same
+transparent opt-in panel.
+
+**Approach.** Extend `Calibration.elm` with `fitFlatPace : List Run -> Maybe
+FlatPaceFit`. A **runnable km** is one the predictor itself treats as runnable —
+`abs slope < 0.04` (`Predictor.elm:98-105`) — with a positive recorded time and
+distance. Realized pace = `Σ runnable seconds / Σ runnable distance (km)`
+(distance-weighted; mirrors vmh's realized-rate method, no Tobler/intensity
+back-out — ADR-0007). Add a second row to the existing calibrate panel on
+`#/profile`: fitted pace (M:SS/km) + current + Apply (`CalibrateFlatPace` sets
+`flatTrailPaceSecPerKm` + persists). The pace field is derived from the profile
+(`formatMmss prof.flatTrailPaceSecPerKm`), so Apply reflects immediately.
+
+**Acceptance criteria:**
+- [ ] `Calibration.fitFlatPace` returns the distance-weighted realized pace over
+  runnable kms (`abs slope < 0.04`) across linked runs, contributing counts, and
+  `Nothing` for no runnable data.
+- [ ] `smoke:calibration` extended for `fitFlatPace` (known-input pace, the
+  slope-band cut, no/zero-time skip, no-data null) over the real compiled fn.
+- [ ] The panel shows the flat-pace fit alongside vmh, each with its own Apply;
+  the contributors line covers runs feeding either fit.
+- [ ] Wiring verified headlessly (build, panel/Msg in bundle); UI click flagged
+  for a manual check (the user already confirmed the vmh path on real data).
+- [ ] ADR-0007 for the flat-pace fit (runnable = predictor band; raw realized
+  pace; Tobler-normalization considered + deferred).
+- [ ] All local-CI gates green.
+
+**Notes.** Completes the two core predictor rates (climb + flat) from real data.
+Further fits (climb-fatigue `k`, Riegel, sustainable-HR, descent, decoupling —
+roadmap §7) stay queued/data-gated. The orient rides in the task PR (CURRENT was
+empty post-batch; no prior close PR to carry it).
