@@ -60,7 +60,7 @@ not in asking the user.
 - **reference/** — `project-brief.md` (product intent — wins conflicts),
   `glossary.md`, `local-ci.md`, `labyrinth.md` (the article behind the
   record-the-maze principle), the cadence specs, `pace-prediction-roadmap.md`,
-  `archive/`.
+  `coach-collab-spec.md`, `archive/`.
 - **whiteboard/** — discussions in flight; conventions + index in its README.
 - **philosophy/** — tombstone only; the docs moved into `framework/`
   (2026-06-09, TASK-034).
