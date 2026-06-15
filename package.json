@@ -10,6 +10,7 @@
     "smoke": "node scripts/smoke-storage.mjs",
     "smoke:aidcsv": "node scripts/smoke-aid-csv.mjs",
     "smoke:sections": "node scripts/smoke-sections.mjs",
+    "smoke:calibration": "node scripts/smoke-calibration.mjs",
     "perf:trace": "node scripts/profile-trace.mjs"
   },
   "devDependencies": {
