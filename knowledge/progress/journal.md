@@ -1448,3 +1448,47 @@ TASK-044 = flat pace (queued), remaining fits left in roadmap §7 (data-gated).
 **Next:** TASK-043 — `Calibration.fitVmh` (pure, harness-tested) + a transparent
 calibrate panel on `#/profile`. Oriented in CURRENT.md. Branch
 `feat/task-043-vmh-calibration`.
+
+---
+## 2026-06-15 13:42 — TASK-043: vmh calibration (batch task 5/5 — batch complete)
+
+**Task:** TASK-043 — first calibration fit (climb rate from linked runs); first
+slice of the TASK-022 epic.
+**What I did:** New pure `Calibration.elm` (`fitVmh`): over climb kms (course
+gain ≥ 30 m with a positive recorded time) across the user's linked actual runs,
+`vmh = Σ gain / (Σ seconds / 3600)` — the gain-weighted realized climb rate;
+returns value + climb-km/run counts or `Nothing`. Uses data already held
+(`kmsCache` gain + `actualSplits.splits`); no new fetching. Surfaced on
+`#/profile` via a transparent opt-in panel (`viewCalibrationPanel`): fitted rate
++ contributing run names + current value → explicit Apply (`CalibrateVmh` sets +
+persists `verticalRateVmh`); hint when nothing's linked. Helpers
+`linkedRunsWithRace`/`linkedRuns`/`calibrationContributors`. ADR-0006.
+**What I verified:** New `smoke:calibration` harness drives the REAL compiled
+`fitVmh` — 17 checks: gain-weighting (1421/1000/1080 m/h for known inputs), the
+30 m threshold cut, skipping kms with no/zero recorded time, `null` for no data,
+multi-run aggregation → `PASS`. type-check `Success!`, build `✓`, smoke / aidcsv
+/ sections all green. `CalibrateVmh` + the panel strings present in the compiled
+bundle. **Gap:** the UI click-path (link run → Apply → field updates + persists)
+isn't headless-testable — fit logic fully smoke-tested + wiring type-checks;
+flagged a manual check.
+**What changed in the repo:** PR #80, merged `819e9dc`. `Calibration.elm`,
+`CalibrationHarness.elm`, `smoke-calibration.mjs`, `package.json`, `Main.elm`,
+ADR-0006 + INDEX + `local-ci.md`. This close PR moves it to DONE, ticks BACKLOG,
+and **clears CURRENT — the five-task batch is complete.**
+**Batch summary (user promoted 5 on 2026-06-15, one PR each + close PR):**
+TASK-039 section-overlap fix (#72) · TASK-040 gpxText IDB split + v2→v3 migration
+(#74) · TASK-041 slopeFactor docstring (#76) · TASK-042 print-friendly table
+(#78) · TASK-043 vmh calibration (#80, first slice of the TASK-022 epic). Added
+ADRs 0004/0005/0006 and three CI gates (`smoke:sections`, `smoke:calibration`,
+expanded storage `smoke`). Two manual checks recommended (headless env can't do
+them): browser round-trip after the TASK-040 IDB migration; print-preview of the
+TASK-042 table.
+**What I learned:** Calibration's §9 "open questions" turned out mostly resolved
+by shipped work — the disciplined move was to read the roadmap before assuming
+the user needed to weigh in, then proceed with an ADR for the one real choice
+(transparency). The pure-fit + harness pattern (shared with sections) made the
+risky part (the math) the well-verified part.
+**Next:** Nothing active — batch complete. BACKLOG has TASK-044 (flat-pace
+calibration) + the further roadmap §7 fits + parking-lot items, each needing only
+selection (calibration fits want a per-fit user go-ahead). Surfacing the two
+recommended manual checks + the queued calibration work to the user.
