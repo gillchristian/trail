@@ -2454,6 +2454,7 @@ viewProfileSettings model =
             , p2 "Population-tier defaults seed the predictor. Tweak any field; values stick on save."
             ]
         , profilePresetsRow
+        , viewCalibrationPanel model
         , div [ class "rounded-2xl bg-slate-900 border border-slate-800 p-5 space-y-5" ]
             [ profileFieldRow "Vertical rate"
                 "m / h on moderate climbs (~10-20% grade). Strong mid-pack ≈ 850."
@@ -2549,7 +2550,6 @@ viewProfileSettings model =
                     "bpm"
                 ]
             ]
-        , viewCalibrationPanel model
         , div [ class "flex items-center justify-end gap-3" ]
             [ if model.profileSaved then
                 p [ class "text-sm text-emerald-400" ] [ text "Saved ✓" ]
