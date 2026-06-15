@@ -22,7 +22,7 @@ exit 0 before a PR opens.
 |---|---|---|
 | Type-check | `npx elm make src/Main.elm --output=/dev/null` | The app compiles. In Elm this is the lion's share of correctness. |
 | Build | `npm run build` | Vite production build succeeds (catches asset/JS-interop breakage Elm can't see). |
-| Storage smoke | `npm run smoke` | IndexedDB save/load/delete round-trips for the v1 `races` store, including UTMB-size payloads (`scripts/smoke-storage.mjs`). **Scope:** the `races` store only — *not* the v2 `settings` store (athlete profile / Strava token) nor the DB-version upgrade path. |
+| Storage smoke | `npm run smoke` | IndexedDB round-trips for the v3 schema: the `races`/`gpx` split (GPX in its own row), full vs light (meta) save, orphan-free delete, and the **v2 → v3 migration** of inline `gpxText` — including UTMB-size payloads (`scripts/smoke-storage.mjs`; ADR-0005). **Scope:** still does not cover the `settings` store (athlete profile / Strava token). Mirrors `main.js`'s IDB logic (can't import it), so the two must stay in sync. |
 | Aid-CSV smoke | `npm run smoke:aidcsv` | `AidCsv.parse`/`toCsv` behavior via the compiled `Platform.worker` harness (`scripts/smoke-aid-csv.mjs` + `src/AidCsvHarness.elm`). |
 | Section-partition smoke | `npm run smoke:sections` | `Planning.sectionsForRace` assigns each km to exactly one section by midpoint, so section gain/loss/Time/cum (and section-mode CSV) never double-count a km straddling an aid distance (`scripts/smoke-sections.mjs` + `src/SectionsHarness.elm`; ADR-0004). Regression guard for the TASK-039 overlap bug. |
 
