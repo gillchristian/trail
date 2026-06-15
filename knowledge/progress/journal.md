@@ -1258,3 +1258,31 @@ tasks (036/037/038) shipped + closed; BACKLOG Active is empty.
 **Next:** Nothing active. BACKLOG Active is clear. Future work: parking lot
 (incl. the new slope-comment fix + the older section-overlap bug) or the lone
 open Proposal TASK-022 (predictor calibration) — needs explicit user go-ahead.
+
+---
+## 2026-06-15 12:42 — Queue a five-task batch (user request); orient TASK-039
+
+**What I did:** The user promoted five backlog items in one go and asked me to
+work them one at a time, each its own PR. Queued them into BACKLOG Active
+(`[ ]`, in execution order): **TASK-039** section-overlap double-count fix,
+**TASK-040** separate `gpxText` into its own IDB row, **TASK-041** the
+`Planning.elm` slope-factor *comment* fix (the follow-up TASK-038 deferred),
+**TASK-042** print-friendly planning-table export, **TASK-022** calibration
+from past activities. Next id was 039 (highest anywhere was 038); TASK-022 keeps
+its existing Proposals id. Annotated the four promoted parking-lot bullets
+(struck + `→ promoted as TASK-0NN`), keeping the not-promoted section-card Δ
+sub-note parked. TASK-022's Proposals entry + the "needs go-ahead" gate updated
+to record the explicit user go-ahead (2026-06-15). Oriented **TASK-039** into
+CURRENT.md with full acceptance criteria.
+**What I verified:** Baseline before any change — `elm 0.19.1`, `node v22.19.0`,
+tree clean, `npx elm make src/Main.elm --output=/dev/null` → "Success!". Read
+`Planning.elm` end-to-end + the Main.elm section-consumption sites
+(`sectionsWithCumulative` 5049, `viewSectionCardAndDetails` 5231,
+`sectionActualSeconds` 6332) and `Csv.elm:170/188` to map the double-count blast
+radius before writing TASK-039's criteria. This is a docs/planning-only PR.
+**What changed in the repo:** queue PR (docs) — `BACKLOG.md` (+5 Active, parking
+lot + Proposals annotations), `CURRENT.md` (TASK-039 oriented), this entry.
+**Plan/order:** 039 → 040 → 041 → 042 → 022. 039/041 both touch `Planning.elm`
+but different functions (no conflict; rebase between). 022 is Large → split into
+sub-tasks when oriented.
+**Next:** Implement TASK-039 on `fix/task-039-section-overlap`.
