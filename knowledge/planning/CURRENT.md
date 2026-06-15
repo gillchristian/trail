@@ -16,55 +16,58 @@
 
 ## Active
 
-### TASK-039 — Fix section-overlap double-count in `Planning.sectionsForRace`
+### TASK-040 — Separate `gpxText` into its own IDB row
 
-**Source:** BACKLOG parking lot (scoped during TASK-025), promoted 2026-06-15.
-First of a five-task batch the user promoted on 2026-06-15: TASK-039, 040, 041,
-042, 022 — worked one at a time, each its own PR.
-**Branch:** `fix/task-039-section-overlap`
+**Source:** BACKLOG parking lot, promoted 2026-06-15 (batch task 2 of 5; TASK-039
+shipped — PR #72, `633e263`).
+**Branch:** `refactor/task-040-gpx-store`
 
-**Problem.** `sectionsForRace` (`Planning.elm:457`) assigns kms to sections with
-an overlap test `km.distStart < b && km.distEnd > a`. A km window straddling an
-aid-station distance `b` satisfies the test for *both* the section ending at `b`
-and the one starting at `b`, so:
-- its index appears in two sections' `kmIndices` → `sectionSeconds`
-  (`Main.elm:5060`/`5236`) and `sectionActualSeconds` (`6332`) double-count its
-  seconds; the cum column `runningAfterSection` (`5071`) inflates; it shows in
-  two section cards' `containedKms` (`5234`);
-- `sumKmField` (`Planning.elm:502`, which ignores its `a`/`b` args) adds its
-  whole gain/loss twice → `section.gain`/`.loss` (`5109-5110`, `5357-5360`)
-  double-count;
-- section-mode CSV (`Csv.elm:188`) double-counts likewise.
+**Problem.** `Race.gpxText : String` (`Types.elm:222`) holds the raw GPX (~3 MB
+for a UTMB-size track). It is encoded inline in the race JSON (`Types.elm:313`)
+and the whole race object is the value in the `races` IDB store. So **every**
+`Storage.saveRace (encodeRace …)` — 14 call sites in `Main.elm`, almost all
+plan/aid/metadata/actual edits — re-ships that 3 MB across the port and rewrites
+it to IDB, even though the GPX never changes after import. PR #29 only papered
+over the drag case (`SliderInput` is live-only, the comment at `Main.elm:1413`;
+`SliderCommit` still writes the whole thing).
 
-The `sumKmField` comment *claims* "sum the full km value when its center falls
-inside the range" — but the code does an overlap test, not a center test.
-
-**Approach.** Assign each km to exactly one section by **midpoint containment**
-(`a ≤ (distStart+distEnd)/2 < b`) — a clean partition: no double-count, no
-dropped km, and it makes the code match `sumKmField`'s own documented intent.
-Pro-rating the straddling km's gain/loss/seconds across the two sides was
-considered and rejected for now (per-km plan seconds are indivisible; gain/loss
-would need re-deriving the km's elevation at the split point) — bounded
-whole-km attribution is the conventional, reversible choice. Record the
-decision (ADR if it clears the INDEX bar, else journal + code comment).
+**Approach (to confirm while building).** Add a second object store `gpx` keyed
+by race id (DB v2 → v3). `gpxText` is **immutable after import** (set only in
+`buildDraftRace`/`.trail` import; no edit path), so:
+- the `races` row carries the race *minus* `gpxText`;
+- the `gpx` row (`{ id, gpxText }`) is written **once** at import and never again;
+- on load, JS joins `gpxText` back into each race before sending to Elm (the
+  decoder at `Types.elm:512` still requires the field — keep it that way);
+- plan/aid/meta/actual saves use a light port that writes only the `races` row —
+  no `gpxText` in the payload — so the 3 MB never crosses the port on an edit;
+- import/`.trail`-import uses a full save that writes both stores.
+- v2 → v3 `onupgradeneeded` migrates existing inline-`gpxText` races into the
+  `gpx` store (no data loss). `.trail` file format is unaffected — `gpxText`
+  still travels in the export envelope; only IDB layout changes (no `.trail`
+  version bump). Capture the schema/migration choice in an ADR.
 
 **Acceptance criteria:**
-- [ ] **Partition.** For a race with an aid positioned mid-km, every km index
-  appears in exactly one section's `kmIndices` (none in two, none dropped).
-- [ ] **No elevation double-count.** Σ over sections of `section.gain` equals
-  the sum of all per-km `.gain` (same for `.loss`), within rounding — it was
-  strictly greater when a km straddled an aid.
-- [ ] **No time double-count.** Σ over sections of `sectionSeconds` equals the
-  total plan moving seconds; the section-table cum column ends exactly at the
-  total. (Same for `sectionActualSeconds` when an actual is linked.)
-- [ ] Misleading comments in `sectionsForRace`/`sumKmField` corrected to
-  describe midpoint assignment.
-- [ ] An aid landing exactly on a km boundary (no straddle) is unchanged.
-- [ ] Local CI green (type-check, build, smoke, smoke:aidcsv). Verification of
-  the partition/no-double-count invariants is by a section smoke harness over
-  the compiled `Planning.sectionsForRace` (preferred — quotable + regression
-  guard) or, failing that, an app reproduction; output quoted in the journal.
+- [ ] New `gpx` object store, `DB_VERSION` 2 → 3, `onupgradeneeded` creates it
+  (`src/main.js`).
+- [ ] **Migration:** a race stored under v2 (inline `gpxText`) survives the
+  upgrade — its GPX moves into the `gpx` store, intact (~3 MB round-trips byte
+  for byte), and still loads + parses.
+- [ ] **The win:** a plan-only save (slider commit, aid add/edit/delete, target
+  commit, metadata edit, actual link/unlink) writes only the `races` row; the
+  `gpx` row is not rewritten and `gpxText` is absent from the light save payload.
+- [ ] On load, `gpxText` is re-attached so the Elm decoder succeeds and GPX
+  export (`GpxExport`) + profile parse (`Gpx.parseGPX race.gpxText`) still work.
+- [ ] A freshly imported race (both `.gpx` and `.trail`) persists, and after a
+  reload the track + plan + aid stations are intact.
+- [ ] `scripts/smoke-storage.mjs` (the hand-copied mirror of `main.js`'s IDB
+  logic) updated to the v3 schema and extended: store creation, v2 → v3
+  migration, plan-only-save-leaves-gpx-untouched, load-join round-trip with a
+  real ~3 MB GPX. `npm run smoke` green.
+- [ ] All five local-CI gates green + a **manual app round-trip** (import → edit
+  plan → reload → data intact), output/observation quoted in the journal.
+- [ ] ADR for the two-store schema + migration.
 
-**Notes.** The section-card **Δ vs plan** moving-vs-clock bug (the other half of
-the old parking-lot entry) stays deferred — unblocked by this fix but its own
-task. Out of scope here.
+**Notes.** Keep `race.gpxText` in the Elm model (don't thread GPX out of the
+record) — only the *persistence* path splits. The smoke is a copy of `main.js`,
+not an import of it, so both files must move together (a drift here is exactly
+what TASK-038 cleaned up in the CI docs).
