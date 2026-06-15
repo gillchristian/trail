@@ -1539,3 +1539,65 @@ go-ahead. `CURRENT.md` updated from "checkpoint pending" to "paused by user."
 Nothing active. Ready work when the user returns: the section-card Δ-vs-plan
 fix (unblocked by TASK-039's partition), other parking-lot items, or the two
 recommended manual checks (TASK-040 browser round-trip, TASK-042 print preview).
+
+---
+## 2026-06-15 14:40 — TASK-045: section plan time is clock time (clock-vs-clock Δ)
+
+**Task:** TASK-045 (parking lot → promoted; the follow-up TASK-025 explicitly
+deferred, unblocked by TASK-039/ADR-0004). User asked for it directly.
+
+**What I did:** The section `Δ vs plan` compared planned **moving** seconds
+(`Σ` per-km moving over `kmIndices`) against actual **clock** seconds
+(`sectionActualSeconds` — real splits, which include time spent at an aid), so
+resting at an aid but running on pace read as that-much "behind plan." Made a
+section's plan **Time = clock** = `sectionMoving + sectionAidRest`, kept **Pace
+moving**, and set **Δ = actual − clock** — the section-level lift of TASK-025's
+per-km clock model. New pure `Planning.sectionAidRest aids section` sums the rest
+of aids whose containing km (`kmAtDistance`) is in `section.kmIndices`. Applied
+to the section table (`sectionsWithCumulative` — Time/Cum clock, aid rows now
+non-additive dividers showing rest as context, a footer caption), the section
+card (`viewSectionDetails` — Time stat clock + amber caption mirroring the per-km
+one), and section-mode CSV (`buildSectionRows` — `section_time` /
+`cumulative_after_aid` clock, matching the UI + km-mode). ADR-0008.
+
+**The crux (why not `followedByAid`):** the obvious "use the aid this section
+ends at" is wrong ~half the time. An aid at `b` lives in km `floor(b/1000)`,
+whose midpoint is `…+500`; when `frac(b) < 500` the aid's km — and so its
+stoppage in the actual split — belongs to the section *after* `b`, not the one
+that ends at it. `sectionActualSeconds` sums actual splits over `kmIndices`, so
+charging the plan rest to the same km/section is the only rule consistent with
+the actual in every case. The midpoint partition (ADR-0004) makes that km unique
+— which is exactly why this was blocked on TASK-039.
+
+**What I verified:** all six local-CI gates green. Type-check `Success!`; build
+`✓ built` (350.02 kB). Smokes: storage `SMOKE PASSED`, aid-csv `PASS`,
+calibration `PASS`, and **sections `PASS`** — extended (the harness had
+hard-coded rest = 0) with the new `Planning.sectionAidRest` driven over the real
+compiled module:
+```
+E: aid-rest attribution (clock time) + conservation
+  ok   km map still [[0,1],[2],[3,4]]
+  ok   aidRest per section == [300, 0, 600]
+  ok   Σ aidRest == 900 (== Σ rests; none dropped or double-counted)
+F: aids but no rest times → aidRest all zero
+  ok   aidRest == [0, 0]
+```
+Scenario E is the proof: aid@3300 (first half of its km) attributes to section 2
+(the section *after* it) → `[300, 0, 600]`, **not** `[300, 600, 0]` that
+`followedByAid` would give. Worked consequence: a runner who holds planned moving
+pace and rests exactly as planned now sees Δ = 0 on every section (it used to
+show a phantom deficit equal to the aid rest). Not verifiable headless: the
+browser render of the section table/card with a **linked actual** — recommended
+post-merge (added to CURRENT.md's manual-check list).
+
+**What changed in the repo:** PR #86, merged `08c9a66`. `Planning.elm`
+(`sectionAidRest` + export), `Main.elm` (section table + card), `Csv.elm`,
+`SectionsHarness.elm` + `smoke-sections.mjs` (scenarios E/F), ADR-0008 + INDEX +
+`local-ci.md`. This close PR moves it to DONE, ticks BACKLOG, strikes the
+parking-lot line, clears CURRENT.
+
+**Next:** Nothing active. Calibration stays **paused** (user decision 2026-06-15)
+— don't promote the harder roadmap §7 fits without a fresh go-ahead. Ready work:
+parking-lot items (light/dark, multi-language); three recommended manual checks
+(TASK-040 round-trip, TASK-042 print preview, TASK-045 section view with a linked
+actual).
