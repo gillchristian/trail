@@ -1,11 +1,12 @@
 port module SectionsHarness exposing (main)
 
-{-| Test-only harness: drives the real `Planning.sectionsForRace` from Node
-via ports, so `scripts/smoke-sections.mjs` can verify that kms partition
-cleanly across sections — a km straddling an aid-station distance is counted
-in exactly one section, never both — without a browser. Mirrors
-`AidCsvHarness`. Not imported by the app (`main.js` → `Main.elm` only), so it
-never ships in the bundle.
+{-| Test-only harness: drives the real `Planning.sectionsForRace` and
+`Planning.sectionAidRest` from Node via ports, so `scripts/smoke-sections.mjs`
+can verify (a) that kms partition cleanly across sections — a km straddling an
+aid-station distance is counted in exactly one section, never both — and (b)
+that each section's attributed aid rest sums to the course total, all without a
+browser. Mirrors `AidCsvHarness`. Not imported by the app (`main.js` →
+`Main.elm` only), so it never ships in the bundle.
 -}
 
 import Json.Decode as D
@@ -46,6 +47,7 @@ type alias Request =
     { totalDistance : Float
     , kms : List KmSpec
     , aids : List Float
+    , rests : List Float
     }
 
 
@@ -61,10 +63,11 @@ kmSpecDecoder =
 
 requestDecoder : D.Decoder Request
 requestDecoder =
-    D.map3 Request
+    D.map4 Request
         (D.field "totalDistance" D.float)
         (D.field "kms" (D.list kmSpecDecoder))
         (D.field "aids" (D.list D.float))
+        (D.oneOf [ D.field "rests" (D.list D.float), D.succeed [] ])
 
 
 toKm : KmSpec -> Planning.Km
@@ -85,16 +88,27 @@ toKm s =
     }
 
 
-toAid : Int -> Float -> AidStation
-toAid i d =
+toAid : Int -> Float -> Int -> AidStation
+toAid i d rest =
     { id = "aid-" ++ String.fromInt i
     , name = "Aid " ++ String.fromInt (i + 1)
     , distance = d
-    , restSeconds = 0
+    , restSeconds = rest
     , services = []
     , notes = ""
     , cutoff = Nothing
     }
+
+
+{-| Rest (seconds) for the aid at index `i`, 0 when the request omits it.
+-}
+restAt : Int -> List Float -> Int
+restAt i rests =
+    rests
+        |> List.drop i
+        |> List.head
+        |> Maybe.map round
+        |> Maybe.withDefault 0
 
 
 handle : D.Value -> E.Value
@@ -105,18 +119,21 @@ handle v =
 
         Ok req ->
             let
+                aidStations =
+                    List.indexedMap (\i d -> toAid i d (restAt i req.rests)) req.aids
+
                 sections =
                     Planning.sectionsForRace
                         { totalDistance = req.totalDistance
-                        , aidStations = List.indexedMap toAid req.aids
+                        , aidStations = aidStations
                         , kms = List.map toKm req.kms
                         }
             in
-            E.object [ ( "sections", E.list encodeSection sections ) ]
+            E.object [ ( "sections", E.list (encodeSection aidStations) sections ) ]
 
 
-encodeSection : Planning.Section -> E.Value
-encodeSection s =
+encodeSection : List AidStation -> Planning.Section -> E.Value
+encodeSection aids s =
     E.object
         [ ( "index", E.int s.index )
         , ( "label", E.string s.label )
@@ -126,4 +143,5 @@ encodeSection s =
         , ( "gain", E.float s.gain )
         , ( "loss", E.float s.loss )
         , ( "kmIndices", E.list E.int s.kmIndices )
+        , ( "aidRest", E.int (Planning.sectionAidRest aids s) )
         ]

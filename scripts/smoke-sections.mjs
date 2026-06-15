@@ -113,6 +113,32 @@ const run = async () => {
     check('Σ loss == 400 (not double-counted)', sum(sections.map((s) => s.loss)) === 400, String(sum(sections.map((s) => s.loss))))
   }
 
+  // --- E: aid-REST attribution + conservation (the TASK-045 clock fix) ---
+  {
+    // Same straddles as A (km map [[0,1],[2],[3,4]]), now with rest times.
+    // Aid 1700 is in the 2nd half of km1 (mid 1500 < 1700) → km1 → section 0,
+    // the section ENDING at it (here == followedByAid). Aid 3300 is in the 1st
+    // half of km3 (mid 3500 ≥ 3300) → km3 → section 2, the section AFTER it —
+    // NOT section 1, which it "follows". So its rest lands in section 2.
+    // (followedByAid would have wrongly charged section 1 — the bug we avoid.)
+    const { sections } = await call({
+      totalDistance: TOTAL, kms: course(100, 0), aids: [1700, 3300], rests: [300, 600],
+    })
+    console.log('E: aid-rest attribution (clock time) + conservation')
+    check('km map still [[0,1],[2],[3,4]]', eqJson(sections.map((s) => s.kmIndices), [[0, 1], [2], [3, 4]]))
+    check('aidRest per section == [300, 0, 600]', eqJson(sections.map((s) => s.aidRest), [300, 0, 600]),
+      JSON.stringify(sections.map((s) => s.aidRest)))
+    check('Σ aidRest == 900 (== Σ rests; none dropped or double-counted)',
+      sum(sections.map((s) => s.aidRest)) === 900, String(sum(sections.map((s) => s.aidRest))))
+  }
+
+  // --- F: aids but no rest times → every section's aidRest defaults to 0 ---
+  {
+    const { sections } = await call({ totalDistance: TOTAL, kms: course(100, 0), aids: [2500] })
+    console.log('F: aids but no rest times → aidRest all zero')
+    check('aidRest == [0, 0]', eqJson(sections.map((s) => s.aidRest), [0, 0]), JSON.stringify(sections.map((s) => s.aidRest)))
+  }
+
   console.log('')
   if (failures === 0) {
     console.log('PASS — all section-partition checks green')

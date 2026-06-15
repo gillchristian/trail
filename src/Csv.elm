@@ -174,28 +174,33 @@ sectionsCsv opts =
                 }
 
         rows =
-            buildSectionRows opts.results sections
+            buildSectionRows opts.race.aidStations opts.results sections
     in
     encodeRows header rows
 
 
-buildSectionRows : Dict Int KmResult -> List Section -> List (List String)
-buildSectionRows results sections =
+buildSectionRows : List AidStation -> Dict Int KmResult -> List Section -> List (List String)
+buildSectionRows aids results sections =
     let
         go section ( running, acc ) =
             let
-                seconds =
+                moving =
                     section.kmIndices
                         |> List.filterMap (\idx -> Dict.get idx results)
                         |> List.foldl (\r sum -> sum + r.seconds) 0
 
+                -- Rest of the aids whose km falls in this section (the same
+                -- attribution `section_time`/`cumulative` fold in), so the
+                -- export matches the UI and km-mode: time already includes
+                -- rest, `aid_rest` is the breakdown. See Planning.sectionAidRest.
                 aidRest =
-                    section.followedByAid
-                        |> Maybe.map .restSeconds
-                        |> Maybe.withDefault 0
+                    Planning.sectionAidRest aids section
+
+                clock =
+                    moving + aidRest
 
                 runningAfterAid =
-                    running + seconds + aidRest
+                    running + clock
 
                 row =
                     [ String.fromInt (section.index + 1)
@@ -205,9 +210,9 @@ buildSectionRows results sections =
                     , formatFloat 3 (section.distance / 1000)
                     , formatInt section.gain
                     , formatInt section.loss
-                    , String.fromInt seconds
-                    , formatHhmmss seconds
-                    , paceForRow seconds section.distance
+                    , String.fromInt clock
+                    , formatHhmmss clock
+                    , paceForRow moving section.distance
                     , section.followedByAid |> Maybe.map .name |> Maybe.withDefault ""
                     , String.fromInt aidRest
                     , formatHhmmss aidRest

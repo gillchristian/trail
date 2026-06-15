@@ -5221,6 +5221,9 @@ viewSectionTable race kms results =
 
             else
                 []
+
+        hasAidRest =
+            Planning.aidRestTotal race.aidStations > 0
     in
     div [ class "rounded-2xl bg-slate-900 border border-slate-800 overflow-x-auto" ]
         [ Html.table [ class "w-full text-sm" ]
@@ -5239,6 +5242,12 @@ viewSectionTable race kms results =
                 ]
             , Html.tbody [] rows
             ]
+        , if hasAidRest then
+            p [ class "px-4 py-3 text-xs text-slate-500 border-t border-slate-800" ]
+                [ text "Section time and Cum are clock time — moving plus the aid rest taken in that section. Pace is moving only." ]
+
+          else
+            text ""
         ]
 
 
@@ -5253,24 +5262,22 @@ sectionsWithCumulative race results sections =
 
         go section ( running, acc ) =
             let
-                sectionSeconds =
+                sectionMoving =
                     section.kmIndices
                         |> List.filterMap (\idx -> Dict.get idx results)
                         |> List.foldl (\r sum -> sum + r.seconds) 0
 
-                aidRest =
-                    section.followedByAid
-                        |> Maybe.map .restSeconds
-                        |> Maybe.withDefault 0
+                sectionRest =
+                    Planning.sectionAidRest race.aidStations section
 
-                runningAfterSection =
-                    running + sectionSeconds
+                sectionClock =
+                    sectionMoving + sectionRest
 
-                runningAfterRest =
-                    runningAfterSection + aidRest
+                newRunning =
+                    running + sectionClock
 
                 pace =
-                    paceMinPerKm sectionSeconds section.distance
+                    paceMinPerKm sectionMoving section.distance
 
                 actualMaybe =
                     sectionActualSeconds race section.kmIndices
@@ -5282,7 +5289,7 @@ sectionsWithCumulative race results sections =
                                 [ Html.td [ class "px-4 py-3 text-right text-slate-200 tabular-nums" ]
                                     [ text (formatHmsLong s) ]
                                 , Html.td [ class "px-4 py-3 text-right" ]
-                                    [ viewSignedDeltaCell (s - sectionSeconds) ]
+                                    [ viewSignedDeltaCell (s - sectionClock) ]
                                 ]
 
                             Nothing ->
@@ -5305,18 +5312,30 @@ sectionsWithCumulative race results sections =
                          , Html.td [ class "px-4 py-3 text-right text-rose-300 tabular-nums" ] [ text (formatInt section.gain ++ " m+") ]
                          , Html.td [ class "px-4 py-3 text-right text-emerald-300 tabular-nums" ] [ text (formatInt section.loss ++ " m−") ]
                          , Html.td [ class "px-4 py-3 text-right text-slate-300 tabular-nums" ] [ text pace ]
-                         , Html.td [ class "px-4 py-3 text-right text-white font-medium tabular-nums" ] [ text (formatHmsLong sectionSeconds) ]
+                         , Html.td [ class "px-4 py-3 text-right text-white font-medium tabular-nums" ] [ text (formatHmsLong sectionClock) ]
                          ]
                             ++ actualCells
-                            ++ [ Html.td [ class "px-4 py-3 text-right text-slate-300 tabular-nums" ] [ text (formatHmsLong runningAfterSection) ] ]
+                            ++ [ Html.td [ class "px-4 py-3 text-right text-slate-300 tabular-nums" ] [ text (formatHmsLong newRunning) ] ]
                         )
 
                 aidRow =
                     case section.followedByAid of
                         Just aid ->
+                            -- A divider between sections, not a time row: this aid's
+                            -- rest is already folded into the clock Time of whichever
+                            -- section owns its km (Planning.sectionAidRest), so it is
+                            -- shown here only as context and adds nothing to Cum.
                             Html.tr [ class "border-t border-slate-800 bg-slate-950/40" ]
                                 ([ Html.td [ class "px-4 py-2 text-xs align-top" ]
-                                    [ div [ class "text-amber-300" ] [ text ("★ " ++ aid.name) ]
+                                    [ div [ class "text-amber-300" ]
+                                        [ text ("★ " ++ aid.name)
+                                        , if aid.restSeconds > 0 then
+                                            span [ class "text-amber-300/60 font-normal" ]
+                                                [ text ("  ·  rest " ++ formatHmsLong aid.restSeconds) ]
+
+                                          else
+                                            text ""
+                                        ]
                                     , if String.isEmpty aid.notes then
                                         text ""
 
@@ -5327,7 +5346,7 @@ sectionsWithCumulative race results sections =
                                  , emptyCell
                                  , emptyCell
                                  , emptyCell
-                                 , Html.td [ class "px-4 py-2 text-right text-xs text-amber-300 tabular-nums" ] [ text ("+" ++ formatHmsLong aid.restSeconds) ]
+                                 , emptyCell
                                  ]
                                     ++ (if hasActual then
                                             [ emptyCell, emptyCell ]
@@ -5335,13 +5354,13 @@ sectionsWithCumulative race results sections =
                                         else
                                             []
                                        )
-                                    ++ [ Html.td [ class "px-4 py-2 text-right text-xs text-slate-400 tabular-nums" ] [ text (formatHmsLong runningAfterRest) ] ]
+                                    ++ [ emptyCell ]
                                 )
 
                         Nothing ->
                             text ""
             in
-            ( runningAfterRest, aidRow :: sectionRow :: acc )
+            ( newRunning, aidRow :: sectionRow :: acc )
 
         ( _, rowsRev ) =
             List.foldl go ( 0, [] ) sections
@@ -5694,6 +5713,12 @@ viewSectionDetails :
     -> Html Msg
 viewSectionDetails race section containedKms results sectionSeconds sectionPace =
     let
+        sectionRest =
+            Planning.sectionAidRest race.aidStations section
+
+        sectionClock =
+            sectionSeconds + sectionRest
+
         actualRow =
             case sectionActualSeconds race section.kmIndices of
                 Just actualS ->
@@ -5704,7 +5729,7 @@ viewSectionDetails race section containedKms results sectionSeconds sectionPace 
                                 [ text "Δ vs plan" ]
                             , p [ class "flex items-baseline gap-1" ]
                                 [ span [ class "text-base font-semibold" ]
-                                    [ viewSignedDeltaCell (actualS - sectionSeconds) ]
+                                    [ viewSignedDeltaCell (actualS - sectionClock) ]
                                 ]
                             ]
                         ]
@@ -5723,12 +5748,18 @@ viewSectionDetails race section containedKms results sectionSeconds sectionPace 
             [ h3 [ class "text-base font-semibold text-white" ] [ text "Section plan" ]
             , div [ class "grid grid-cols-2 sm:grid-cols-4 gap-3 tabular-nums" ]
                 [ smallStat "Distance" (formatFloat 1 (section.distance / 1000)) "km"
-                , smallStat "Time" (formatHmsLong sectionSeconds) ""
+                , smallStat "Time" (formatHmsLong sectionClock) ""
                 , smallStat "Pace" sectionPace "/km"
                 , smallStat "Kms"
                     (String.fromInt (List.length containedKms))
                     ""
                 ]
+            , if sectionRest > 0 then
+                p [ class "text-xs text-amber-300/80" ]
+                    [ text ("Time is clock time, including " ++ formatRest sectionRest ++ " at aid stations in this section. Pace is moving only.") ]
+
+              else
+                text ""
             , actualRow
             , case section.followedByAid of
                 Just aid ->

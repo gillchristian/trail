@@ -8,6 +8,7 @@ module Planning exposing
     , distribute
     , kmAtDistance
     , kmsForRace
+    , sectionAidRest
     , sectionsForRace
     , slopeFactor
     )
@@ -524,6 +525,27 @@ sumKmField field kms =
     -- the elevation would need re-deriving at the split point; whole-km
     -- attribution by midpoint is the simpler, reversible choice (TASK-039).
     List.foldl (\km acc -> acc + field km) 0 kms
+
+
+{-| Total planned aid-station rest that falls *inside* a section, by the same
+km attribution the section sums use: an aid contributes its rest when its
+containing km (`kmAtDistance a.distance`) is one of the section's `kmIndices`.
+
+This is the section-level lift of the per-km clock model (TASK-025): summed
+over all sections it equals `aidRestTotal`, because each aid's km belongs to
+exactly one section under the midpoint partition (ADR-0004). Use it to turn a
+section's *moving* seconds into *clock* seconds (`moving + sectionAidRest`) so a
+plan-vs-actual comparison is clock-vs-clock — actual section splits already
+include the stoppage in whichever km physically held the aid. Note this can
+differ from `followedByAid.restSeconds` when an aid sits in the first half of
+its km (its km then belongs to the *next* section); the km attribution is the
+one that matches the actual splits. See ADR-0008.
+-}
+sectionAidRest : List AidStation -> Section -> Int
+sectionAidRest aids section =
+    aids
+        |> List.filter (\a -> List.member (kmAtDistance a.distance) section.kmIndices)
+        |> List.foldl (\a acc -> acc + a.restSeconds) 0
 
 
 zipPairs : List a -> List ( a, a )

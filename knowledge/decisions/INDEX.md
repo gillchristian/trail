@@ -39,3 +39,4 @@ What does this make easy? What does this make hard? What will I have to revisit 
 - [0005 — Store GPX text in its own IndexedDB row](0005-gpx-own-idb-row.md)
 - [0006 — Calibrate climb rate (`vmh`) from linked runs: gain-weighted, transparent](0006-calibration-vmh.md)
 - [0007 — Calibrate flat-trail pace from runnable kms](0007-calibration-flat-pace.md)
+- [0008 — Section plan time is clock time (moving + midpoint-attributed aid rest)](0008-section-clock-time.md)
