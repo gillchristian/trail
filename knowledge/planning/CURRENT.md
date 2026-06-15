@@ -16,48 +16,53 @@
 
 ## Active
 
-### TASK-042 — Print-friendly export of the planning table
+### TASK-043 — Calibrate climb rate (`vmh`) from linked actual runs
 
-**Source:** BACKLOG parking lot, promoted 2026-06-15 (batch task 4 of 5; 039/040/041
-shipped — PRs #72/#74/#76).
-**Branch:** `feat/task-042-print-plan`
+**Source:** First split of TASK-022 (calibration), promoted 2026-06-15 (batch
+task 5 of 5; 039/040/041/042 shipped — PRs #72/#74/#76/#78). TASK-022 is the
+parent epic; the roadmap (§7) says "split into per-fit subtasks" ordered by
+value-per-effort, and **vertical rate is #1** — it replaces the hand-set
+`verticalRateVmh`, the core climb-time input (`climb = gain / (vmh × i)`).
 
-**Goal.** Let the user print the plan table (km mode + section mode) cleanly on
-paper — legible black-on-white, the app's dark chrome stripped, rows not split
-across page breaks, the table header repeated per page.
+**Why this slice.** Roadmap §9's "open questions" are mostly resolved by shipped
+work (one global profile, continuous slider, loud confidence, actual-as-column,
+hybrid local-first). The one genuinely open question — calibration transparency
+(#7) — the roadmap answers itself: *show which activities, let the user opt in*.
+Adopt that (ADR). The vmh fit needs only data we already have: each linked
+race's per-km course gain (`Planning.computeKms`, cached in `model.kmsCache`) +
+its `actualSplits.splits` (per-km seconds). No new Strava fetching.
 
-**Approach.** The plan page (`viewPlanTable`, `Main.elm:4082`) stacks chrome
-above the table: `viewPlanCrumb`, `viewPlanHeader`, `viewPlanTargetPanel`,
-`viewPredictorStrip`, `viewActualRunStrip`, `viewPlanTabs` (+ Download-CSV
-button ~4700), then `viewKmTable`/`viewSectionTable`. Outside it sit the sticky
-`viewHeader` (2056) and `viewFooter`. Plan:
-- Add a **Print** button next to Download CSV → new port `printPage : () -> Cmd msg`
-  → `window.print()` in `main.js` (Elm can't call it directly).
-- Mark chrome `print:hidden` (Tailwind v4 `print:` variant is available —
-  `@import "tailwindcss"`): app header, footer, crumb, target panel, predictor
-  strip, actual strip, tabs, the CSV/Print buttons.
-- Keep `viewPlanHeader` (race name + stats) + the table visible. Wrap the
-  printable part in a `.plan-print` container and add an `@media print` block in
-  `src/styles/app.css`: white background, black text, real borders on `th`/`td`,
-  `thead { display: table-header-group }` (repeat header per page),
-  `tr { break-inside: avoid }`, and reset the dark `bg-*`/`text-*` cell colors
-  to readable print values (scoped to `.plan-print` so it doesn't touch screen).
+**Approach.**
+- New pure module `Calibration.elm` — `fitVmh : List { kms : List Km, splits :
+  Dict Int Int } -> Maybe VmhFit`, where a climb km (gain ≥ threshold, e.g.
+  ≥ 30 m) contributes its gain + actual seconds; `fittedVmh = Σ climbGain /
+  (Σ climbSeconds / 3600)` (gain-weighted = realized climb rate). Returns the
+  fit + contributing climb-km / race counts (for confidence + transparency), or
+  `Nothing` when there's no qualifying climb data.
+- Profile page (`#/profile`): a "Calibrate from your runs" panel. With ≥1 linked
+  actual: "Fitted climb rate **X m/h** from N climbs across M runs (current Y).
+  [Apply]" + the contributing races listed. With none: a "link an actual run to
+  calibrate" hint. Apply → set `profile.verticalRateVmh`, save (reuse the
+  existing profile-save path).
 
 **Acceptance criteria:**
-- [ ] A **Print** control on the plan page triggers the browser print dialog
-  (port → `window.print()`); works in both km and section modes.
-- [ ] `@media print` rules exist in the built CSS and: hide app chrome, render
-  the table black-on-white with visible cell borders, repeat the header row per
-  page, and avoid splitting a row across pages.
-- [ ] On-screen appearance is unchanged (print rules are print-scoped /
-  `print:` variants only).
-- [ ] Build emits the print CSS; the `printPage` port appears in the compiled
-  bundle (so the JS `subscribe` binds); all five local-CI gates green.
-- [ ] **Visual check:** confirm the print preview in a browser is clean — *this
-  is the real acceptance and needs a human* (the env can't render a print
-  preview headlessly, same limitation as TASK-040's round-trip). Implement the
-  conventional, low-risk pattern; flag the visual review in the PR.
+- [ ] `Calibration.fitVmh` returns the gain-weighted climb rate over climb kms
+  across linked runs, the contributing counts, and `Nothing` for no climb data.
+- [ ] **Verified by a `smoke:calibration` harness** (pure, like `smoke:sections`)
+  driving the real compiled `fitVmh` over synthetic linked runs — assert the
+  fitted vmh for known inputs, the no-data case, and the climb-threshold cut.
+- [ ] Profile page shows the fitted vmh + provenance (which/how many runs) and an
+  Apply button that updates + persists `verticalRateVmh`; degrades to a hint when
+  no actuals are linked.
+- [ ] On-screen wiring verified as far as headless allows (build, port/UI present);
+  the visual/click path flagged for a manual check (env can't drive the Elm UI).
+- [ ] ADR for the calibration methodology (gain-weighted fit, climb threshold,
+  transparency/opt-in, confidence from data volume).
+- [ ] All local-CI gates green (incl. the new calibration smoke).
 
-**Notes.** No new route — print the existing page via `@media print`, the
-robust/standard approach. Section-mode + km-mode share the page, so one print
-path covers both. Keep it conservative; this is a stylesheet, not a redesign.
+**Notes.** Delivers the single highest-value calibration fit. **TASK-044**
+(flat-trail-pace calibration, same data path) is queued; the further fits
+(climb-fatigue `k`, Riegel, sustainable-HR-by-duration, descent technique,
+decoupling) stay in roadmap §7 as future sub-tasks — several are gated on more
+data (multiple races / distance range) and should be promoted only with user
+appetite. Report calibration status to the user after this ships.

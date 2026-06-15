@@ -1408,3 +1408,43 @@ the un-normalized 1.69/2.40 numbers everywhere.
 Approach: `print:hidden` chrome + `@media print` table restyle + a `window.print()`
 port button. Visual acceptance needs a human (env can't render print preview) —
 flagged. Branch `feat/task-042-print-plan`.
+
+---
+## 2026-06-15 13:31 — TASK-042: print-friendly plan table (batch task 4/5)
+
+**Task:** TASK-042 — print the plan table cleanly on paper.
+**What I did:** New `Dom.print` port → `window.print()` (Elm can't call it), wired
+a **Print** button next to Download CSV. Hid chrome with Tailwind's `print:hidden`
+variant (app header, footer, breadcrumb, and — wrapped in one `print:hidden` div
+at the `viewPlanTable` call site to preserve on-screen order + `space-y-6`
+spacing — the target panel, predictor slider, actual-run strip; plus the
+tabs/buttons row). Wrapped the printable race-header + table in `.plan-print` and
+added an `@media print` block in `app.css`: white bg, black text, `1px` cell
+borders, `thead{display:table-header-group}` (header repeats per page),
+`tr{break-inside:avoid}`, compact 11px table font, `@page{margin:1.5cm}`.
+**What I verified:** Type-check `Success!`, build `✓ built in 827ms`, smoke
+`SMOKE PASSED`, smoke:aidcsv `PASS`, smoke:sections `PASS`. Confirmed the built
+bundle wires `window.print` and the built CSS carries the `.plan-print` /
+`table-header-group` / `break-inside` rules. On-screen unchanged (the wrapper is
+visually inert — `print:` only applies in print media; spacing preserved).
+**Caught while editing:** first compile failed — `Dom.print` is a port of type
+`() -> Cmd msg`, so the handler needed `Dom.print ()`, not `Dom.print`. Fixed.
+**Honest gap:** the actual print-preview legibility (does it look good on paper?)
+is the real acceptance and the headless env can't render it — implemented the
+conventional low-risk print-stylesheet pattern and flagged a manual ⌘P review in
+the PR. Same class of gap as TASK-040's browser round-trip.
+**What changed in the repo:** PR #78, merged `c2d30b4`. `Dom.elm`, `Main.elm`,
+`main.js`, `app.css`. This close PR moves it to DONE, ticks BACKLOG, and **splits
+TASK-022** (calibration) into per-fit sub-tasks, orienting TASK-043.
+**What I learned / decided about TASK-022:** Read roadmap §7/§9/§10 + the data
+shapes. §9's "open questions" are mostly already resolved by shipped work (one
+global profile, continuous slider, loud confidence, actual-as-column, hybrid
+local-first); only calibration-transparency (#7) is open and the roadmap answers
+it (transparent/opt-in). So no user blocker — proceed with an ADR. Split TASK-022
+per the roadmap ("split into per-fit subtasks"): **TASK-043 = vmh** (the #1
+value-per-effort fit, replaces the core hand-set climb rate, feasible from
+existing linked-actual data: course gain via `kmsCache` + `actualSplits.splits`),
+TASK-044 = flat pace (queued), remaining fits left in roadmap §7 (data-gated).
+**Next:** TASK-043 — `Calibration.fitVmh` (pure, harness-tested) + a transparent
+calibrate panel on `#/profile`. Oriented in CURRENT.md. Branch
+`feat/task-043-vmh-calibration`.
