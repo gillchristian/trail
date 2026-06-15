@@ -1,14 +1,24 @@
-module Calibration exposing (Run, VmhFit, climbGainThreshold, fitVmh)
+module Calibration exposing
+    ( FlatPaceFit
+    , Run
+    , VmhFit
+    , climbGainThreshold
+    , fitFlatPace
+    , fitVmh
+    , runnableSlopeThreshold
+    )
 
-{-| Fit an athlete's climb rate (`vmh`, m of ascent per hour) from the runs
-they've already linked to a race — the first calibration fit (TASK-043,
-ADR-0006). It uses only data trail already holds: each linked run's per-km
-course gain (from `Planning.computeKms`) and its per-km actual times.
+{-| Fit an athlete's pace model from the runs they've already linked to a race,
+using only data trail already holds: each linked run's per-km course profile
+(from `Planning.computeKms`) and its per-km actual times. Both fits follow one
+**realized-rate** method (ADR-0006/0007): aggregate the relevant terrain across
+runs and divide — no regression, naturally distance/gain-weighted. Pure; the UI
+in `Main.elm` decides whether to surface/apply.
 
-The fit is the **realized climb rate**: total ascent climbed on climb kms,
-divided by the total time spent on them. Gain-weighting falls out naturally —
-a long sustained climb counts more than a brief rise. Pure; the UI in
-`Main.elm` decides whether to surface/apply it.
+  - `fitVmh` — climb rate (`vmh`, m ascent/hour): total ascent on climb kms ÷
+    total time on them (TASK-043).
+  - `fitFlatPace` — flat-trail pace (s/km): total runnable distance ÷ total
+    runnable time, inverted to a pace (TASK-044).
 
 -}
 
@@ -100,6 +110,98 @@ runContributions run =
                         Just secs ->
                             if secs > 0 then
                                 Just ( km.gain, secs )
+
+                            else
+                                Nothing
+
+                        Nothing ->
+                            Nothing
+
+                else
+                    Nothing
+            )
+
+
+
+-- FLAT-TRAIL PACE (TASK-044, ADR-0007)
+
+
+type alias FlatPaceFit =
+    { paceSecPerKm : Int -- fitted flat-trail pace, seconds per km
+    , runnableKmCount : Int -- runnable kms that contributed
+    , runCount : Int -- runs that contributed at least one runnable km
+    , totalDistanceM : Float -- distance summed over the runnable kms (m)
+    , totalSeconds : Int -- time summed over the runnable kms (s)
+    }
+
+
+{-| A km counts as "runnable" when its grade is gentle enough that the predictor
+treats it as runnable rather than climb/descent: `abs slope < 0.04`
+(`Predictor.elm`). Matching the predictor keeps the fit and the model consistent.
+-}
+runnableSlopeThreshold : Float
+runnableSlopeThreshold =
+    0.04
+
+
+{-| Fit flat-trail pace from linked runs. `Nothing` when there's no usable
+runnable data (no gentle-grade km with a positive distance and time).
+-}
+fitFlatPace : List Run -> Maybe FlatPaceFit
+fitFlatPace runs =
+    let
+        contribsPerRun : List (List ( Float, Int ))
+        contribsPerRun =
+            List.map runnableContributions runs
+
+        all : List ( Float, Int )
+        all =
+            List.concat contribsPerRun
+
+        runCount : Int
+        runCount =
+            contribsPerRun
+                |> List.filter (not << List.isEmpty)
+                |> List.length
+
+        totalDistanceM : Float
+        totalDistanceM =
+            List.foldl (\( d, _ ) acc -> acc + d) 0 all
+
+        totalSeconds : Int
+        totalSeconds =
+            List.foldl (\( _, s ) acc -> acc + s) 0 all
+
+        runnableKmCount : Int
+        runnableKmCount =
+            List.length all
+    in
+    if runnableKmCount == 0 || totalDistanceM <= 0 then
+        Nothing
+
+    else
+        Just
+            { paceSecPerKm = round (toFloat totalSeconds / (totalDistanceM / 1000))
+            , runnableKmCount = runnableKmCount
+            , runCount = runCount
+            , totalDistanceM = totalDistanceM
+            , totalSeconds = totalSeconds
+            }
+
+
+{-| The `(distanceM, seconds)` pairs a run contributes: its runnable kms
+(gentle grade) that have a positive distance and a positive recorded time.
+-}
+runnableContributions : Run -> List ( Float, Int )
+runnableContributions run =
+    run.kms
+        |> List.filterMap
+            (\km ->
+                if abs km.slope < runnableSlopeThreshold && km.distance > 0 then
+                    case Dict.get km.index run.splits of
+                        Just secs ->
+                            if secs > 0 then
+                                Just ( km.distance, secs )
 
                             else
                                 Nothing

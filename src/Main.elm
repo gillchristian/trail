@@ -352,6 +352,7 @@ type Msg
     | ProfileSetMaxHr String
     | ProfileSave
     | CalibrateVmh
+    | CalibrateFlatPace
       -- predictor slider
     | SliderInput String
     | SliderCommit String
@@ -1314,6 +1315,23 @@ update msg model =
 
                         next =
                             { prof | verticalRateVmh = toFloat (round fit.vmh) }
+                    in
+                    ( { model | profile = next, profileSaved = True }
+                    , Storage.saveProfile (AthleteProfile.encode next)
+                    )
+
+                Nothing ->
+                    ( model, Cmd.none )
+
+        CalibrateFlatPace ->
+            case Calibration.fitFlatPace (linkedRuns model) of
+                Just fit ->
+                    let
+                        prof =
+                            model.profile
+
+                        next =
+                            { prof | flatTrailPaceSecPerKm = fit.paceSecPerKm }
                     in
                     ( { model | profile = next, profileSaved = True }
                     , Storage.saveProfile (AthleteProfile.encode next)
@@ -2310,15 +2328,15 @@ linkedRuns model =
     List.map Tuple.second (linkedRunsWithRace model)
 
 
-{-| Names of the linked runs that actually feed the fit — a single-run fit is
-`Just` iff that run has a qualifying climb km. Shown for transparency.
+{-| Names of the linked runs that feed either calibration fit — a single-run
+fit is `Just` iff that run has qualifying terrain. Shown for transparency.
 -}
 calibrationContributors : Model -> List String
 calibrationContributors model =
     linkedRunsWithRace model
         |> List.filterMap
             (\( race, runData ) ->
-                if Calibration.fitVmh [ runData ] /= Nothing then
+                if Calibration.fitVmh [ runData ] /= Nothing || Calibration.fitFlatPace [ runData ] /= Nothing then
                     Just race.name
 
                 else
@@ -2326,52 +2344,91 @@ calibrationContributors model =
             )
 
 
+{-| One fit's row: a description (built by the caller) and an Apply button. -}
+calibRow : List (Html Msg) -> Msg -> Html Msg
+calibRow descr applyMsg =
+    div [ class "flex items-start justify-between gap-3" ]
+        [ p [ class "text-sm text-slate-400" ] descr
+        , button
+            [ onClick applyMsg
+            , class "shrink-0 px-3 py-1.5 text-sm border border-slate-700 rounded-md hover:bg-slate-800 text-slate-200"
+            ]
+            [ text "Apply" ]
+        ]
+
+
 viewCalibrationPanel : Model -> Html Msg
 viewCalibrationPanel model =
-    div [ class "rounded-2xl bg-slate-900 border border-slate-800 p-5 space-y-3" ]
-        [ p [ class "text-sm font-medium text-slate-100" ] [ text "Calibrate from your runs" ]
-        , case Calibration.fitVmh (linkedRuns model) of
-            Just fit ->
-                div [ class "space-y-3" ]
-                    [ p [ class "text-sm text-slate-400" ]
-                        [ text "Fitted climb rate "
+    let
+        runs =
+            linkedRuns model
+
+        vmhRow =
+            case Calibration.fitVmh runs of
+                Just fit ->
+                    [ calibRow
+                        [ text "Climb rate "
                         , span [ class "text-slate-100 font-semibold tabular-nums" ]
                             [ text (formatInt fit.vmh ++ " m/h") ]
                         , text
-                            (" from "
+                            (" — from "
                                 ++ String.fromInt fit.climbKmCount
-                                ++ " climb km across "
-                                ++ String.fromInt fit.runCount
-                                ++ " linked run"
-                                ++ (if fit.runCount == 1 then
-                                        ""
-
-                                    else
-                                        "s"
-                                   )
-                                ++ " · current "
+                                ++ " climb km · current "
                                 ++ formatInt model.profile.verticalRateVmh
-                                ++ " m/h."
+                                ++ " m/h"
                             )
                         ]
-                    , case calibrationContributors model of
-                        [] ->
-                            text ""
-
-                        names ->
-                            p [ class "text-xs text-slate-500" ]
-                                [ text ("Using: " ++ String.join ", " names) ]
-                    , button
-                        [ onClick CalibrateVmh
-                        , class "px-3 py-1.5 text-sm border border-slate-700 rounded-md hover:bg-slate-800 text-slate-200"
-                        ]
-                        [ text "Apply to vertical rate" ]
+                        CalibrateVmh
                     ]
 
-            Nothing ->
-                p [ class "text-sm text-slate-500" ]
-                    [ text "Link an actual run to a race (via Strava or a GPX upload) to calibrate your climb rate from real data." ]
-        ]
+                Nothing ->
+                    []
+
+        flatRow =
+            case Calibration.fitFlatPace runs of
+                Just fit ->
+                    [ calibRow
+                        [ text "Flat pace "
+                        , span [ class "text-slate-100 font-semibold tabular-nums" ]
+                            [ text (formatMmss fit.paceSecPerKm ++ " /km") ]
+                        , text
+                            (" — from "
+                                ++ String.fromInt fit.runnableKmCount
+                                ++ " runnable km · current "
+                                ++ formatMmss model.profile.flatTrailPaceSecPerKm
+                                ++ " /km"
+                            )
+                        ]
+                        CalibrateFlatPace
+                    ]
+
+                Nothing ->
+                    []
+
+        rows =
+            vmhRow ++ flatRow
+
+        contributorsLine =
+            case calibrationContributors model of
+                [] ->
+                    []
+
+                names ->
+                    [ p [ class "text-xs text-slate-500" ]
+                        [ text ("From your linked runs: " ++ String.join ", " names) ]
+                    ]
+    in
+    div [ class "rounded-2xl bg-slate-900 border border-slate-800 p-5 space-y-3" ]
+        (p [ class "text-sm font-medium text-slate-100" ] [ text "Calibrate from your runs" ]
+            :: (if List.isEmpty rows then
+                    [ p [ class "text-sm text-slate-500" ]
+                        [ text "Link an actual run to a race (via Strava or a GPX upload) to calibrate your climb rate and flat pace from real data." ]
+                    ]
+
+                else
+                    rows ++ contributorsLine
+               )
+        )
 
 
 viewProfileSettings : Model -> Html Msg

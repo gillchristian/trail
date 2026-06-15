@@ -30,7 +30,7 @@ main =
 
 
 type alias KmSpec =
-    { index : Int, gain : Float }
+    { index : Int, gain : Float, slope : Float, distance : Float }
 
 
 type alias RunSpec =
@@ -39,7 +39,16 @@ type alias RunSpec =
 
 kmSpecDecoder : D.Decoder KmSpec
 kmSpecDecoder =
-    D.map2 KmSpec (D.field "index" D.int) (D.field "gain" D.float)
+    D.map4 KmSpec
+        (D.field "index" D.int)
+        (optionalFloat "gain")
+        (optionalFloat "slope")
+        (optionalFloat "distance")
+
+
+optionalFloat : String -> D.Decoder Float
+optionalFloat key =
+    D.oneOf [ D.field key D.float, D.succeed 0 ]
 
 
 pairDecoder : D.Decoder ( Int, Int )
@@ -59,22 +68,22 @@ requestDecoder =
     D.field "runs" (D.list runSpecDecoder)
 
 
-{-| Only `index` and `gain` matter to `fitVmh`; the rest of the real
-`Planning.Km` is filled with neutral values.
+{-| Only `index`/`gain` (fitVmh) and `slope`/`distance` (fitFlatPace) matter;
+the rest of the real `Planning.Km` is filled with neutral values.
 -}
 toKm : KmSpec -> Planning.Km
 toKm s =
     { index = s.index
     , distStart = 0
     , distEnd = 0
-    , distance = 0
+    , distance = s.distance
     , eleStart = 0
     , eleEnd = 0
     , minEle = 0
     , maxEle = 0
     , gain = s.gain
     , loss = 0
-    , slope = 0
+    , slope = s.slope
     , points = []
     , cumDist = []
     }
@@ -92,11 +101,18 @@ handle v =
             E.object [ ( "error", E.string (D.errorToString e) ) ]
 
         Ok specs ->
-            E.object [ ( "fit", encodeFit (Calibration.fitVmh (List.map toRun specs)) ) ]
+            let
+                runs =
+                    List.map toRun specs
+            in
+            E.object
+                [ ( "vmh", encodeVmhFit (Calibration.fitVmh runs) )
+                , ( "flat", encodeFlatFit (Calibration.fitFlatPace runs) )
+                ]
 
 
-encodeFit : Maybe Calibration.VmhFit -> E.Value
-encodeFit mf =
+encodeVmhFit : Maybe Calibration.VmhFit -> E.Value
+encodeVmhFit mf =
     case mf of
         Just fit ->
             E.object
@@ -104,6 +120,22 @@ encodeFit mf =
                 , ( "climbKmCount", E.int fit.climbKmCount )
                 , ( "runCount", E.int fit.runCount )
                 , ( "totalGain", E.float fit.totalGain )
+                , ( "totalSeconds", E.int fit.totalSeconds )
+                ]
+
+        Nothing ->
+            E.null
+
+
+encodeFlatFit : Maybe Calibration.FlatPaceFit -> E.Value
+encodeFlatFit mf =
+    case mf of
+        Just fit ->
+            E.object
+                [ ( "paceSecPerKm", E.int fit.paceSecPerKm )
+                , ( "runnableKmCount", E.int fit.runnableKmCount )
+                , ( "runCount", E.int fit.runCount )
+                , ( "totalDistanceM", E.float fit.totalDistanceM )
                 , ( "totalSeconds", E.int fit.totalSeconds )
                 ]
 
