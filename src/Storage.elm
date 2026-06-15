@@ -11,6 +11,7 @@ port module Storage exposing
     , loadStravaToken
     , saveProfile
     , saveRace
+    , saveRaceMeta
     , saveStravaToken
     )
 
@@ -31,6 +32,9 @@ port storageLoadAll : () -> Cmd msg
 
 
 port storageSave : Value -> Cmd msg
+
+
+port storageSaveMeta : Value -> Cmd msg
 
 
 port storageDelete : String -> Cmd msg
@@ -104,6 +108,17 @@ gotStravaToken =
 saveRace : Value -> Cmd msg
 saveRace =
     storageSave
+
+
+{-| Save a race **without** its GPX text — for plan/aid/metadata edits. The
+GPX lives in its own IDB row, written once at import via `saveRace`. Both
+ports echo the saved race back through `gotRace` (`storageRaceSaved`); the
+meta echo omits `gpxText`, which `RaceSaved` refills from the in-model race.
+See ADR-0005 / TASK-040.
+-}
+saveRaceMeta : Value -> Cmd msg
+saveRaceMeta =
+    storageSaveMeta
 
 
 deleteRace : String -> Cmd msg
