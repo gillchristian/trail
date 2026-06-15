@@ -1601,3 +1601,70 @@ parking-lot line, clears CURRENT.
 parking-lot items (light/dark, multi-language); three recommended manual checks
 (TASK-040 round-trip, TASK-042 print preview, TASK-045 section view with a linked
 actual).
+
+---
+## 2026-06-15 20:37 — Coach-collaboration epic: intake (ADR + spec + tickets)
+
+**Task:** Not a TASK — meta-intake. The user handed off a self-contained spec
+("Coach collaboration via `.trail` merge") and asked to ticket it, then start
+working. Per the spec's own hand-off brief: promote §0 to an ADR, queue a brief
+nuance, create the WI tasks in §6 order.
+
+**What I did (PR #88, merged `8167db4`):**
+- **ADR-0009** — `.trail` file sync: three-way merge against a common ancestor
+  (not a CRDT) + *freeze the course, merge the plan*. §1 of the spec became the
+  alternatives body.
+- **`reference/coach-collab-spec.md`** — the full spec preserved (rationale +
+  per-WI acceptance criteria + the 5 open questions), marked adopted.
+- **BACKLOG** — TASK-046 (brief nuance) · TASK-047 (WI-1 identity/integrity
+  guard) · TASK-048 (WI-2 course freeze) · TASK-049 (fork-safe aid ids) ·
+  TASK-050 (WI-3 three-way merge) · TASK-051 (WI-4 history feed). §6 order.
+- INDEX + manifest reference list updated.
+
+**The maze I recorded (spec premises vs. the actual code, verified 2026-06-15):**
+1. **Stable share id is new** — `Race.id` exists (JS `crypto.randomUUID()`) and
+   is in the `.trail`, but the import path *regenerates* it (`Main.elm:447`,
+   `id = raceIdFromString ""`) so a file can be imported twice. So WI-1's
+   identity needs a *separate* id that survives the round-trip.
+2. **Aid ids already exist** (`AidStation.id = "a" ++ aidStationSeq`,
+   `Main.elm:1967`; round-trips). The spec's "distance-keyed aids" premise is
+   stale. The real hazard: the *shared* per-race counter mints identical ids on
+   both forks → collisions. So TASK-049 is reframed "add ids" → "fork-safe ids."
+3. **`.trail` version is a strict-equality gate** (`ProjectFile.elm` `D.fail`s),
+   not a `D.oneOf` default — WI-1 must widen it to {v1, v2} explicitly.
+
+**Verification:** docs-only — `git diff --name-only` showed only `knowledge/`,
+so the code CI gates (elm/build/smokes) don't apply. ADR + spec linked; six
+tickets carry acceptance criteria + Q-gates + deps.
+
+**Decision-gates ahead (not auto-decidable — spec §7):** Q1 (courseHash input +
+mismatch behavior) gates WI-1; Q2–Q5 gate WI-3. The spec routes these to the
+user; I'll surface Q1 when I pull TASK-047.
+
+**Next:** TASK-046 (brief nuance, docs-only, no open questions) → then TASK-047
+(WI-1), where Q1 must be resolved with the user first.
+
+---
+## 2026-06-15 20:52 — TASK-046: file-based collaboration scoped into the brief
+
+**Task:** TASK-046 (coach-collab epic, spec §0). First of six. No open
+questions — the decision is settled in ADR-0009.
+
+**What I did (PR #89, merged `4896f60`):** Nuanced `project-brief.md`'s *Out of
+scope* the way "No backend, ever" was softened for Strava. Qualified
+"no multi-user" → "no *server-side* multi-user"; rewrote "No social / sharing
+features." → "No *server-side* social / sharing features — no accounts, no
+hosted documents, no real-time co-editing," with a parenthetical that
+async/file-based/single-document collaboration (export → annotate → merge via
+three-way merge) is in scope at Layer 0, pointing at ADR-0009 /
+`coach-collab-spec.md`. Both lines nuanced, not deleted.
+
+**What I verified:** docs-only — `git diff --name-only` showed only
+`knowledge/reference/project-brief.md` (+ the CURRENT.md plan record), no `src/`,
+so the code CI gates don't apply. Re-read the two lines + new nuance: reads
+consistently with the Strava-softening already a few lines up.
+
+**Next:** TASK-047 (WI-1 — `.trail` identity/integrity guard). **Gated on Q1**
+(courseHash input: canonical decoded track vs. raw bytes; and mismatch behavior:
+hard-block vs. warn). Per spec §7 these are the user's call — surfacing Q1 to the
+user before writing WI-1's plan.
