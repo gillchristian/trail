@@ -1903,3 +1903,54 @@ The pure backfill is smoke-tested; the export-handler wiring is type-check/build
 **Next:** coach-collab arc still paused at the verified seam — TASK-052 (WI-3
 merge UI/orchestration) + TASK-051 (WI-4 feed) remain, both needing in-browser
 verification. Resume on the user's go-ahead.
+
+---
+## 2026-06-16 09:44 — TASK-051: WI-4 change-history feed (drawer)
+
+**Task:** TASK-051 (coach-collab epic, spec §5). User picked it next over the
+WI-3 merge UI, with 3 Tailwind-UI feed refs ("inspiration, gamified styling")
+and asked where the open button should go. Resumed from the paused seam with
+their go-ahead + active in-browser verification.
+
+**What I did (PR #102, merged `ddf7076`):**
+- Pure **`Changelog`**: two-way `diff : PlanningLayer -> PlanningLayer -> List
+  ChangeDescriptor`, `union` by entryId, entry constructors. `diff` emits only
+  the spec taxonomy (aids, km note/pace, race name/date) and **nothing** for
+  target-time/location/url/notes — so the effort slider doesn't spam the feed.
+- `Race.history` + a `commitRaceEdit` chokepoint at the `saveRaceMeta` edit
+  sites (diff before→after; empty diff → no entry). New races seed
+  `CourseUploaded`. Carried in `.trail`.
+- Right slide-over **drawer**: timeline + per-type colored circular badges +
+  author/relative-time; "Activity" button on the header row mirroring the back
+  link (the user's suggested placement).
+
+**The architectural snag worth recording — import cycle.** `Race` (in `Types`)
+must hold the history, but `Changelog` imports `Merge` → `Types`, so `Types`
+importing `Changelog` back would cycle. Resolved by putting the *typed
+`ChangeDescriptor`/`ChangeEntry` + their codecs in `Types`* (data layer) and
+keeping the *diff/union logic in `Changelog`*. Clean split: `Types` = data +
+codecs, `Changelog` = the diff that needs `Merge.PlanningLayer`.
+
+**Process note — held for review before merge.** Unlike the smaller fixes, I
+left PR #102 unmerged and handed it to the user for in-browser review first
+(design-subjective UI + behaviour I can't verify headlessly — the `delivery.md`
+"want a second pair of eyes" case). They confirmed ("Looks good") and removed
+their `feed-0N.html` scratch refs; then I merged.
+
+**What I verified (all 9 gates green; quoted):**
+```
+type-check Success!   build ✓ built
+storage/aidcsv/sections/calibration/trailsync/merge PASS
+changelog PASS  (new: every descriptor kind, non-taxonomy → [], codec round-trip, union dedupe)
+```
+The drawer render + logging round-trip (edit → entry → echo → drawer) was the
+user's in-browser check; the engine + codec are smoke-tested. Traced the
+`RaceSaved` echo: it keeps the decoded race's history and only refills gpxText,
+so logged entries flow back into the model.
+
+**Next:** the arc's last piece is **TASK-052 (WI-3 part 2 — merge integration +
+review UI)**: persist `mergeBase`+`version`, `.trail` carries `{base,current,
+version}`, version-bump on edit, the import→merge entry point, the dedicated
+review screen, and appending `Merged` change-sets to the WI-4 feed. Q2–Q5
+already resolved; verification largely manual (browser). Epic so far: TASK-046
+✓ 047 ✓ 048 ✓ 049 ✓ 050 ✓ 051 ✓ 053 ✓.
