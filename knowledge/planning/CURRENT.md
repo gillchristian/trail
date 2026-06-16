@@ -14,11 +14,29 @@
 **Notes:** scope cuts, links, anything decided while planning.
 ```
 
-_(none — TASK-050 (WI-3 engine) shipped (PR #97, `afefeb8`; ADR-0011). **Next:
-TASK-052 (WI-3 part 2 — merge integration + review UI), no new open questions**
-(Q2–Q5 already resolved) → proceeding autonomously; verification largely manual
-(browser) per the standing limit. Then TASK-051 (WI-4 history feed).
-Coach-collab epic: TASK-046 ✓, 047 ✓, 048 ✓, 049 ✓, 050 ✓.)_
+_(none — autonomous build **paused at a verified seam** (2026-06-15). The
+coach-collaboration arc's headlessly-verifiable core is shipped and green:
+**TASK-046** (brief) ✓, **047** WI-1 identity/guard ✓, **048** WI-2 course freeze
+✓, **049** fork-safe aid ids ✓, **050** WI-3 merge **engine** ✓ — ADRs 0009/0010/0011,
+gates `smoke:trailsync` + `smoke:merge`.
+
+**Why paused (not blocked-by-effort):** the two remaining items are a different
+verification class — their value is interactive **browser** behavior I can't drive
+headlessly, and TASK-052's base/version orchestration is stateful distributed
+logic where "it compiles" ≠ "it's correct." Shipping them compile-only would be
+"should-work code I haven't run" (`when-stuck.md`). They're fully specced + ADR'd,
+ready to resume:
+- **TASK-052** — WI-3 part 2: merge integration + dedicated review UI (persist
+  `mergeBase`+`version`, `.trail` carries `{base,current,version}`, bump on edit,
+  import→merge entry point, review screen). Q2–Q5 already resolved.
+- **TASK-051** — WI-4: structured change-history feed.
+
+**Recommended in-browser checks** (headless env can't do them):
+- **Coach-collab arc:** upload a GPX → export `.trail` → confirm it carries
+  `shareId` + `courseHash` (v2); a v1 `.trail` still imports; add an aid →
+  device-tagged id.
+- **Standing (pre-arc):** TASK-040 IDB round-trip; TASK-042 print preview;
+  TASK-045 section table/card with a linked actual.)_
 
 ---
 
