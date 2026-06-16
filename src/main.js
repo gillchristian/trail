@@ -78,7 +78,14 @@ async function loadAllRaces() {
 // id) back so Elm can add the brand-new race to its model.
 async function saveRace(race) {
   const db = await dbPromise
-  const withId = { ...race, id: race.id || crypto.randomUUID() }
+  // `id` is the local row key (fresh on every import). `shareId` is the stable
+  // cross-round-trip identity for .trail sharing (TASK-047): mint one only when
+  // absent, so a v2 import that already carries a shareId keeps it.
+  const withId = {
+    ...race,
+    id: race.id || crypto.randomUUID(),
+    shareId: race.shareId || crypto.randomUUID(),
+  }
   const { gpxText, ...meta } = withId
   return new Promise((resolve, reject) => {
     const tx = db.transaction([RACES_STORE, GPX_STORE], 'readwrite')

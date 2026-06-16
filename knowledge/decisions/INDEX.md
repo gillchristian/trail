@@ -41,3 +41,4 @@ What does this make easy? What does this make hard? What will I have to revisit 
 - [0007 — Calibrate flat-trail pace from runnable kms](0007-calibration-flat-pace.md)
 - [0008 — Section plan time is clock time (moving + midpoint-attributed aid rest)](0008-section-clock-time.md)
 - [0009 — `.trail` file sync for coach collaboration: three-way merge, frozen course](0009-trail-file-sync.md)
+- [0010 — Course identity for `.trail` sharing: stable shareId + canonical course hash, hard-block on mismatch](0010-course-identity-and-guard.md)

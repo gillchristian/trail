@@ -209,6 +209,23 @@ sortAidStations =
 -- RACE
 
 
+{-| `shareId` and `courseHash` are the `.trail`-sharing identity (TASK-047 /
+ADR-0010, the coach-collaboration arc).
+
+`shareId` is a *stable* lineage id, distinct from `id`: `id` is the local IDB
+key and is regenerated on every import (so the same file can be imported twice
+as two rows), whereas `shareId` is minted once and **preserved across the
+export/import round-trip** — it's what lets a coach's returned file be matched
+back to the race it came from. `courseHash` fingerprints the course the plan was
+built on (see `TrailSync.courseHash`), so an imported plan can be refused when it
+was built on a different course.
+
+Both default to `""` for v1 `.trail` files and pre-existing IDB races; the import
+path mints/computes them on the way in (`shareId` JS-side like `id`, `courseHash`
+from the GPX). They ride in `raceMetaFields`, so they round-trip through both the
+full and the light (meta) save paths.
+
+-}
 type alias Race =
     { id : RaceId
     , name : String
@@ -226,6 +243,8 @@ type alias Race =
     , aidStationSeq : Int
     , plan : Plan
     , actualSplits : Maybe ActualSplits
+    , shareId : String
+    , courseHash : String
     }
 
 
@@ -327,6 +346,8 @@ raceMetaFields r =
             Nothing ->
                 E.null
       )
+    , ( "shareId", E.string r.shareId )
+    , ( "courseHash", E.string r.courseHash )
     ]
 
 
@@ -509,6 +530,19 @@ maybeInt =
 
 decodeRace : Decoder Race
 decodeRace =
+    -- Overlay the `.trail`-sharing identity onto the core race, defaulting both
+    -- fields to "" for v1 files / pre-existing IDB races (TASK-047 / ADR-0010).
+    D.map3
+        (\race shareId courseHash ->
+            { race | shareId = shareId, courseHash = courseHash }
+        )
+        raceCoreDecoder
+        (D.oneOf [ D.field "shareId" D.string, D.succeed "" ])
+        (D.oneOf [ D.field "courseHash" D.string, D.succeed "" ])
+
+
+raceCoreDecoder : Decoder Race
+raceCoreDecoder =
     let
         coreDecoder =
             D.map8 coreBuilder
@@ -567,6 +601,8 @@ coreBuilder :
     -> (Float -> Float -> String -> Int -> List AidStation -> Int -> Plan -> Maybe ActualSplits -> Race)
 coreBuilder id name date location url notes cover dist =
     \gain loss gpx ts aids seq plan actual ->
+        -- shareId / courseHash are overlaid by `decodeRace` (with back-compat
+        -- defaults); placeholders here keep this a complete `Race`.
         { id = id
         , name = name
         , date = date
@@ -583,6 +619,8 @@ coreBuilder id name date location url notes cover dist =
         , aidStationSeq = seq
         , plan = plan
         , actualSplits = actual
+        , shareId = ""
+        , courseHash = ""
         }
 
 

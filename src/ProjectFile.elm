@@ -14,6 +14,12 @@ Wrapped with a `version` field so a future format bump (different
 shape, additional metadata) can be detected and rejected with a
 clear error instead of silently mis-decoding.
 
+**v2 (TASK-047)** adds the `.trail`-sharing identity (`shareId` +
+`courseHash`) to the embedded race. The two are plain extra fields that
+`decodeRace` already tolerates as absent (back-compat defaults), so a v1
+document decodes through the same path — the only change here is widening
+the accepted version set to `{1, 2}` instead of an exact-match gate.
+
 -}
 
 import Json.Decode as D
@@ -23,7 +29,15 @@ import Types exposing (Race, decodeRace, encodeRace)
 
 currentVersion : Int
 currentVersion =
-    1
+    2
+
+
+{-| Versions this build can read. v1 had no `shareId`/`courseHash`; both decode
+to "" and are stamped on import (see `Main` / TASK-047).
+-}
+isSupportedVersion : Int -> Bool
+isSupportedVersion v =
+    v == 1 || v == 2
 
 
 encode : Race -> String
@@ -56,14 +70,14 @@ documentDecoder =
                     D.field "version" D.int
                         |> D.andThen
                             (\v ->
-                                if v == currentVersion then
+                                if isSupportedVersion v then
                                     D.field "race" decodeRace
 
                                 else
                                     D.fail
                                         ("This .trail file was written for version "
                                             ++ String.fromInt v
-                                            ++ ". This build only reads version "
+                                            ++ ". This build reads versions 1 and "
                                             ++ String.fromInt currentVersion
                                             ++ "."
                                         )

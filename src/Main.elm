@@ -49,6 +49,7 @@ import Svg
 import Svg.Attributes as SA
 import Task
 import Time
+import TrailSync
 import Types
     exposing
         ( AidStation
@@ -447,10 +448,20 @@ update msg model =
                             -- Drop the imported id so JS assigns a fresh one
                             -- (lets users import the same .trail twice safely)
                             -- and stamp a new createdAt so it sorts to the top.
+                            -- shareId is *kept* (the round-trip identity); only
+                            -- the local IDB key is regenerated. A v1 file has no
+                            -- courseHash — compute it from the embedded GPX so
+                            -- the race is fully stamped (TASK-047).
                             draft =
                                 { importedRace
                                     | id = raceIdFromString ""
                                     , createdAt = model.now
+                                    , courseHash =
+                                        if importedRace.courseHash == "" then
+                                            TrailSync.courseHashFromGpxText importedRace.gpxText
+
+                                        else
+                                            importedRace.courseHash
                                 }
                         in
                         ( { model | upload = Persisting fileName }
@@ -1832,6 +1843,11 @@ buildDraftRace now track gpxText =
     , aidStationSeq = 0
     , plan = defaultPlan
     , actualSplits = Nothing
+
+    -- shareId left blank → JS mints it on save (like `id`). courseHash is the
+    -- fingerprint of this course, set once here from the parsed track.
+    , shareId = ""
+    , courseHash = TrailSync.courseHash track
     }
 
 

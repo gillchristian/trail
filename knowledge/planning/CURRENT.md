@@ -16,14 +16,43 @@
 
 ## Active
 
-_(none — TASK-046 shipped (PR #89, `4896f60`). **Next: TASK-047 (WI-1 —
-`.trail` identity/integrity guard), blocked on Q1** — the courseHash input
-(canonical decoded track vs. raw GPX bytes) and the mismatch behavior
-(hard-block vs. warn-and-allow) are the user's call per spec §7. Q1 has been put
-to the user; write WI-1's acceptance criteria here once it's answered. The rest
-of the epic (TASK-048 course freeze, TASK-049 fork-safe aid ids, TASK-050 WI-3
-three-way merge — gated on Q2–Q5, TASK-051 WI-4 history feed) follows in spec §6
-order.)_
+### TASK-047 — WI-1: `.trail` format v2 — identity + integrity guard
+
+**Source:** BACKLOG (coach-collab epic, spec §2)
+**Branch:** feat/task-047-trail-identity-guard
+**Q1 resolved (user, 2026-06-15):** courseHash = **canonical decoded track**
+(rounded lat/lon/ele, tolerant of cosmetic GPX diffs); on courseHash mismatch =
+**hard-block** the import. → ADR-0010.
+**Acceptance criteria:**
+- [x] `Race` gains a stable **`shareId`** distinct from the IDB-key `id`: minted
+  JS-side (`main.js` `race.shareId || crypto.randomUUID()`), **preserved on
+  import** (import keeps it, only `id` is blanked). New upload → ""→JS mints; v1
+  import → ""→mints; v2 import → preserved. Verified: `smoke:trailsync` classify
+  + `smoke` "provided shareId is preserved" / "round-trips through IDB".
+- [x] `Race` gains **`courseHash`** from the canonical decoded track (lat/lon→5
+  dp, ele→nearest m), pure-Elm double-polynomial hash (no crypto/port). Verified
+  `smoke:trailsync`: deterministic; cosmetically-different-but-equivalent GPX →
+  **same** hash; different course → **different** hash; unparseable → "".
+- [x] `.trail` → **v2** (carries the fields); version gate widened to **{1,2}**.
+  v1 imports (mints shareId + computes courseHash). Verified `smoke:trailsync`:
+  v1 decodes (fields→""), v2 decodes (fields preserved), v3 rejected, v1
+  re-exports as v2.
+- [x] Pure **guard** `TrailSync.classify` → `Mergeable | DifferentRace |
+  DifferentCourse` (+ `verdictMessage`). Verified `smoke:trailsync`: all three
+  verdicts + empty-shareId-never-matches.
+- [x] New **`smoke:trailsync`** gate (24 checks) over the real compiled modules;
+  all six prior gates stay green; type-check `Success!` + build `✓ built`.
+- [x] Back-compat: v1 `.trail` decodes (defaults ""); v3 IDB races load (decoder
+  defaults); storage smoke + migration still `SMOKE PASSED`.
+**Notes:** **Scope boundary** — WI-1 delivers the *data* (format v2) + the *pure
+guard*, fully smoke-tested; it does **not** add the "update-from-file" UI or
+change the existing import-as-new-race behavior (that path now just stamps the
+two fields). The guard is wired in by **TASK-050 (WI-3)**, which adds the merge
+entry point that calls classify → merge. Known edge logged for WI-3:
+re-importing your own file as-new produces two local races sharing a shareId
+(the dedicated update-from-file path is the intended route). `main.js` mints
+shareId (`race.shareId || crypto.randomUUID()`); `smoke-storage.mjs` mirror
+updated to match.
 
 ---
 
