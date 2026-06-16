@@ -16,35 +16,10 @@
 
 ## Active
 
-### TASK-048 — WI-2: course-freeze invariant (planning-layer / course boundary)
-
-**Source:** BACKLOG (coach-collab epic, spec §3)
-**Branch:** feat/task-048-course-freeze
-**Acceptance criteria:**
-- [x] New `Merge` module defines the freeze structurally: `Race` splits into a
-  frozen **course** (gpxText + distance/gain/loss + courseHash) and a mergeable
-  **`PlanningLayer`** (name/date/location/url/notes + aidStations/aidStationSeq +
-  plan). `planningLayer : Race -> PlanningLayer` + `withPlanningLayer :
-  PlanningLayer -> Race -> Race` (keeps the **local** course + identity +
-  owner-only fields verbatim). The surface WI-3 merges within.
-- [x] **Course can't change through the merge path, by construction.** Verified
-  `smoke:merge`: feeding a planning layer from a *different* course →
-  gpxText/courseHash/distance/gain/loss (+ id/shareId/createdAt/coverImage/
-  actualSplits) all stay local; name/date/location/url/notes/aids/plan come from
-  source.
-- [x] Round-trip identity `withPlanningLayer (planningLayer r) r == r` — verified
-  `smoke:merge` (gpxText/courseHash/name/aids/plan/shareId preserved).
-- [x] New `smoke:merge` gate (25 checks) over the real compiled `Merge` module;
-  all 7 prior gates green; type-check `Success!` + build `✓ built`.
-- [x] The "different course → rejected on import" half is already shipped + tested
-  in WI-1 (`TrailSync.classify` DifferentCourse + `smoke:trailsync`) — referenced,
-  not re-done.
-**Notes:** Light task (spec calls it "guard + exclusion"). The *enforcement* of
-"merge can't touch the course" is the `withPlanningLayer` reassembly: WI-3
-produces a merged `PlanningLayer` and rebuilds the race through it, so track
-points are never a merge input/output. Per-field merge *policy* within the layer
-(e.g. coverImage handling, last-write vs conflict) is WI-3's call (partly Q3) —
-WI-2 only fixes the boundary. `Merge` is seeded here and grown by WI-3.
+_(none — TASK-048 (WI-2) shipped (PR #93, `c5bc0af`). **Next: TASK-049
+(fork-collision-safe aid ids), no open questions** → proceeding autonomously.
+Then TASK-050 (WI-3 three-way merge — gated on Q2–Q5, surface to the user),
+TASK-051 (WI-4 history feed). Coach-collab epic: TASK-046 ✓, 047 ✓, 048 ✓.)_
 
 ---
 
