@@ -38,6 +38,12 @@ html, body, #app {
   50%       { box-shadow: 0 0 0 6px rgba(229, 46, 58, 0); }
 }
 
+/* History drawer slide-in (TASK-051) */
+@keyframes trail-drawer-in {
+  from { transform: translateX(100%); }
+  to   { transform: translateX(0); }
+}
+
 /* Apply to <path> with class="trail-stroke" */
 .trail-stroke {
   stroke-dasharray: 20000;
@@ -60,6 +66,10 @@ html, body, #app {
   animation: trail-pulse 2.4s ease-out infinite;
 }
 
+.trail-drawer-in {
+  animation: trail-drawer-in 0.18s ease-out;
+}
+
 /* Reduce visual noise for users that ask for it */
 @media (prefers-reduced-motion: reduce) {
   .trail-stroke, .trail-ghost {
@@ -70,6 +80,9 @@ html, body, #app {
     animation: none;
   }
   .trail-pulse {
+    animation: none;
+  }
+  .trail-drawer-in {
     animation: none;
   }
 }
