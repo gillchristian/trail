@@ -2047,3 +2047,55 @@ dropped TASK-052. Root loose files left untracked for the user to remove.
 **Next:** start **TASK-054 (WI-5)** — gated on **Q-I1–Q-I3** (surfaced to the
 user this turn) + the identity ADR (ADR-0012). Once answered: write the ADR,
 pull TASK-054 into CURRENT with acceptance criteria, implement.
+
+---
+## 2026-06-16 — WI-5 kickoff: gating questions resolved, ADR-0012, TASK-054 slices 1–2
+
+**Gating questions resolved + ADR-0012 (PR #108, merged `ab216e9`).** The user
+answered Q-I1–Q-I3: **build the explicit dual-id link action**; **dedicated IDB
+store** for the identity record; **names-only** (no role badge). Their steer on
+Q-I1 — "the same person on two devices is the problem this solves" — drove
+choosing the robust link action over punting. Promoted §1.2 + the three answers
+to **ADR-0012**; opened TASK-054 in CURRENT with acceptance criteria + a
+pure-core-first slice plan (mirroring the TASK-050/052 verifiability split).
+
+**Slice 1 — pure `Identity` core (PR #109, merged `1dfe2fb`).** New module, no
+existing code touched, fully headless-verifiable: types
+(UserId/Me/DirEntry/Directory); the name **LWW** register (`learn` /
+`mergeDirectory`, ordered by `nameUpdatedAt` so a stale import never reverts a
+name); the import **mint/adopt decision** as pure fns (`decideImport` — only a
+file you own imports silently; `resolveOwnership` — *yourself* adopts the file
+owner id and **never mints**, *someone-else*-with-no-identity mints-then-reviews);
+`subsetFor`; codecs. New **`smoke:identity`** gate (`src/IdentityHarness.elm` +
+`scripts/smoke-identity.mjs`, 21 checks), registered in local-ci.md.
+
+**Slice 2 — `owner` on Race (PR #110, merged `da1c64b`).** `owner : String` (a
+userId), introduced exactly like `shareId`/`courseHash` (TASK-047/053): defaults
+"", rides `raceMetaFields`, stamped later. Types (type + encode + `decodeRace`
+overlay `map4→map5` with `D.oneOf ""` + `coreBuilder`); `buildDraftRace` seeds
+"". `smoke:trailsync` extended: owner round-trips (v2), defaults "" (v1),
+survives export. Because it rides `encodeRace`, the `.trail` already carries it.
+
+**Verified (all headless):** type-check Success; build ✓; all 8 smokes PASS
+(incl. the new identity gate + the owner assertions). **`deviceId` untouched** —
+`userId` layers over it (ADR-0012).
+
+**Inert by design until the flows:** owner is "" at runtime and `me` doesn't
+exist yet — the deferred-mint discipline means identity only appears at first
+share. Slices 1–2 are the schema + pure-logic foundation; a `.trail` exported
+now already carries `owner` (forward-compat).
+
+**Remaining (browser-verified, like the WI-4 feed):**
+- **Slice 3 — IDB identity store + boot:** the dedicated `identity` store (DB
+  v3→v4) + `Storage` ports + `main.js` handlers; load `me : Maybe Me` +
+  `directory` into the model at boot; `.trail` name denormalization (the
+  `people` pairs) + import-merge into the directory. Store mechanics are
+  storage-smoke-able (fake-indexeddb); the real boot needs a browser.
+- **Slice 4 — flows:** export-mint name prompt; import yourself/someone-else
+  prompt (adopt/mint/review); `owner` backfill on touch/export; the Q-I1 link
+  action; `resolveName` wired into labels.
+
+**Next:** slice 3 (store + boot), then slice 4 (flows) — both need the user's
+in-browser verification (IDB upgrade, boot, the prompts/link action), as TASK-051
+did. A couple of slice-4 UX details (prompt copy, link-action placement) are
+worth a quick look with the user.
