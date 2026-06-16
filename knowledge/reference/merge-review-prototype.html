@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Merge review — suggestion prototype</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tabler-icons/3.35.0/tabler-icons.min.css" />
+<style>
+  :root {
+    --color-background-primary: #ffffff;
+    --color-background-secondary: #f4f3ee;
+    --color-background-tertiary: #ecebe4;
+    --color-text-primary: #1f1e1c;
+    --color-text-secondary: #6e6d66;
+    --color-text-tertiary: #9a9990;
+    --color-text-info: #185FA5;
+    --color-border-tertiary: rgba(30,30,28,0.12);
+    --color-border-secondary: rgba(30,30,28,0.22);
+    --color-border-info: #378ADD;
+    --border-radius-md: 8px;
+    --border-radius-lg: 12px;
+    --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --color-background-primary: #262624;
+      --color-background-secondary: #302f2c;
+      --color-background-tertiary: #191917;
+      --color-text-primary: #f3f2ee;
+      --color-text-secondary: #b4b2a9;
+      --color-text-tertiary: #8a8980;
+      --color-text-info: #85B7EB;
+      --color-border-tertiary: rgba(255,255,255,0.14);
+      --color-border-secondary: rgba(255,255,255,0.26);
+      --color-border-info: #378ADD;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: var(--font-sans);
+    color: var(--color-text-primary);
+    background: var(--color-background-tertiary);
+    line-height: 1.7;
+    -webkit-font-smoothing: antialiased;
+  }
+  button {
+    font-family: var(--font-sans);
+    font-size: 14px;
+    padding: 8px 14px;
+    color: var(--color-text-primary);
+    background: var(--color-background-primary);
+    border: 0.5px solid var(--color-border-secondary);
+    border-radius: var(--border-radius-md);
+    cursor: pointer;
+  }
+  button:hover { background: var(--color-background-secondary); }
+  button:active { transform: scale(0.98); }
+  .sr-only {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+  }
+  #toast {
+    position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%);
+    background: var(--color-text-primary); color: var(--color-background-primary);
+    font-size: 13px; padding: 10px 16px; border-radius: var(--border-radius-md);
+    opacity: 0; transition: opacity 0.2s; pointer-events: none; max-width: 90vw;
+  }
+  #toast.show { opacity: 0.95; }
+</style>
+</head>
+<body>
+
+<div style="min-height: 100vh; background: rgba(0,0,0,0.45); display: flex; align-items: center; justify-content: center; padding: 1.5rem;">
+  <h2 class="sr-only">A review dialog showing two of your coach's edits that overlap with yours; for each, pick your version or your coach's, then apply or keep your own version.</h2>
+
+  <div style="width: 440px; max-width: 100%; background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-lg); padding: 1.25rem 1.25rem 1rem;">
+
+    <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;">
+      <div>
+        <p style="font-size: 18px; font-weight: 500; margin: 0;">Coach's suggestions</p>
+        <p style="font-size: 13px; color: var(--color-text-secondary); margin: 4px 0 0;">2 changes overlap with edits you made</p>
+      </div>
+      <button id="close" aria-label="Keep my version and close" style="width: 32px; height: 32px; padding: 0; display: flex; align-items: center; justify-content: center; border-radius: var(--border-radius-md);"><i class="ti ti-x" style="font-size: 18px;" aria-hidden="true"></i></button>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 8px; margin: 12px 0 4px; padding: 8px 12px; background: var(--color-background-secondary); border-radius: var(--border-radius-md);">
+      <i class="ti ti-check" style="font-size: 16px; color: var(--color-text-secondary);" aria-hidden="true"></i>
+      <span style="font-size: 13px; color: var(--color-text-secondary);">5 other changes from your coach were added automatically.</span>
+    </div>
+
+    <div id="cards"></div>
+
+    <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 12px; padding-top: 12px; border-top: 0.5px solid var(--color-border-tertiary);">
+      <span id="progress" style="font-size: 13px; color: var(--color-text-secondary);">0 of 2 chosen</span>
+      <div style="display: flex; gap: 8px;">
+        <button id="keep">Keep my version</button>
+        <button id="apply" disabled style="opacity: 0.45; cursor: not-allowed;">Apply changes</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(function () {
+  function sendPrompt(text) {
+    var t = document.getElementById("toast");
+    t.textContent = "Would send to chat: " + text;
+    t.classList.add("show");
+    clearTimeout(t._h);
+    t._h = setTimeout(function () { t.classList.remove("show"); }, 2600);
+  }
+
+  var conflicts = [
+    { id: "c1", icon: "ti-run", where: "Target pace \u00b7 km 14 (the climb)", mine: "6:40 /km", theirs: "7:10 /km" },
+    { id: "c2", icon: "ti-map-pin", where: "Aid station \u00b7 km 28 \u00b7 El Mirador", mine: "3 min stop", theirs: "6 min stop" }
+  ];
+  var picks = {};
+
+  function circle(letter, ramp) {
+    var bg = ramp === "teal" ? "#E1F5EE" : "var(--color-background-secondary)";
+    var fg = ramp === "teal" ? "#085041" : "var(--color-text-secondary)";
+    return '<span style="flex:none;width:24px;height:24px;border-radius:50%;background:' + bg + ';color:' + fg + ';font-size:12px;font-weight:500;display:flex;align-items:center;justify-content:center;">' + letter + '</span>';
+  }
+
+  function option(cid, side, name, letter, ramp, value) {
+    return '<button data-c="' + cid + '" data-side="' + side + '" ' +
+      'style="all:unset;font-family:var(--font-sans);box-sizing:border-box;cursor:pointer;display:flex;align-items:center;gap:10px;width:100%;padding:10px 12px;border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);background:var(--color-background-primary);">' +
+      circle(letter, ramp) +
+      '<span style="display:flex;flex-direction:column;line-height:1.3;"><span style="font-size:12px;color:var(--color-text-secondary);">' + name + '</span>' +
+      '<span style="font-size:15px;font-weight:500;color:var(--color-text-primary);">' + value + '</span></span>' +
+      '<i class="ti ti-check check" style="margin-left:auto;font-size:18px;color:var(--color-text-info);opacity:0;" aria-hidden="true"></i></button>';
+  }
+
+  var html = "";
+  conflicts.forEach(function (c) {
+    html += '<div style="margin-top:12px;padding:12px;border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);">' +
+      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;"><i class="ti ' + c.icon + '" style="font-size:16px;color:var(--color-text-secondary);" aria-hidden="true"></i>' +
+      '<span style="font-size:13px;font-weight:500;">' + c.where + '</span></div>' +
+      '<div style="display:flex;flex-direction:column;gap:8px;">' +
+      option(c.id, "mine", "You", "Y", "gray", c.mine) +
+      option(c.id, "theirs", "Coach", "C", "teal", c.theirs) +
+      '</div></div>';
+  });
+  document.getElementById("cards").innerHTML = html;
+
+  function refresh() {
+    document.querySelectorAll('[data-c]').forEach(function (b) {
+      var on = picks[b.dataset.c] === b.dataset.side;
+      b.style.borderColor = on ? "var(--color-border-info)" : "var(--color-border-tertiary)";
+      b.style.borderWidth = on ? "2px" : "0.5px";
+      b.style.padding = on ? "9px 11px" : "10px 12px";
+      b.querySelector(".check").style.opacity = on ? "1" : "0";
+    });
+    var n = Object.keys(picks).length;
+    document.getElementById("progress").textContent = n + " of " + conflicts.length + " chosen";
+    var apply = document.getElementById("apply");
+    var done = n === conflicts.length;
+    apply.disabled = !done;
+    apply.style.opacity = done ? "1" : "0.45";
+    apply.style.cursor = done ? "pointer" : "not-allowed";
+    apply.style.borderWidth = done ? "2px" : "0.5px";
+    apply.style.borderColor = done ? "var(--color-border-info)" : "var(--color-border-secondary)";
+    apply.style.color = done ? "var(--color-text-info)" : "var(--color-text-secondary)";
+  }
+
+  document.querySelectorAll('[data-c]').forEach(function (b) {
+    b.addEventListener("click", function () {
+      picks[b.dataset.c] = b.dataset.side;
+      refresh();
+    });
+  });
+
+  function reject() {
+    if (Object.keys(picks).length > 0 &&
+        !confirm("Discard your choices and keep your own version?")) return;
+    sendPrompt("Keep my version \u2014 reject the import");
+  }
+  document.getElementById("keep").addEventListener("click", reject);
+  document.getElementById("close").addEventListener("click", reject);
+  document.getElementById("apply").addEventListener("click", function () {
+    if (this.disabled) return;
+    sendPrompt("Apply changes with my chosen versions for each suggestion");
+  });
+
+  refresh();
+})();
+</script>
+
+</body>
+</html>

@@ -17,25 +17,23 @@
 _(none — TASK-051 (WI-4 feed) shipped + user-verified (PR #102, `ddf7076`).
 **Coach-collab arc — updated 2026-06-16:** the companion spec
 (`reference/merge-ui-identity-spec.md`) was ingested into the backlog, adding
-three tasks beyond TASK-052. Remaining work in the arc is now:
+three tasks beyond TASK-052 — which the user then **dropped, folding it into
+TASK-056** (the merge UI ships last). Remaining work in the arc:
 
-- **TASK-054 — WI-5: identity & authorship** *(foundation; recommended next —
-  TASK-056 and the feed's author labels depend on it)*. Gated on Q-I1–Q-I3 + an
-  ADR (promote spec §1.2 / §2.2).
-- **TASK-052 — WI-3 part 2: integration/apply seam** — persist
-  `mergeBase`+`version`, `.trail` carries `{base,current,version}`, version-bump
-  on edit, the import→merge entry point + classify, apply the resolved result.
-  Q2–Q5 resolved (ADR-0011); engine (TASK-050) done + smoke-tested.
-- **TASK-056 — WI-3·UI: suggestion-review surface** *(the review screen, detailed
-  by the companion spec — was TASK-052's part (d))*. Gated on Q-U1–Q-U5; deps
-  TASK-054 + TASK-052.
+- **TASK-054 — WI-5: identity & authorship** *(foundation; next)*. Gated on
+  Q-I1–Q-I3 + an ADR (promote spec §1.2 / §2.2). A person-level `userId`
+  layered over the existing device-level `deviceId` (same person on two devices =
+  one `userId`); see the spec's Reality corrections.
 - **TASK-055 — Home view: personal/other + filter by person** *(falls out of
-  WI-5; deps TASK-054, slots in any time after it)*.
+  WI-5; deps TASK-054)*.
+- **TASK-056 — WI-3 part 2: merge integration + review UI** *(WI-3's whole last
+  mile — absorbs the dropped TASK-052; ships LAST)*. Gated on Q-U1–Q-U5; deps
+  TASK-050 (done) + TASK-054. Design ref: `reference/merge-review-prototype.html`.
 
-Suggested order: **TASK-054 (WI-5) → TASK-052 (integration) → TASK-056 (review
-UI) → TASK-055 (home view)**. Verification of 052/056 is largely manual
-(browser); the review-then-merge flow used for TASK-051 worked well. Resume on
-the user's go-ahead — resolve the gating questions (and the WI-5 ADR) first.
+Build order (user, 2026-06-16): **TASK-054 → TASK-055 → TASK-056 (last)**.
+Verification of 056 is largely manual (browser); the review-then-merge flow used
+for TASK-051 worked well. Resume on the user's go-ahead — resolve the gating
+questions (and the WI-5 ADR) first.
 
 Done so far: TASK-046 ✓ · 047 (WI-1) ✓ · 048 (WI-2) ✓ · 049 (fork-safe ids) ✓ ·
 050 (WI-3 engine) ✓ · 051 (WI-4 feed) ✓ · 053 (identity backfill) ✓.
