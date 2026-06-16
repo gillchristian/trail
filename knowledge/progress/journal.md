@@ -1768,3 +1768,46 @@ source; round-trip `withPlanningLayer (planningLayer r) r == r` holds.
 **Next:** TASK-049 (fork-collision-safe aid ids) — **no open questions**,
 proceeding autonomously. Then TASK-050 (WI-3 three-way merge — gated on Q2–Q5,
 will surface to the user), then TASK-051 (WI-4 history feed).
+
+---
+## 2026-06-15 23:34 — TASK-049: fork-collision-safe aid ids + per-device id
+
+**Task:** TASK-049 (coach-collab epic, the sub-task between WI-2 and WI-3). No
+open questions. Reframed at intake from the spec's stale "add ids" to "make the
+existing ids fork-safe" (ADR-0009 grounding #2).
+
+**What I did (PR #95, merged `fa0969f`):** Aid ids were `"a" ++ aidStationSeq`
+off a *per-race* counter — two forks both at seq N mint the same id for
+different new aids, which WI-3 couldn't tell apart. Introduced a stable
+**`deviceId`** (UUID, `main.js` → `localStorage['trail.deviceId']`, passed in
+flags → `Model.deviceId`) and `Merge.mintAidId deviceId seq` →
+`"a"+seq+"-"+first8(deviceId)`, wired into both minting sites (`validateAidForm`
++ `assignAidIds`/CSV). Existing `"aN"` ids untouched.
+
+**Two calls worth recording:**
+1. **localStorage, not IDB, for `deviceId`.** Elm needs it synchronously at boot
+   (flags) to tag ids the moment an aid is added; IDB is async (ports). It's a
+   device fingerprint, not race data, so localStorage is the right store despite
+   the rest of the app using IDB. Noted in the `main.js` comment.
+2. **Build `deviceId` now, not in WI-4.** It's used by aid-id tagging (here),
+   WI-3 conflict attribution, and WI-4 author stamping — 3 uses, clears the
+   extraction bar, and the spec explicitly intends a shared per-device id. Not
+   premature.
+
+**Why back-compat is automatic:** ancestral aids (from the common ancestor)
+carry the SAME `"aN"` id on both forks → they correctly *match* in the merge.
+Only *new* post-fork aids need distinguishing, and those get device tags. So
+tagging only new ids is exactly right — no migration, no re-id.
+
+**Verified (all 8 gates green; quoted):**
+```
+type-check Success!   build ✓ built
+storage/aidcsv/sections/calibration/trailsync PASS
+merge PASS  (extended: mint-aid — diff-device-same-seq DISTINCT, same-device
+            deterministic, empty deviceId → bare "a5")
+```
+
+**Next:** TASK-050 (WI-3 three-way merge — the core). **Gated on Q2–Q5** (spec
+§7): ancestor delivery (embed base vs lookup), profile/splits authority, version
+scheme, conflict UX. Per the spec these are the user's call — surfacing Q2–Q5
+before writing WI-3's plan.
