@@ -2015,3 +2015,35 @@ them.
 
 **Next:** the arc resumes with **TASK-054 (WI-5)** on the user's go-ahead —
 resolve Q-I1–Q-I3 and write the identity ADR first.
+
+---
+## 2026-06-16 — Apply user decisions on the merge arc (drop 052 → 056)
+
+**Task:** Follow-up to the companion-spec intake (#104/#105). The user reviewed
+the ticketing and decided: (1) keep both `deviceId` + `userId` — stressing that
+the *same person on two devices* is the case `userId` exists to solve; (2) **drop
+TASK-052, fold it into TASK-056** (WI-3's whole last mile — integration + review
+UI — ships last); (3) confirmed the sequencing. They also handed over a UI
+prototype as design inspiration.
+
+**What I did (PR #106, merged `b15475d`):** docs-only.
+- **TASK-052 dropped** (struck), its integration scope moved verbatim into
+  **TASK-056**, retitled "WI-3 (part 2): merge integration + suggestion-review
+  UI" and marked **ships last**; deps now TASK-050 (done) + TASK-054. Repointed
+  TASK-051's `Merged`-pending note to 056.
+- **Build order locked:** TASK-054 (identity) → TASK-055 (home) → TASK-056
+  (merge UI, last) — sub-section intro + CURRENT.md.
+- **Preserved the prototype** → `reference/merge-review-prototype.html`,
+  referenced from TASK-056: take the UX/layout (card list, two equal options,
+  ring+check selection, reassurance row, Apply/Keep footer, confirm-on-dismiss,
+  identity tint); not the icons/markup; and its `"Coach"` role labels are the
+  exact seat-relative bug WI-5 fixes → person names.
+- **Sharpened the grounding:** same person/two devices = one `userId`, so
+  `userId` is device-independent by design, never derived from `deviceId`.
+
+**Verification:** docs-only (only `knowledge/`). No live deps reference the
+dropped TASK-052. Root loose files left untracked for the user to remove.
+
+**Next:** start **TASK-054 (WI-5)** — gated on **Q-I1–Q-I3** (surfaced to the
+user this turn) + the identity ADR (ADR-0012). Once answered: write the ADR,
+pull TASK-054 into CURRENT with acceptance criteria, implement.
