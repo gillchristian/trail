@@ -1668,3 +1668,64 @@ consistently with the Strava-softening already a few lines up.
 (courseHash input: canonical decoded track vs. raw bytes; and mismatch behavior:
 hard-block vs. warn). Per spec §7 these are the user's call — surfacing Q1 to the
 user before writing WI-1's plan.
+
+---
+## 2026-06-15 23:18 — TASK-047: WI-1 `.trail` v2 identity + integrity guard
+
+**Task:** TASK-047 (coach-collab epic, spec §2). Second of six; the foundation
+the merge (WI-3) sits on. **Q1 resolved with the user** before implementing
+(spec §7 routed it there): courseHash from the **canonical decoded track**
+(not raw bytes), and **hard-block** on course mismatch. → ADR-0010.
+
+**What I did (PR #91, merged `409eeee`):**
+- `Race` + `shareId` (stable cross-round-trip identity) and `courseHash`. The
+  code's reality (verified during intake) drove the design: `Race.id` is the IDB
+  key and is *regenerated on import* (`Main.elm:447`), so it can't be the shared
+  identity — `shareId` is new, minted JS-side like `id` but **preserved on
+  import** (only `id` is blanked). Both default `""` (v1 files / old IDB rows);
+  stamped on the way in.
+- New pure **`TrailSync`** module: `courseHash : Gpx.Track -> String` over a
+  canonical rendering (lat/lon scaled to 5 dp, ele to nearest m) hashed with a
+  **double polynomial** (two moduli, ~60-bit) — each fold stays in Elm's
+  safe-integer range, so no `Math.imul` 32-bit tricks and no crypto port (the
+  threat model isn't adversarial). `classify` returns the typed verdict
+  `Mergeable | DifferentRace | DifferentCourse`; empty shareId never matches.
+- `.trail` → **v2**: `currentVersion = 2`, gate widened to `{1,2}`
+  (`isSupportedVersion`); codecs carry both fields with `D.oneOf` defaults;
+  decoder restructured (placeholder `""` in `coreBuilder`, overlaid by a `map3`
+  wrapper) to dodge Elm's `map8` arity ceiling. `main.js` mints shareId.
+
+**The crux (why a new field, not reuse `id`):** the spec assumed `raceId` was new
+but the code already had a UUID `id` — yet that id is *deliberately* thrown away
+on import. Reusing it would break the round-trip link the moment the coach
+imports. So `shareId` is orthogonal: `id` = local row key (fresh per import),
+`shareId` = logical document identity (preserved). Documented in ADR-0010 +
+the Types docstring.
+
+**What I verified (all 7 gates green; quoted):**
+```
+type-check  Success!
+build       ✓ built in 902ms
+storage     SMOKE PASSED   (+ shareId minted-when-absent / preserved / round-trips)
+aidcsv      PASS
+sections    PASS
+calibration PASS
+trailsync   PASS  (new — 24 checks)
+```
+New `smoke:trailsync` proves: courseHash deterministic + **cosmetically-different
+GPX → same hash** (the rounding tolerance — sub-1m precision + sub-1m ele) +
+different course → different hash + unparseable → ""; all three classify verdicts
++ empty-shareId-never-matches; v1 decodes (fields→""), v2 decodes (preserved), v3
+rejected, **v1 re-exports as v2** with identity intact. Not headless-verifiable
+(standing project limit): the full browser upload→export→re-import→guard flow —
+recommended manual check.
+
+**Scope boundary (deliberate):** WI-1 is data + the pure guard, no merge UI. The
+"update-from-file" action that calls `classify`→merge is WI-3 (TASK-050). Known
+edge for WI-3: re-importing your own file as-new makes two local rows share a
+shareId — the update-from-file path is the intended route.
+
+**Next:** TASK-048 (WI-2 course freeze) — light, **no open questions** (Q2–Q5
+gate WI-3, not WI-2), so proceeding autonomously. Then TASK-049 (fork-safe aid
+ids), then TASK-050 (WI-3, gated on Q2–Q5 — will surface those to the user),
+then TASK-051 (WI-4 feed).
