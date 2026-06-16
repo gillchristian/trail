@@ -1859,3 +1859,47 @@ TASK-052 (UI).
 `mergeBase`+`version` on Race, `.trail` carries `{base,current,version}`, bump
 on edit, the import→merge entry point, the dedicated review screen. Verification
 largely manual (browser) per the standing limit. Then TASK-051 (WI-4 feed).
+
+---
+## 2026-06-16 08:26 — TASK-053: backfill .trail identity for pre-existing races
+
+**Task:** TASK-053 (user bug report). The user verified import works, then found
+existing races export as v2 with an **empty courseHash** (and shareId). Root
+cause: WI-1's decoder defaults both to `""` for back-compat, and nothing
+backfilled races already in IDB — so the export carried blanks, which would
+break the coach round-trip (returned file's courseHash wouldn't match the local
+`""` → guard blocks).
+
+**Decision (with the user):** backfill **at download/export**, not on load. The
+user suggested download-time; I agreed — computing courseHash needs a GPX
+re-parse, and the home page doesn't parse GPX today, so hashing every race on
+load would add a one-time hitch; only the shared race needs identity, so stamp
+it lazily at share time. Persist so it's stable for the round-trip.
+
+**What I did (PR #100, merged `bdedf61`):**
+- Pure `TrailSync.ensureIdentity : Race -> Race` — fills courseHash (from gpxText)
+  + shareId when empty; **shareId seeded from the race's stable IDB `id`** (a
+  UUID): a unique/stable seed needing no async JS mint. It coincides with `id`
+  initially for backfilled races but diverges after any import (id regenerates,
+  shareId preserved) — consistent with ADR-0010. Already-stamped races unchanged.
+- `ExportProjectFile` stamps before encoding; if it changed, persists via
+  `saveRaceMeta` (light — no 3 MB GPX re-ship). New races still get a JS UUID
+  shareId at full save; this only backfills the pre-WI-1 ones.
+
+**Why shareId-from-id instead of the pendingExport+JS-UUID dance:** the pure
+synchronous seed avoids adding async export state to the update loop (less
+compile-only-verified surface), and equality-comparison doesn't care about
+shareId format. Documented the trade-off in the code + ADR-0010 lineage.
+
+**What I verified (all 8 gates green; quoted):**
+```
+type-check Success!   build ✓ built
+storage/aidcsv/sections/calibration/merge PASS
+trailsync PASS  (extended: ensureIdentity backfills from id+gpx; already-stamped preserved)
+```
+The pure backfill is smoke-tested; the export-handler wiring is type-check/build
++ the user's in-browser confirm (they're actively verifying).
+
+**Next:** coach-collab arc still paused at the verified seam — TASK-052 (WI-3
+merge UI/orchestration) + TASK-051 (WI-4 feed) remain, both needing in-browser
+verification. Resume on the user's go-ahead.
