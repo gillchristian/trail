@@ -14,6 +14,7 @@
     "smoke:trailsync": "node scripts/smoke-trailsync.mjs",
     "smoke:merge": "node scripts/smoke-merge.mjs",
     "smoke:changelog": "node scripts/smoke-changelog.mjs",
+    "smoke:identity": "node scripts/smoke-identity.mjs",
     "perf:trace": "node scripts/profile-trace.mjs"
   },
   "devDependencies": {
