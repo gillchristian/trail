@@ -14,8 +14,35 @@
 **Notes:** scope cuts, links, anything decided while planning.
 ```
 
-_(none — autonomous build **paused at a verified seam** (2026-06-15). The
-coach-collaboration arc's headlessly-verifiable core is shipped and green:
+### TASK-053 — Backfill `.trail` identity for pre-existing races (at export)
+
+**Source:** user bug report 2026-06-16 — existing races export as v2 with an
+empty `courseHash` (and `shareId`): the WI-1 decoder defaults both to `""` and
+nothing backfilled races already in IDB.
+**Branch:** fix/task-053-backfill-identity
+**Decision (with user):** backfill **at download/export**, not on load —
+computing `courseHash` needs a GPX re-parse, so hashing every race on load would
+add a hitch the home page doesn't have today; only the shared race needs
+identity. Persist it so the round-trip guard matches later.
+**Acceptance criteria:**
+- [x] Pure `TrailSync.ensureIdentity : Race -> Race` fills `shareId` (seeded from
+  the race's stable IDB `id` when empty) + `courseHash` (computed from gpxText
+  when empty); a race that already has both is unchanged. Verified `smoke:trailsync`
+  (backfilled from id + gpx; already-stamped preserved).
+- [x] `ExportProjectFile` exports the *stamped* race and, when it changed,
+  persists it via `saveRaceMeta` (light — no GPX re-ship). Verified type-check +
+  build; **pending user in-browser confirm** (old race's `.trail` carries
+  non-empty `shareId` + `courseHash`).
+- [x] All 8 gates green; type-check `Success!` + build `✓ built`.
+**Notes:** `shareId` seeded from `id` (a UUID) is a clean unique+stable seed —
+they coincide initially for backfilled races but diverge after any import (id
+regenerates, shareId preserved), consistent with ADR-0010. New races still get a
+JS-minted UUID shareId at full save; this only backfills the pre-WI-1 ones.
+
+---
+
+_(coach-collab arc still **paused at the verified seam** (2026-06-15) below
+TASK-053. The headlessly-verifiable core is shipped and green:
 **TASK-046** (brief) ✓, **047** WI-1 identity/guard ✓, **048** WI-2 course freeze
 ✓, **049** fork-safe aid ids ✓, **050** WI-3 merge **engine** ✓ — ADRs 0009/0010/0011,
 gates `smoke:trailsync` + `smoke:merge`.
