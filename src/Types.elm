@@ -229,6 +229,12 @@ path mints/computes them on the way in (`shareId` JS-side like `id`, `courseHash
 from the GPX). They ride in `raceMetaFields`, so they round-trip through both the
 full and the light (meta) save paths.
 
+`owner` (WI-5 / ADR-0012) is the race's person-level `userId` — distinct from the
+device-level `deviceId` and from the document-level `shareId`. It follows the same
+pattern: defaults to `""` for pre-identity races / v1 files, rides in
+`raceMetaFields`, and is stamped once a device identity exists (the flows slice of
+TASK-054; cf. how `shareId`/`courseHash` were backfilled in TASK-053).
+
 -}
 type alias Race =
     { id : RaceId
@@ -249,6 +255,7 @@ type alias Race =
     , actualSplits : Maybe ActualSplits
     , shareId : String
     , courseHash : String
+    , owner : String
     , history : List ChangeEntry
     }
 
@@ -525,6 +532,7 @@ raceMetaFields r =
       )
     , ( "shareId", E.string r.shareId )
     , ( "courseHash", E.string r.courseHash )
+    , ( "owner", E.string r.owner )
     , ( "history", E.list encodeChangeEntry r.history )
     ]
 
@@ -708,15 +716,17 @@ maybeInt =
 
 decodeRace : Decoder Race
 decodeRace =
-    -- Overlay the `.trail`-sharing identity onto the core race, defaulting both
-    -- fields to "" for v1 files / pre-existing IDB races (TASK-047 / ADR-0010).
-    D.map4
-        (\race shareId courseHash history ->
-            { race | shareId = shareId, courseHash = courseHash, history = history }
+    -- Overlay the `.trail`-sharing identity + owner onto the core race,
+    -- defaulting each to "" / [] for v1 files / pre-existing IDB races
+    -- (TASK-047 / ADR-0010; owner: TASK-054 / ADR-0012).
+    D.map5
+        (\race shareId courseHash owner history ->
+            { race | shareId = shareId, courseHash = courseHash, owner = owner, history = history }
         )
         raceCoreDecoder
         (D.oneOf [ D.field "shareId" D.string, D.succeed "" ])
         (D.oneOf [ D.field "courseHash" D.string, D.succeed "" ])
+        (D.oneOf [ D.field "owner" D.string, D.succeed "" ])
         (D.oneOf [ D.field "history" (D.list changeEntryDecoder), D.succeed [] ])
 
 
@@ -780,8 +790,8 @@ coreBuilder :
     -> (Float -> Float -> String -> Int -> List AidStation -> Int -> Plan -> Maybe ActualSplits -> Race)
 coreBuilder id name date location url notes cover dist =
     \gain loss gpx ts aids seq plan actual ->
-        -- shareId / courseHash are overlaid by `decodeRace` (with back-compat
-        -- defaults); placeholders here keep this a complete `Race`.
+        -- shareId / courseHash / owner are overlaid by `decodeRace` (with
+        -- back-compat defaults); placeholders here keep this a complete `Race`.
         { id = id
         , name = name
         , date = date
@@ -800,6 +810,7 @@ coreBuilder id name date location url notes cover dist =
         , actualSplits = actual
         , shareId = ""
         , courseHash = ""
+        , owner = ""
         , history = []
         }
 

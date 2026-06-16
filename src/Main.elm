@@ -1881,6 +1881,10 @@ buildDraftRace deviceId now track gpxText =
     , shareId = ""
     , courseHash = TrailSync.courseHash track
 
+    -- owner left blank → stamped once a device identity exists (WI-5 flows,
+    -- TASK-054 / ADR-0012); a userId, never the deviceId.
+    , owner = ""
+
     -- Seed the change history with the course-upload event (TASK-051).
     , history = [ Changelog.courseUploaded deviceId now 0 ]
     }
