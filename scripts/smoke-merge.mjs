@@ -99,6 +99,22 @@ const run = async () => {
   check('plan targetSeconds taken from source', r.plan.targetSeconds === 9000, String(r.plan.targetSeconds))
   check('plan kmPlans taken from source', r.plan.kmPlans.length === 1, String(r.plan.kmPlans.length))
 
+  console.log('mintAid: fork-collision-safe aid ids (TASK-049)')
+  {
+    const devA = '550e8400-e29b-41d4-a716-446655440000'
+    const devB = 'f47ac10b-58cc-4372-a567-0e02b2c3d479'
+    const a5 = (await call({ op: 'mintAid', deviceId: devA, seq: 5 })).id
+    const a5again = (await call({ op: 'mintAid', deviceId: devA, seq: 5 })).id
+    const b5 = (await call({ op: 'mintAid', deviceId: devB, seq: 5 })).id
+    const a6 = (await call({ op: 'mintAid', deviceId: devA, seq: 6 })).id
+    const bare = (await call({ op: 'mintAid', deviceId: '', seq: 5 })).id
+    check('same device + seq → deterministic', a5 === a5again, `${a5} vs ${a5again}`)
+    check('different device, same seq → DISTINCT (fork-safe)', a5 !== b5, `${a5} vs ${b5}`)
+    check('same device, different seq → distinct', a5 !== a6, `${a5} vs ${a6}`)
+    check('id starts with "a"+seq', a5.startsWith('a5'), a5)
+    check('empty deviceId → bare "aN" (back-compat fallback)', bare === 'a5', bare)
+  }
+
   console.log('roundtrip: withPlanningLayer (planningLayer r) r == r')
   const { result: rt } = await call({ op: 'roundtrip', race: local })
   // Compare the full encoded race against a re-encoding of the input. The

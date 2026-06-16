@@ -180,6 +180,17 @@ if (incomingStravaToken) {
   history.replaceState({}, '', callbackUrl.toString())
 }
 
+// Stable per-device id (TASK-049): tags newly minted aid-station ids so two
+// independently-edited copies of a race don't collide on the shared per-race
+// counter, and is the author identity WI-3/WI-4 reuse. localStorage (not IDB)
+// because Elm needs it synchronously at boot, via flags; it's a device
+// fingerprint, not race data.
+let deviceId = localStorage.getItem('trail.deviceId')
+if (!deviceId) {
+  deviceId = crypto.randomUUID()
+  localStorage.setItem('trail.deviceId', deviceId)
+}
+
 // ============================================================
 // Elm boot + port wiring
 // ============================================================
@@ -190,6 +201,7 @@ const app = Elm.Main.init({
     now: Date.now(),
     incomingStravaToken: incomingStravaToken,
     backendUrl: BACKEND_URL,
+    deviceId: deviceId,
   },
 })
 
