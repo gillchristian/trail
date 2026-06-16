@@ -12,6 +12,7 @@
     "smoke:sections": "node scripts/smoke-sections.mjs",
     "smoke:calibration": "node scripts/smoke-calibration.mjs",
     "smoke:trailsync": "node scripts/smoke-trailsync.mjs",
+    "smoke:merge": "node scripts/smoke-merge.mjs",
     "perf:trace": "node scripts/profile-trace.mjs"
   },
   "devDependencies": {
