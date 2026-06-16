@@ -14,33 +14,34 @@
 **Notes:** scope cuts, links, anything decided while planning.
 ```
 
-_(none — TASK-051 (WI-4 feed) shipped + user-verified (PR #102, `ddf7076`).
-**Coach-collab arc — updated 2026-06-16:** the companion spec
-(`reference/merge-ui-identity-spec.md`) was ingested into the backlog, adding
-three tasks beyond TASK-052 — which the user then **dropped, folding it into
-TASK-056** (the merge UI ships last). Remaining work in the arc:
+### TASK-054 — WI-5: identity & authorship (foundation)
 
-- **TASK-054 — WI-5: identity & authorship** *(foundation; next)*. Gated on
-  Q-I1–Q-I3 + an ADR (promote spec §1.2 / §2.2). A person-level `userId`
-  layered over the existing device-level `deviceId` (same person on two devices =
-  one `userId`); see the spec's Reality corrections.
-- **TASK-055 — Home view: personal/other + filter by person** *(falls out of
-  WI-5; deps TASK-054)*.
-- **TASK-056 — WI-3 part 2: merge integration + review UI** *(WI-3's whole last
-  mile — absorbs the dropped TASK-052; ships LAST)*. Gated on Q-U1–Q-U5; deps
-  TASK-050 (done) + TASK-054. Design ref: `reference/merge-review-prototype.html`.
+**Source:** BACKLOG (coach-collab arc, companion spec Part 1)
+**Branch:** `feat/task-054-wi5-identity` (implementation not yet started — plan + ADR landed first)
+**Decisions:** ADR-0012 — **Q-I1** *build the explicit link action* · **Q-I2** *dedicated IDB store* · **Q-I3** *names-only* (user, 2026-06-16).
 
-Build order (user, 2026-06-16): **TASK-054 → TASK-055 → TASK-056 (last)**.
-Verification of 056 is largely manual (browser); the review-then-merge flow used
-for TASK-051 worked well. Resume on the user's go-ahead — resolve the gating
-questions (and the WI-5 ADR) first.
+**Acceptance criteria:**
+- [ ] Stable `userId` (UUID v4) minted at **exactly two points** — first export w/ no identity; import-as-someone-else w/ no identity — and **never** on the "yourself" path (which adopts the file's owner id). *(Smoke the mint/adopt decision fn; trace the two sites.)*
+- [ ] `me = {userId, displayName}` persists in a **dedicated IDB store** (DB-version bump + migration), distinct from `AthleteProfile.Profile`. *(Manual: store created on upgrade; `me` survives reload.)*
+- [ ] Races persist `owner : userId`; a race with no `owner` adopts `me` on first touch. Names live only in the directory + denormalized in `.trail`. *(Smoke codec + owner default.)*
+- [ ] Directory `{ [userId]: {displayName, nameUpdatedAt} }` resolves all name display; rename = one row, all owned races relabel with no per-race write. *(Manual: rename → relabel.)*
+- [ ] `.trail` denormalizes the `(userId, displayName, nameUpdatedAt)` pairs it references. *(Smoke codec round-trip.)*
+- [ ] Import branches: `file.owner.userId == me.userId` → **no prompt**; owner ≠ me → prompt yourself/someone-else (*yourself* **adopts** the file's owner id; *someone-else* w/ no identity chains a name prompt + mints). *(Manual: 3 branches.)*
+- [ ] Name **LWW**: a name applies only when incoming `nameUpdatedAt` is newer; an older file never reverts a name. *(Smoke the LWW register.)*
+- [ ] **Q-I1 link action:** explicit *"this device is already `<name>` — link to `<ownerName>`?"* reconciles a dual-id (mint-then-import-own-older). *(Manual.)*
+- [ ] Back-compat: pre-identity `.trail` + IDB records decode via `D.oneOf` defaults. *(Smoke decoders; manual load of a pre-WI-5 race.)*
 
-Done so far: TASK-046 ✓ · 047 (WI-1) ✓ · 048 (WI-2) ✓ · 049 (fork-safe ids) ✓ ·
-050 (WI-3 engine) ✓ · 051 (WI-4 feed) ✓ · 053 (identity backfill) ✓.
+**Implementation plan — pure-core-first, mirroring the TASK-050/052 split (verifiability):**
+1. **Slice 1 — pure core + persistence** *(mostly headless-verifiable → PR 1)*: identity types (`UserId`, `Me`, directory entry) + codecs + back-compat decoders; `owner` on `Race` (+ default-to-me); `.trail` denormalization; the name-LWW register + the mint/adopt **decision** as pure functions; the dedicated IDB store + DB-version migration (the migration itself = a manual browser check). New `smoke:identity` (mint/adopt decisions, LWW, codec round-trip, owner default). `deviceId` **untouched** (stays the device-scoped collision key per ADR-0012).
+2. **Slice 2 — flows + prompts + link action** *(manual browser verification → PR 2)*: export-mint prompt; import yourself/someone-else prompt + adopt/mint; name prompt; the Q-I1 link action.
 
-**Recommended in-browser checks** (headless env can't do them):
-- **Standing (pre-arc):** TASK-040 IDB round-trip; TASK-042 print preview;
-  TASK-045 section table/card with a linked actual.)_
+**Notes:** `userId` layers **over** the existing `deviceId` — do **not** remove `deviceId` or re-key `entryId`/the version vector by `userId` (ADR-0012 grounding). Home view (TASK-055) consumes `owner` but is a separate task. No role badge (Q-I3).
+
+---
+
+**Arc state (2026-06-16):** companion spec ingested (#104) → TASK-052 dropped, folded into TASK-056 (#106) → Q-I1–Q-I3 resolved + **ADR-0012**. Build order **TASK-054 → TASK-055 → TASK-056 (last)**. Done: TASK-046–051, 053 ✓.
+
+**Recommended in-browser checks (standing, pre-arc):** TASK-040 IDB round-trip; TASK-042 print preview; TASK-045 section table/card with a linked actual.
 
 ---
 
@@ -54,5 +55,7 @@ Done so far: TASK-046 ✓ · 047 (WI-1) ✓ · 048 (WI-2) ✓ · 049 (fork-safe 
   round-trip after the TASK-040 IDB migration; print-preview of the TASK-042
   table; section table/card with a **linked actual** for TASK-045 (clock Time,
   Actual − Time = Δ, monotonic Cum ending at total clock).
-- **After TASK-046:** the epic continues with TASK-047 (WI-1), where **Q1**
-  (courseHash input + mismatch behavior) must be resolved with the user first.
+- **Coach-collab arc:** engine + feed shipped (TASK-046–051, 053). Now in the
+  identity/UI strand — TASK-054 (WI-5) active; then TASK-055 (home), TASK-056
+  (merge UI, last). **Q-U1–Q-U5 gate TASK-056** — resolve with the user before
+  that surface.
