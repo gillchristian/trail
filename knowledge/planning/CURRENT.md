@@ -15,17 +15,30 @@
 ```
 
 _(none — TASK-051 (WI-4 feed) shipped + user-verified (PR #102, `ddf7076`).
-**The coach-collaboration arc has one piece left: TASK-052 (WI-3 part 2 — merge
-integration + review UI)** — persist `mergeBase`+`version`, `.trail` carries
-`{base,current,version}`, version-bump on edit, the import→merge entry point, the
-dedicated review screen (Q5), and appending `Merged` change-sets to the WI-4
-feed. Q2–Q5 already resolved (ADR-0011); the pure merge engine (TASK-050) is
-done + smoke-tested. Verification is largely manual (browser) — same review-then-
-merge flow as TASK-051 worked well; resume on the user's go-ahead.
+**Coach-collab arc — updated 2026-06-16:** the companion spec
+(`reference/merge-ui-identity-spec.md`) was ingested into the backlog, adding
+three tasks beyond TASK-052. Remaining work in the arc is now:
 
-Coach-collab epic: TASK-046 ✓ · 047 (WI-1) ✓ · 048 (WI-2) ✓ · 049 (fork-safe ids)
-✓ · 050 (WI-3 engine) ✓ · 051 (WI-4 feed) ✓ · 053 (identity backfill) ✓ — only
-**TASK-052** (WI-3 merge UI) remains.
+- **TASK-054 — WI-5: identity & authorship** *(foundation; recommended next —
+  TASK-056 and the feed's author labels depend on it)*. Gated on Q-I1–Q-I3 + an
+  ADR (promote spec §1.2 / §2.2).
+- **TASK-052 — WI-3 part 2: integration/apply seam** — persist
+  `mergeBase`+`version`, `.trail` carries `{base,current,version}`, version-bump
+  on edit, the import→merge entry point + classify, apply the resolved result.
+  Q2–Q5 resolved (ADR-0011); engine (TASK-050) done + smoke-tested.
+- **TASK-056 — WI-3·UI: suggestion-review surface** *(the review screen, detailed
+  by the companion spec — was TASK-052's part (d))*. Gated on Q-U1–Q-U5; deps
+  TASK-054 + TASK-052.
+- **TASK-055 — Home view: personal/other + filter by person** *(falls out of
+  WI-5; deps TASK-054, slots in any time after it)*.
+
+Suggested order: **TASK-054 (WI-5) → TASK-052 (integration) → TASK-056 (review
+UI) → TASK-055 (home view)**. Verification of 052/056 is largely manual
+(browser); the review-then-merge flow used for TASK-051 worked well. Resume on
+the user's go-ahead — resolve the gating questions (and the WI-5 ADR) first.
+
+Done so far: TASK-046 ✓ · 047 (WI-1) ✓ · 048 (WI-2) ✓ · 049 (fork-safe ids) ✓ ·
+050 (WI-3 engine) ✓ · 051 (WI-4 feed) ✓ · 053 (identity backfill) ✓.
 
 **Recommended in-browser checks** (headless env can't do them):
 - **Standing (pre-arc):** TASK-040 IDB round-trip; TASK-042 print preview;
