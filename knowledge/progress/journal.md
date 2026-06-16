@@ -1729,3 +1729,42 @@ shareId — the update-from-file path is the intended route.
 gate WI-3, not WI-2), so proceeding autonomously. Then TASK-049 (fork-safe aid
 ids), then TASK-050 (WI-3, gated on Q2–Q5 — will surface those to the user),
 then TASK-051 (WI-4 feed).
+
+---
+## 2026-06-15 23:26 — TASK-048: WI-2 course-freeze boundary
+
+**Task:** TASK-048 (coach-collab epic, spec §3). Third of six. No open questions
+(Q2–Q5 gate WI-3). Light by design.
+
+**What I did (PR #93, merged `c5bc0af`):** Turned "freeze the course, merge the
+plan" from an axiom into a *type-enforced boundary*. New `Merge` module splits a
+`Race` into three disjoint groups — frozen course (gpxText + distance/gain/loss +
+courseHash), mergeable `PlanningLayer` (name/date/location/url/notes + aids +
+plan), local/owner-only (id/shareId/createdAt + coverImage + actualSplits) — with
+`planningLayer : Race -> PlanningLayer` and `withPlanningLayer : PlanningLayer ->
+Race -> Race`. The reassembly copies the course + identity + owner-only fields
+from the **local** race verbatim, so WI-3's merge can never alter track points:
+they're not in the planning layer, full stop.
+
+**Why this shape (vs. a doc-only invariant):** WI-1 already shipped the *guard*
+half (reject a different-course import) and trail has no course editor, so a
+naive WI-2 would be near-empty. The value is the structural surface WI-3 builds
+on: WI-3 will produce a merged `PlanningLayer` and rebuild via `withPlanningLayer`
+— the freeze is then a property of the reassembly, not a rule to remember. Kept
+the per-field merge *policy* out (that's WI-3, partly Q3); WI-2 only draws the
+in/out-of-bounds line.
+
+**What I verified (all 8 gates green; quoted):**
+```
+type-check Success!   build ✓ built
+storage SMOKE PASSED   aidcsv/sections/calibration/trailsync PASS
+merge PASS  (new — 25 checks)
+```
+`smoke:merge`: with a `PlanningLayer` taken from a *different* course, the rebuilt
+race keeps local's gpxText/courseHash/distance/gain/loss + id/shareId/createdAt/
+coverImage/actualSplits, and takes name/date/location/url/notes/aids/plan from
+source; round-trip `withPlanningLayer (planningLayer r) r == r` holds.
+
+**Next:** TASK-049 (fork-collision-safe aid ids) — **no open questions**,
+proceeding autonomously. Then TASK-050 (WI-3 three-way merge — gated on Q2–Q5,
+will surface to the user), then TASK-051 (WI-4 history feed).
