@@ -21,6 +21,7 @@ import Browser
 import Browser.Events
 import Browser.Navigation as Nav
 import Calibration
+import Changelog
 import Csv
 import Dict exposing (Dict)
 import Dom
@@ -54,6 +55,8 @@ import TrailSync
 import Types
     exposing
         ( AidStation
+        , ChangeDescriptor(..)
+        , ChangeEntry
         , KmTime(..)
         , Plan
         , Race
@@ -206,6 +209,7 @@ type alias Model =
     , stravaPickerSearch : String
     , sliderDraft : Maybe Float
     , sparklineCoords : Dict String (List ( Float, Float ))
+    , historyOpen : Bool
     }
 
 
@@ -248,6 +252,7 @@ init flags url key =
       , stravaPickerSearch = ""
       , sliderDraft = Nothing
       , sparklineCoords = Dict.empty
+      , historyOpen = False
       }
     , Cmd.batch
         [ Storage.loadAll
@@ -328,6 +333,8 @@ type Msg
       -- metadata edit
     | OpenMetaEdit
     | CloseMetaEdit
+    | OpenHistory
+    | CloseHistory
     | MetaSetName String
     | MetaSetDate String
     | MetaSetLocation String
@@ -480,7 +487,7 @@ update msg model =
                     Ok track ->
                         let
                             draft =
-                                buildDraftRace model.now track content
+                                buildDraftRace model.deviceId model.now track content
                         in
                         ( { model | upload = Persisting fileName }
                         , Storage.saveRace (encodeRace draft)
@@ -700,7 +707,7 @@ update msg model =
                                                 , aidStationSeq = race.aidStationSeq + 1
                                             }
                             in
-                            ( model, Storage.saveRaceMeta (encodeRaceMeta updatedRace) )
+                            ( model, commitRaceEdit race updatedRace model )
 
                 _ ->
                     ( model, Cmd.none )
@@ -712,7 +719,7 @@ update msg model =
                         updatedRace =
                             { race | aidStations = List.filter (\a -> a.id /= aidId) race.aidStations }
                     in
-                    ( model, Storage.saveRaceMeta (encodeRaceMeta updatedRace) )
+                    ( model, commitRaceEdit race updatedRace model )
 
                 Nothing ->
                     ( model, Cmd.none )
@@ -759,7 +766,7 @@ update msg model =
                             }
                     in
                     ( { model | aidImport = AidImportClosed }
-                    , Storage.saveRaceMeta (encodeRaceMeta updatedRace)
+                    , commitRaceEdit race updatedRace model
                     )
 
                 _ ->
@@ -811,7 +818,7 @@ update msg model =
                             { race | plan = withTargetSeconds newTarget race.plan }
                     in
                     ( { model | targetTimeText = formatted }
-                    , Storage.saveRaceMeta (encodeRaceMeta updatedRace)
+                    , commitRaceEdit race updatedRace model
                     )
 
                 Nothing ->
@@ -864,7 +871,7 @@ update msg model =
                             { race | plan = withKmPlan kmIndex updatedKp race.plan }
                     in
                     ( { model | kmTimeText = formatted }
-                    , Storage.saveRaceMeta (encodeRaceMeta updatedRace)
+                    , commitRaceEdit race updatedRace model
                     )
 
                 Nothing ->
@@ -886,7 +893,7 @@ update msg model =
                         updatedRace =
                             { race | plan = withKmPlan kmIndex updatedKp race.plan }
                     in
-                    ( model, Storage.saveRaceMeta (encodeRaceMeta updatedRace) )
+                    ( model, commitRaceEdit race updatedRace model )
 
                 Nothing ->
                     ( model, Cmd.none )
@@ -905,7 +912,7 @@ update msg model =
                             { race | plan = withKmPlan kmIndex updatedKp race.plan }
                     in
                     ( { model | kmTimeText = "" }
-                    , Storage.saveRaceMeta (encodeRaceMeta updatedRace)
+                    , commitRaceEdit race updatedRace model
                     )
 
                 Nothing ->
@@ -1034,6 +1041,12 @@ update msg model =
         CloseMetaEdit ->
             ( { model | metaEditor = MetaClosed }, Cmd.none )
 
+        OpenHistory ->
+            ( { model | historyOpen = True }, Cmd.none )
+
+        CloseHistory ->
+            ( { model | historyOpen = False }, Cmd.none )
+
         MetaSetName s ->
             ( updateMetaForm (\f -> { f | name = s }) model, Cmd.none )
 
@@ -1094,7 +1107,7 @@ update msg model =
                             }
                     in
                     ( { model | metaEditor = MetaClosed }
-                    , Storage.saveRaceMeta (encodeRaceMeta updatedRace)
+                    , commitRaceEdit race updatedRace model
                     )
 
                 _ ->
@@ -1141,7 +1154,7 @@ update msg model =
                                     { race | actualSplits = Just actual }
                             in
                             ( { model | actualRunError = Nothing }
-                            , Storage.saveRaceMeta (encodeRaceMeta updatedRace)
+                            , commitRaceEdit race updatedRace model
                             )
 
         ClearActualRun rid ->
@@ -1461,7 +1474,7 @@ update msg model =
                                             { race | actualSplits = Just actual }
                                     in
                                     ( { model | stravaPicker = PickerClosed, actualRunError = Nothing }
-                                    , Storage.saveRaceMeta (encodeRaceMeta updatedRace)
+                                    , commitRaceEdit race updatedRace model
                                     )
 
         StravaPickerSetSearch rid query ->
@@ -1844,8 +1857,8 @@ buildKmsCache races tracks existing =
     List.foldl (\r acc -> cacheKms r tracks acc) existing races
 
 
-buildDraftRace : Int -> Track -> String -> Race
-buildDraftRace now track gpxText =
+buildDraftRace : String -> Int -> Track -> String -> Race
+buildDraftRace deviceId now track gpxText =
     { id = raceIdFromString ""
     , name = track.name
     , date = Nothing
@@ -1867,7 +1880,34 @@ buildDraftRace now track gpxText =
     -- fingerprint of this course, set once here from the parsed track.
     , shareId = ""
     , courseHash = TrailSync.courseHash track
+
+    -- Seed the change history with the course-upload event (TASK-051).
+    , history = [ Changelog.courseUploaded deviceId now 0 ]
     }
+
+
+{-| Persist a plan/aid/metadata edit, logging a change-history entry (TASK-051).
+Diffs the mergeable planning layer before→after via `Changelog.diff`; a
+non-planning change (target time, the slider, linking actual splits, …) yields
+an empty diff and so appends no entry — the save still happens. Used in place of
+a bare `Storage.saveRaceMeta` at the edit sites; `before` is the race as it was,
+`after` the edited race.
+-}
+commitRaceEdit : Race -> Race -> Model -> Cmd Msg
+commitRaceEdit before after model =
+    let
+        changes =
+            Changelog.diff (Merge.planningLayer before) (Merge.planningLayer after)
+
+        withHistory =
+            case Changelog.entryFromChanges model.deviceId model.now (List.length after.history) "local" changes of
+                Just entry ->
+                    { after | history = after.history ++ [ entry ] }
+
+                Nothing ->
+                    after
+    in
+    Storage.saveRaceMeta (encodeRaceMeta withHistory)
 
 
 readFile : File -> Cmd Msg
@@ -2095,6 +2135,7 @@ view model =
             , div [ class "flex-1 pb-10" ] [ viewContent model ]
             , viewFooter
             , viewDeleteModal model
+            , viewHistoryDrawer model
             , viewErrorToast model
             ]
         ]
@@ -3275,8 +3316,11 @@ viewRaceDetail model race =
                     )
     in
     div [ class "max-w-screen-2xl mx-auto mt-8 space-y-8 px-6" ]
-        [ a [ Route.href Route.Index, class "inline-flex items-center gap-2 text-sm text-slate-400 hover:text-slate-100" ]
-            [ text "← Back to races" ]
+        [ div [ class "flex items-center justify-between gap-3" ]
+            [ a [ Route.href Route.Index, class "inline-flex items-center gap-2 text-sm text-slate-400 hover:text-slate-100" ]
+                [ text "← Back to races" ]
+            , viewHistoryButton race
+            ]
         , viewRaceHero race
         , div [ class "flex items-end justify-between gap-4 flex-wrap" ]
             [ div [ class "min-w-0" ]
@@ -6491,6 +6535,267 @@ smallStat labelText value unit =
 -- ============================================================
 -- DELETE CONFIRM + ERROR TOAST
 -- ============================================================
+
+
+-- ============================================================
+-- CHANGE-HISTORY FEED / DRAWER (WI-4 / TASK-051)
+-- ============================================================
+
+
+{-| Right-aligned "Activity" button on the race-page header row, mirroring the
+"← Back to races" link styling, with a count once there are entries.
+-}
+viewHistoryButton : Race -> Html Msg
+viewHistoryButton race =
+    let
+        count =
+            List.length race.history
+    in
+    button
+        [ onClick OpenHistory
+        , class "inline-flex items-center gap-2 text-sm text-slate-400 hover:text-slate-100"
+        ]
+        [ span [ class "text-base leading-none" ] [ text "📍" ]
+        , text "Activity"
+        , if count > 0 then
+            span
+                [ class "inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-full bg-rose-500/20 text-rose-300 text-xs font-semibold" ]
+                [ text (String.fromInt count) ]
+
+          else
+            text ""
+        ]
+
+
+{-| Right slide-over drawer holding the activity feed for the current race.
+-}
+viewHistoryDrawer : Model -> Html Msg
+viewHistoryDrawer model =
+    if not model.historyOpen then
+        text ""
+
+    else
+        case currentRace model of
+            Nothing ->
+                text ""
+
+            Just race ->
+                div [ class "fixed inset-0 z-50 flex justify-end" ]
+                    [ div
+                        [ class "absolute inset-0 bg-slate-950/70 backdrop-blur-sm"
+                        , onClick CloseHistory
+                        ]
+                        []
+                    , div [ class "relative w-full max-w-md bg-slate-900 border-l border-slate-800 shadow-2xl flex flex-col trail-drawer-in" ]
+                        [ div [ class "flex items-start justify-between px-6 py-4 border-b border-slate-800" ]
+                            [ div []
+                                [ h2 [ class "text-lg font-semibold text-slate-100" ] [ text "Activity" ]
+                                , p [ class "text-xs text-slate-500 mt-0.5" ] [ text "Every change to this plan, newest first" ]
+                                ]
+                            , button
+                                [ onClick CloseHistory
+                                , class "text-slate-500 hover:text-slate-100 text-2xl leading-none -mt-1"
+                                ]
+                                [ text "×" ]
+                            ]
+                        , div [ class "flex-1 overflow-y-auto px-6 py-5" ]
+                            [ viewHistoryFeed model.now model.deviceId race.history ]
+                        ]
+                    ]
+
+
+viewHistoryFeed : Int -> String -> List ChangeEntry -> Html Msg
+viewHistoryFeed now deviceId history =
+    if List.isEmpty history then
+        div [ class "text-center py-12" ]
+            [ p [ class "text-4xl mb-3 opacity-60" ] [ text "🗺" ]
+            , p [ class "text-sm text-slate-500" ] [ text "No changes recorded yet." ]
+            ]
+
+    else
+        let
+            entries =
+                List.reverse history
+
+            total =
+                List.length entries
+        in
+        div [] (List.indexedMap (viewHistoryEntry now deviceId total) entries)
+
+
+viewHistoryEntry : Int -> String -> Int -> Int -> ChangeEntry -> Html Msg
+viewHistoryEntry now deviceId total i entry =
+    let
+        isLast =
+            i == total - 1
+
+        ( badgeIcon, badgeTone ) =
+            entryBadge entry
+    in
+    div [ class "relative flex gap-4 pb-6" ]
+        [ if isLast then
+            text ""
+
+          else
+            div [ class "absolute left-4 top-9 -bottom-1 w-px bg-slate-800" ] []
+        , div
+            [ class ("relative z-10 flex size-8 shrink-0 items-center justify-center rounded-full ring-4 ring-slate-900 " ++ badgeTone) ]
+            [ span [ class "text-sm leading-none" ] [ text badgeIcon ] ]
+        , div [ class "min-w-0 flex-1" ]
+            [ div [ class "flex items-baseline justify-between gap-2" ]
+                [ span [ class "text-sm font-medium text-slate-200" ] [ text (authorLabel deviceId entry.author) ]
+                , span [ class "text-xs text-slate-500 whitespace-nowrap" ] [ text (relativeTime now entry.timestampMs) ]
+                ]
+            , div [ class "mt-1.5 space-y-1" ] (List.map viewChangeRow entry.changes)
+            ]
+        ]
+
+
+viewChangeRow : ChangeDescriptor -> Html Msg
+viewChangeRow d =
+    let
+        info =
+            describeChange d
+    in
+    div [ class "flex items-start gap-2 text-sm text-slate-400" ]
+        [ span [ class ("shrink-0 leading-5 " ++ info.tone) ] [ text info.icon ]
+        , span [ class "leading-5" ] [ text info.phrase ]
+        ]
+
+
+{-| The badge icon + tint for an entry, by its nature (a course upload, a merge,
+or an ordinary local edit).
+-}
+entryBadge : ChangeEntry -> ( String, String )
+entryBadge entry =
+    if List.any isCourseUploaded entry.changes then
+        ( "🗺", "bg-emerald-500/20" )
+
+    else if entry.source == "merge" then
+        ( "🔀", "bg-sky-500/20" )
+
+    else
+        ( "✏️", "bg-rose-500/20" )
+
+
+isCourseUploaded : ChangeDescriptor -> Bool
+isCourseUploaded d =
+    case d of
+        CourseUploaded ->
+            True
+
+        _ ->
+            False
+
+
+{-| Per-type icon, phrasing and tint for one change — the feed's per-type visual
+treatment (spec §5).
+-}
+describeChange : ChangeDescriptor -> { icon : String, phrase : String, tone : String }
+describeChange d =
+    let
+        km1 km =
+            "km " ++ String.fromInt (km + 1)
+    in
+    case d of
+        AidAdded r ->
+            { icon = "⛑", phrase = "Added aid “" ++ r.name ++ "”", tone = "text-emerald-300" }
+
+        AidRemoved r ->
+            { icon = "✕", phrase = "Removed aid “" ++ r.name ++ "”", tone = "text-rose-300" }
+
+        AidMoved r ->
+            { icon = "📍", phrase = "Moved “" ++ r.name ++ "” to " ++ km1 r.toKm, tone = "text-amber-300" }
+
+        AidRenamed r ->
+            { icon = "🏷", phrase = "Renamed aid to “" ++ r.to ++ "”", tone = "text-slate-300" }
+
+        AidRetimed r ->
+            { icon = "⏱", phrase = "“" ++ r.name ++ "” rest → " ++ formatRestShort r.toRest, tone = "text-sky-300" }
+
+        KmNoteAdded r ->
+            { icon = "📝", phrase = "Note added on " ++ km1 r.km, tone = "text-emerald-300" }
+
+        KmNoteEdited r ->
+            { icon = "📝", phrase = "Note edited on " ++ km1 r.km, tone = "text-slate-300" }
+
+        KmNoteCleared r ->
+            { icon = "📝", phrase = "Note cleared on " ++ km1 r.km, tone = "text-rose-300" }
+
+        KmPaceSet r ->
+            { icon = "⏱", phrase = "Pace set on " ++ km1 r.km, tone = "text-sky-300" }
+
+        KmPaceChanged r ->
+            { icon = "⏱", phrase = "Pace changed on " ++ km1 r.km, tone = "text-amber-300" }
+
+        KmPaceCleared r ->
+            { icon = "⏱", phrase = "Pace cleared on " ++ km1 r.km, tone = "text-rose-300" }
+
+        RaceRenamed r ->
+            { icon = "🏷", phrase = "Renamed race to “" ++ r.to ++ "”", tone = "text-slate-300" }
+
+        RaceDateChanged r ->
+            { icon = "📅", phrase = "Race date " ++ (r.to |> Maybe.map (\t -> "→ " ++ t) |> Maybe.withDefault "cleared"), tone = "text-slate-300" }
+
+        CourseUploaded ->
+            { icon = "🗺", phrase = "Course uploaded", tone = "text-emerald-300" }
+
+        Merged r ->
+            { icon = "🔀", phrase = "Merged " ++ String.fromInt r.count ++ pluralCount r.count ++ " from " ++ r.fromAuthor, tone = "text-sky-300" }
+
+
+pluralCount : Int -> String
+pluralCount n =
+    if n == 1 then
+        " change"
+
+    else
+        " changes"
+
+
+formatRestShort : Int -> String
+formatRestShort secs =
+    if secs == 0 then
+        "0"
+
+    else if modBy 60 secs == 0 then
+        String.fromInt (secs // 60) ++ "m"
+
+    else
+        String.fromInt secs ++ "s"
+
+
+authorLabel : String -> String -> String
+authorLabel deviceId author =
+    if author == deviceId then
+        "You"
+
+    else
+        "Coach"
+
+
+{-| A coarse "Nd/Nh/Nm ago" from two epoch-ms timestamps.
+-}
+relativeTime : Int -> Int -> String
+relativeTime now ms =
+    let
+        secs =
+            (now - ms) // 1000
+    in
+    if secs < 0 then
+        "just now"
+
+    else if secs < 60 then
+        "just now"
+
+    else if secs < 3600 then
+        String.fromInt (secs // 60) ++ "m ago"
+
+    else if secs < 86400 then
+        String.fromInt (secs // 3600) ++ "h ago"
+
+    else
+        String.fromInt (secs // 86400) ++ "d ago"
 
 
 viewDeleteModal : Model -> Html Msg

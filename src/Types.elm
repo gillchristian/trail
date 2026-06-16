@@ -1,6 +1,8 @@
 module Types exposing
     ( ActualSplits
     , AidStation
+    , ChangeDescriptor(..)
+    , ChangeEntry
     , KmPlan
     , KmTime(..)
     , Plan
@@ -8,10 +10,12 @@ module Types exposing
     , RaceId
     , Service(..)
     , allServices
+    , changeEntryDecoder
     , decodeRace
     , decodeRaces
     , defaultPlan
     , emptyKmPlan
+    , encodeChangeEntry
     , encodeRace
     , encodeRaceMeta
     , kmPlanFor
@@ -245,6 +249,7 @@ type alias Race =
     , actualSplits : Maybe ActualSplits
     , shareId : String
     , courseHash : String
+    , history : List ChangeEntry
     }
 
 
@@ -314,6 +319,178 @@ withTargetSeconds t plan =
 
 
 
+-- CHANGE HISTORY (WI-4 / TASK-051)
+--
+-- The typed change-history data lives here (with the rest of the Race codecs)
+-- so `Race` can carry it without an import cycle; the diff/union *logic* is in
+-- `Changelog`, which imports these. Derived + cosmetic (ADR-0009): never
+-- replayed to reconstruct state.
+
+
+type ChangeDescriptor
+    = AidAdded { id : String, name : String }
+    | AidRemoved { id : String, name : String }
+    | AidMoved { id : String, name : String, fromKm : Int, toKm : Int }
+    | AidRenamed { id : String, from : String, to : String }
+    | AidRetimed { id : String, name : String, fromRest : Int, toRest : Int }
+    | KmNoteAdded { km : Int }
+    | KmNoteEdited { km : Int }
+    | KmNoteCleared { km : Int }
+    | KmPaceSet { km : Int, seconds : Int }
+    | KmPaceChanged { km : Int, from : Int, to : Int }
+    | KmPaceCleared { km : Int }
+    | RaceRenamed { from : String, to : String }
+    | RaceDateChanged { from : Maybe String, to : Maybe String }
+    | CourseUploaded
+    | Merged { fromAuthor : String, count : Int }
+
+
+{-| One logical change-set (a local edit or a merge). `source` is
+"local" | "merge" | "import". Immutable; keyed by `entryId` for conflict-free union.
+-}
+type alias ChangeEntry =
+    { entryId : String
+    , author : String
+    , timestampMs : Int
+    , source : String
+    , changes : List ChangeDescriptor
+    }
+
+
+encodeChangeEntry : ChangeEntry -> Value
+encodeChangeEntry e =
+    E.object
+        [ ( "entryId", E.string e.entryId )
+        , ( "author", E.string e.author )
+        , ( "timestampMs", E.int e.timestampMs )
+        , ( "source", E.string e.source )
+        , ( "changes", E.list encodeDescriptor e.changes )
+        ]
+
+
+changeEntryDecoder : Decoder ChangeEntry
+changeEntryDecoder =
+    D.map5 ChangeEntry
+        (D.field "entryId" D.string)
+        (D.field "author" D.string)
+        (D.field "timestampMs" D.int)
+        (D.oneOf [ D.field "source" D.string, D.succeed "local" ])
+        (D.field "changes" (D.list descriptorDecoder))
+
+
+encodeDescriptor : ChangeDescriptor -> Value
+encodeDescriptor d =
+    let
+        tagged kind fields =
+            E.object (( "kind", E.string kind ) :: fields)
+
+        maybeStr m =
+            Maybe.map E.string m |> Maybe.withDefault E.null
+    in
+    case d of
+        AidAdded r ->
+            tagged "aidAdded" [ ( "id", E.string r.id ), ( "name", E.string r.name ) ]
+
+        AidRemoved r ->
+            tagged "aidRemoved" [ ( "id", E.string r.id ), ( "name", E.string r.name ) ]
+
+        AidMoved r ->
+            tagged "aidMoved" [ ( "id", E.string r.id ), ( "name", E.string r.name ), ( "fromKm", E.int r.fromKm ), ( "toKm", E.int r.toKm ) ]
+
+        AidRenamed r ->
+            tagged "aidRenamed" [ ( "id", E.string r.id ), ( "from", E.string r.from ), ( "to", E.string r.to ) ]
+
+        AidRetimed r ->
+            tagged "aidRetimed" [ ( "id", E.string r.id ), ( "name", E.string r.name ), ( "fromRest", E.int r.fromRest ), ( "toRest", E.int r.toRest ) ]
+
+        KmNoteAdded r ->
+            tagged "kmNoteAdded" [ ( "km", E.int r.km ) ]
+
+        KmNoteEdited r ->
+            tagged "kmNoteEdited" [ ( "km", E.int r.km ) ]
+
+        KmNoteCleared r ->
+            tagged "kmNoteCleared" [ ( "km", E.int r.km ) ]
+
+        KmPaceSet r ->
+            tagged "kmPaceSet" [ ( "km", E.int r.km ), ( "seconds", E.int r.seconds ) ]
+
+        KmPaceChanged r ->
+            tagged "kmPaceChanged" [ ( "km", E.int r.km ), ( "from", E.int r.from ), ( "to", E.int r.to ) ]
+
+        KmPaceCleared r ->
+            tagged "kmPaceCleared" [ ( "km", E.int r.km ) ]
+
+        RaceRenamed r ->
+            tagged "raceRenamed" [ ( "from", E.string r.from ), ( "to", E.string r.to ) ]
+
+        RaceDateChanged r ->
+            tagged "raceDateChanged" [ ( "from", maybeStr r.from ), ( "to", maybeStr r.to ) ]
+
+        CourseUploaded ->
+            tagged "courseUploaded" []
+
+        Merged r ->
+            tagged "merged" [ ( "fromAuthor", E.string r.fromAuthor ), ( "count", E.int r.count ) ]
+
+
+descriptorDecoder : Decoder ChangeDescriptor
+descriptorDecoder =
+    D.field "kind" D.string
+        |> D.andThen
+            (\kind ->
+                case kind of
+                    "aidAdded" ->
+                        D.map2 (\id name -> AidAdded { id = id, name = name }) (D.field "id" D.string) (D.field "name" D.string)
+
+                    "aidRemoved" ->
+                        D.map2 (\id name -> AidRemoved { id = id, name = name }) (D.field "id" D.string) (D.field "name" D.string)
+
+                    "aidMoved" ->
+                        D.map4 (\id name f t -> AidMoved { id = id, name = name, fromKm = f, toKm = t }) (D.field "id" D.string) (D.field "name" D.string) (D.field "fromKm" D.int) (D.field "toKm" D.int)
+
+                    "aidRenamed" ->
+                        D.map3 (\id f t -> AidRenamed { id = id, from = f, to = t }) (D.field "id" D.string) (D.field "from" D.string) (D.field "to" D.string)
+
+                    "aidRetimed" ->
+                        D.map4 (\id name f t -> AidRetimed { id = id, name = name, fromRest = f, toRest = t }) (D.field "id" D.string) (D.field "name" D.string) (D.field "fromRest" D.int) (D.field "toRest" D.int)
+
+                    "kmNoteAdded" ->
+                        D.map (\km -> KmNoteAdded { km = km }) (D.field "km" D.int)
+
+                    "kmNoteEdited" ->
+                        D.map (\km -> KmNoteEdited { km = km }) (D.field "km" D.int)
+
+                    "kmNoteCleared" ->
+                        D.map (\km -> KmNoteCleared { km = km }) (D.field "km" D.int)
+
+                    "kmPaceSet" ->
+                        D.map2 (\km s -> KmPaceSet { km = km, seconds = s }) (D.field "km" D.int) (D.field "seconds" D.int)
+
+                    "kmPaceChanged" ->
+                        D.map3 (\km f t -> KmPaceChanged { km = km, from = f, to = t }) (D.field "km" D.int) (D.field "from" D.int) (D.field "to" D.int)
+
+                    "kmPaceCleared" ->
+                        D.map (\km -> KmPaceCleared { km = km }) (D.field "km" D.int)
+
+                    "raceRenamed" ->
+                        D.map2 (\f t -> RaceRenamed { from = f, to = t }) (D.field "from" D.string) (D.field "to" D.string)
+
+                    "raceDateChanged" ->
+                        D.map2 (\f t -> RaceDateChanged { from = f, to = t }) (D.field "from" (D.nullable D.string)) (D.field "to" (D.nullable D.string))
+
+                    "courseUploaded" ->
+                        D.succeed CourseUploaded
+
+                    "merged" ->
+                        D.map2 (\fa c -> Merged { fromAuthor = fa, count = c }) (D.field "fromAuthor" D.string) (D.field "count" D.int)
+
+                    other ->
+                        D.fail ("Unknown change kind: " ++ other)
+            )
+
+
+
 -- ENCODE / DECODE
 
 
@@ -348,6 +525,7 @@ raceMetaFields r =
       )
     , ( "shareId", E.string r.shareId )
     , ( "courseHash", E.string r.courseHash )
+    , ( "history", E.list encodeChangeEntry r.history )
     ]
 
 
@@ -532,13 +710,14 @@ decodeRace : Decoder Race
 decodeRace =
     -- Overlay the `.trail`-sharing identity onto the core race, defaulting both
     -- fields to "" for v1 files / pre-existing IDB races (TASK-047 / ADR-0010).
-    D.map3
-        (\race shareId courseHash ->
-            { race | shareId = shareId, courseHash = courseHash }
+    D.map4
+        (\race shareId courseHash history ->
+            { race | shareId = shareId, courseHash = courseHash, history = history }
         )
         raceCoreDecoder
         (D.oneOf [ D.field "shareId" D.string, D.succeed "" ])
         (D.oneOf [ D.field "courseHash" D.string, D.succeed "" ])
+        (D.oneOf [ D.field "history" (D.list changeEntryDecoder), D.succeed [] ])
 
 
 raceCoreDecoder : Decoder Race
@@ -621,6 +800,7 @@ coreBuilder id name date location url notes cover dist =
         , actualSplits = actual
         , shareId = ""
         , courseHash = ""
+        , history = []
         }
 
 
