@@ -19,6 +19,7 @@ import Json.Encode as E
 import Platform
 import ProjectFile
 import TrailSync exposing (ImportVerdict(..))
+import Types exposing (decodeRace, encodeRace)
 
 
 port run : (D.Value -> msg) -> Sub msg
@@ -53,6 +54,14 @@ handle v =
 
         Ok "encode" ->
             handleEncode v
+
+        Ok "ensureIdentity" ->
+            case D.decodeValue (D.field "race" decodeRace) v of
+                Err e ->
+                    E.object [ ( "error", E.string (D.errorToString e) ) ]
+
+                Ok race ->
+                    E.object [ ( "race", encodeRace (TrailSync.ensureIdentity race) ) ]
 
         Ok other ->
             E.object [ ( "error", E.string ("unknown op: " ++ other) ) ]

@@ -174,6 +174,22 @@ const run = async () => {
     check('a v1 doc re-exports as v2', doc.version === 2, String(doc.version))
   }
 
+  // --- ensureIdentity: backfill identity for pre-existing races (TASK-053) ---
+  console.log('ensureIdentity: backfill shareId + courseHash at export')
+  {
+    const withGpx = { ...raceCore, id: 'local-uuid-1', gpxText: courseA } // no shareId/courseHash
+    const r = (await call({ op: 'ensureIdentity', race: withGpx })).race
+    check('shareId backfilled (seeded from id)', r.shareId === 'local-uuid-1', JSON.stringify(r.shareId))
+    check('courseHash backfilled (computed from gpx)', r.courseHash === hashA1, JSON.stringify(r.courseHash))
+  }
+  {
+    // Already-stamped race is left unchanged.
+    const stamped = { ...raceCore, id: 'x', gpxText: courseA, shareId: 'keep-me', courseHash: 'keep-hash' }
+    const r = (await call({ op: 'ensureIdentity', race: stamped })).race
+    check('existing shareId preserved', r.shareId === 'keep-me', r.shareId)
+    check('existing courseHash preserved', r.courseHash === 'keep-hash', r.courseHash)
+  }
+
   console.log('')
   if (failures === 0) {
     console.log('PASS — all .trail identity/integrity checks green')

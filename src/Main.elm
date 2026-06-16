@@ -994,13 +994,28 @@ update msg model =
         ExportProjectFile ->
             case currentRace model of
                 Just race ->
-                    ( model
-                    , Download.file
-                        { filename = ProjectFile.filenameFor race
-                        , content = ProjectFile.encode race
-                        , mime = "application/json"
-                        }
-                    )
+                    let
+                        -- Stamp identity (shareId + courseHash) onto a race that
+                        -- predates WI-1 so the exported v2 file isn't blank, and
+                        -- persist it (light save) so the local race keeps the
+                        -- same identity for the merge round-trip (TASK-053).
+                        stamped =
+                            TrailSync.ensureIdentity race
+
+                        downloadCmd =
+                            Download.file
+                                { filename = ProjectFile.filenameFor stamped
+                                , content = ProjectFile.encode stamped
+                                , mime = "application/json"
+                                }
+                    in
+                    if stamped == race then
+                        ( model, downloadCmd )
+
+                    else
+                        ( model
+                        , Cmd.batch [ downloadCmd, Storage.saveRaceMeta (encodeRaceMeta stamped) ]
+                        )
 
                 Nothing ->
                     ( model, Cmd.none )

@@ -3,6 +3,7 @@ module TrailSync exposing
     , classify
     , courseHash
     , courseHashFromGpxText
+    , ensureIdentity
     , verdictMessage
     )
 
@@ -35,6 +36,7 @@ WI-3 (TASK-050); this module only gates it.
 -}
 
 import Gpx exposing (Point, Track)
+import Types exposing (Race)
 
 
 {-| The verdict of comparing an incoming `.trail` against a local target race.
@@ -120,6 +122,39 @@ courseHashFromGpxText gpxText =
 
         Err _ ->
             ""
+
+
+{-| Backfill the `.trail`-sharing identity on a race that predates WI-1 (or any
+race still carrying the decoder's `""` defaults), so an export stamps it.
+
+`courseHash` is computed from the GPX; `shareId` is seeded from the race's stable
+IDB `id` (a UUID) — a unique, stable seed that needs no async mint. They coincide
+initially for a backfilled race, but diverge after any import (the IDB `id` is
+regenerated then, while the embedded `shareId` is preserved), so the round-trip
+identity still holds (ADR-0010). A race that already has both fields is returned
+unchanged; new races get their `shareId` minted JS-side at full save, so this
+only ever fires for the pre-existing ones.
+
+Called at export time (TASK-053): hashing needs a GPX parse, so it's done lazily
+for the race actually being shared rather than for every race on load.
+
+-}
+ensureIdentity : Race -> Race
+ensureIdentity race =
+    { race
+        | shareId =
+            if race.shareId == "" then
+                Types.raceIdToString race.id
+
+            else
+                race.shareId
+        , courseHash =
+            if race.courseHash == "" then
+                courseHashFromGpxText race.gpxText
+
+            else
+                race.courseHash
+    }
 
 
 {-| Canonical, rounding-tolerant rendering of one point: lat/lon scaled to 5
