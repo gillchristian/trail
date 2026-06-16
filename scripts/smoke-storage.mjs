@@ -86,8 +86,14 @@ function loadAll(db) {
 }
 
 function saveRace(db, race) {
-  // full save: races row (no gpxText) + gpx row; echoes the full race
-  const withId = { ...race, id: race.id || webcrypto.randomUUID() }
+  // full save: races row (no gpxText) + gpx row; echoes the full race.
+  // `id` = fresh local key; `shareId` = stable .trail identity, minted only
+  // when absent so a v2 import keeps its own (TASK-047). Mirrors main.js.
+  const withId = {
+    ...race,
+    id: race.id || webcrypto.randomUUID(),
+    shareId: race.shareId || webcrypto.randomUUID(),
+  }
   const { gpxText, ...meta } = withId
   return new Promise((res, rej) => {
     const tx = db.transaction([RACES_STORE, GPX_STORE], 'readwrite')
@@ -177,6 +183,14 @@ if (!saved.id) {
 }
 console.log(`OK   · save assigned id: ${saved.id}`)
 assertEq(saved.gpxText, small, 'full-save echo carries gpxText')
+
+// 2b. shareId (TASK-047): minted when absent, preserved when provided.
+if (!saved.shareId) { console.error('FAIL · save minted no shareId'); process.exit(1) }
+console.log(`OK   · save minted shareId: ${saved.shareId}`)
+const kept = await saveRace(db, { ...draft, id: '', shareId: 'pinned-share-id' })
+assertEq(kept.shareId, 'pinned-share-id', 'provided shareId is preserved (v2 import)')
+assertEq((await loadAll(db)).find(r => r.id === kept.id)?.shareId, 'pinned-share-id', 'shareId round-trips through IDB')
+await deleteRace(db, kept.id) // tidy up so the row count below stays 1
 
 // 3. loadAll re-attaches gpxText from the gpx store.
 let all = await loadAll(db)
