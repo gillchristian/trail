@@ -1811,3 +1811,51 @@ merge PASS  (extended: mint-aid — diff-device-same-seq DISTINCT, same-device
 §7): ancestor delivery (embed base vs lookup), profile/splits authority, version
 scheme, conflict UX. Per the spec these are the user's call — surfacing Q2–Q5
 before writing WI-3's plan.
+
+---
+## 2026-06-15 23:52 — TASK-050: WI-3 three-way merge engine (pure)
+
+**Task:** TASK-050 (coach-collab epic, spec §4). The correctness core of WI-3.
+**Q2–Q5 resolved with the user** first (spec §7 routed them there): Q2 embed
+`{base,current}`; Q3 splits + cover owner-only (= WI-2 boundary); Q4 per-device
+version vector; Q5 dedicated review screen, per-km note pick-one v1. → ADR-0011.
+
+**Split decision:** WI-3 is large (engine + version/base orchestration + entry
+point + review UI). I split it: **this task = the pure engine** (fully
+smoke-testable — the hard correctness part), **TASK-052 = integration + review
+UI** (verification largely manual). Mirrors how the project shipped `Predictor`
+before the slider. Recorded TASK-052 in BACKLOG.
+
+**What I did (PR #97, merged `afefeb8`):** Added to `Merge`:
+- Version vector (`Dict deviceId Int`) + `classifyVersions → Same | FastForward
+  | Behind | Diverged`, `bumpVersion`, `mergeVersions`.
+- `mergePlanningLayer base mine theirs → { merged, conflicts }`: a `field3`
+  three-way primitive (only-one-side-changed → that side; both differ → typed
+  conflict, default mine); applied to scalars + per-km `{time,notes}`; aids as a
+  keyed set by fork-safe id (union adds / honoured removes / per-field three-way
+  / edit-vs-remove → presence conflict).
+- `resolve key theirs acc` — pure dispatch folding one "take theirs" onto merged.
+
+**Design calls (in ADR-0011):** (1) merged-defaults-to-mine + `resolve` fold,
+rather than wrapping every field as `MergeField` — keeps `merged` always valid
+and the UI reconstruction a simple fold; both halves smoke-testable. (2)
+per-field aid merge (spec) not whole-aid. (3) version vector over a plain counter
+(only it gives fast-forward detection).
+
+**What I verified (all 8 gates green; quoted):**
+```
+type-check Success!   build ✓ built
+storage/aidcsv/sections/calibration/trailsync PASS
+merge PASS  (extended with WI-3 acceptance scenarios)
+```
+The acceptance criteria, headlessly: disjoint coach km-note + owner aid → **0
+conflicts**, both land; same km note both sides → **1 typed conflict**, `merged`
+= mine, `resolve(theirs)` flips it; deterministic; disjoint aid adds → both
+present; honoured removes; scalar three-way (name vs date); `classifyVersions`
+all four relations. The "human resolves / applies with no conflict UI" parts are
+TASK-052 (UI).
+
+**Next:** TASK-052 (WI-3 part 2 — integration + review UI): persist
+`mergeBase`+`version` on Race, `.trail` carries `{base,current,version}`, bump
+on edit, the import→merge entry point, the dedicated review screen. Verification
+largely manual (browser) per the standing limit. Then TASK-051 (WI-4 feed).
