@@ -17,7 +17,7 @@
 ### TASK-054 — WI-5: identity & authorship (foundation)
 
 **Source:** BACKLOG (coach-collab arc, companion spec Part 1)
-**Branch:** `feat/task-054-wi5-identity` (implementation not yet started — plan + ADR landed first)
+**Branch:** ships as per-slice PRs (pure-core-first). **Slice 1 ✓ PR #109 · Slice 2 ✓ PR #110**; slices 3–4 next.
 **Decisions:** ADR-0012 — **Q-I1** *build the explicit link action* · **Q-I2** *dedicated IDB store* · **Q-I3** *names-only* (user, 2026-06-16).
 
 **Acceptance criteria:**
@@ -32,8 +32,12 @@
 - [ ] Back-compat: pre-identity `.trail` + IDB records decode via `D.oneOf` defaults. *(Smoke decoders; manual load of a pre-WI-5 race.)*
 
 **Implementation plan — pure-core-first, mirroring the TASK-050/052 split (verifiability):**
-1. **Slice 1 — pure core + persistence** *(mostly headless-verifiable → PR 1)*: identity types (`UserId`, `Me`, directory entry) + codecs + back-compat decoders; `owner` on `Race` (+ default-to-me); `.trail` denormalization; the name-LWW register + the mint/adopt **decision** as pure functions; the dedicated IDB store + DB-version migration (the migration itself = a manual browser check). New `smoke:identity` (mint/adopt decisions, LWW, codec round-trip, owner default). `deviceId` **untouched** (stays the device-scoped collision key per ADR-0012).
-2. **Slice 2 — flows + prompts + link action** *(manual browser verification → PR 2)*: export-mint prompt; import yourself/someone-else prompt + adopt/mint; name prompt; the Q-I1 link action.
+1. ✓ **Slice 1 — pure `Identity` core** (PR #109): types + name-LWW register + the mint/adopt **decision** as pure fns + `subsetFor` + codecs; new `smoke:identity` (21 checks). Headless-verified; no existing code touched.
+2. ✓ **Slice 2 — `owner` on Race** (PR #110): `owner : String` (a userId) + encoder + `decodeRace` back-compat default + `buildDraftRace` seed; `smoke:trailsync` owner round-trip/default checks. Headless-verified; rides `encodeRace` so the `.trail` carries it.
+3. **Slice 3 — IDB identity store + boot** *(browser-verified)*: the dedicated `identity` store (DB v3→v4) + `Storage` ports + `main.js` handlers; load `me : Maybe Me` + `directory` into the model at boot; `.trail` name (`people`) denormalization + import-merge into the directory. Store mechanics → `smoke` (fake-indexeddb); real boot → browser.
+4. **Slice 4 — flows** *(browser-verified)*: export-mint name prompt; import yourself/someone-else (adopt / mint / review); `owner` backfill on touch/export; the **Q-I1 link action**; `resolveName` wired into labels.
+
+**Progress (2026-06-16):** slices 1–2 shipped + fully headless-verified (all 8 smokes green). Inert at runtime by design (deferred-mint: `me`/owner appear only at first share); slices 3–4 make it live and need in-browser verification (IDB upgrade, boot, prompts, link action) — like the WI-4 feed.
 
 **Notes:** `userId` layers **over** the existing `deviceId` — do **not** remove `deviceId` or re-key `entryId`/the version vector by `userId` (ADR-0012 grounding). Home view (TASK-055) consumes `owner` but is a separate task. No role badge (Q-I3).
 
