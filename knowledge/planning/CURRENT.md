@@ -14,12 +14,28 @@
 **Notes:** scope cuts, links, anything decided while planning.
 ```
 
-## Active
+### TASK-049 — Fork-collision-safe aid-station ids
 
-_(none — TASK-048 (WI-2) shipped (PR #93, `c5bc0af`). **Next: TASK-049
-(fork-collision-safe aid ids), no open questions** → proceeding autonomously.
-Then TASK-050 (WI-3 three-way merge — gated on Q2–Q5, surface to the user),
-TASK-051 (WI-4 history feed). Coach-collab epic: TASK-046 ✓, 047 ✓, 048 ✓.)_
+**Source:** BACKLOG (coach-collab epic, spec §4 + ADR-0009 grounding #2)
+**Branch:** feat/task-049-fork-safe-aid-ids
+**Acceptance criteria:**
+- [x] Stable per-device id (`deviceId`, UUID) minted once JS-side
+  (`main.js`, localStorage `trail.deviceId`, synchronous → ready at boot) and
+  passed to Elm via flags → `Model.deviceId`. The author identity WI-3/WI-4 reuse.
+- [x] **New** aid ids are device-tagged (`Merge.mintAidId deviceId seq` →
+  `"a"+seq+"-"+first8(deviceId)`) at both minting sites — the aid form
+  (`validateAidForm`) and `assignAidIds` (CSV import). Verified `smoke:merge`:
+  different-device same-seq → **distinct**; same-device same-seq → deterministic.
+- [x] Back-compat: existing `"aN"` ids untouched (no re-id; ancestral aids shared
+  across a fork still match); empty deviceId → bare `"aN"`. Verified `smoke:merge`.
+- [x] `smoke:merge` extended (mint-aid op, 5 checks); all 8 gates green;
+  type-check `Success!` + build `✓ built`.
+**Notes:** Reframed from the spec's "add ids" (aids already have ids:
+`"a"+aidStationSeq`) to "make them fork-safe" — the shared per-race counter
+mints identical ids on both forks (ADR-0009 grounding #2). `deviceId` clears the
+3-use bar (aid ids here, conflict attribution in WI-3, author stamping in WI-4),
+so building it now is coherent, not premature. `Merge.mintAidId` lives in `Merge`
+because its purpose is unambiguous aid-keying for the three-way merge.
 
 ---
 

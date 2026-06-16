@@ -61,5 +61,13 @@ handle v =
                     E.object
                         [ ( "result", encodeRace (Merge.withPlanningLayer (Merge.planningLayer race) race) ) ]
 
+        Ok "mintAid" ->
+            case D.decodeValue (D.map2 Tuple.pair (D.field "deviceId" D.string) (D.field "seq" D.int)) v of
+                Err e ->
+                    E.object [ ( "error", E.string (D.errorToString e) ) ]
+
+                Ok ( deviceId, seq ) ->
+                    E.object [ ( "id", E.string (Merge.mintAidId deviceId seq) ) ]
+
         Ok other ->
             E.object [ ( "error", E.string ("unknown op: " ++ other) ) ]

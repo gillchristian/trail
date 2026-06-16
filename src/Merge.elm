@@ -1,5 +1,6 @@
 module Merge exposing
     ( PlanningLayer
+    , mintAidId
     , planningLayer
     , withPlanningLayer
     )
@@ -33,6 +34,35 @@ gated on Q3; WI-2 only nails down what is in vs. out of bounds.
 -}
 
 import Types exposing (AidStation, Plan, Race)
+
+
+{-| Mint a fork-collision-safe aid-station id (TASK-049, ADR-0009 grounding #2).
+
+Aid ids used to be `"a" ++ seq` from a per-race counter, so two copies of a race
+edited independently (a coach and the owner, both starting from the same `seq`)
+would mint *identical* ids for genuinely different new aids — which a merge can't
+tell apart. Tagging a new id with the minting device's id keeps the two forks'
+new aids distinct: `"a" ++ seq ++ "-" ++ first8(deviceId)`.
+
+Existing `"aN"` ids (including aids inherited from a common ancestor, which
+*should* match across a fork) are untouched — only newly minted ids carry the
+tag. An empty `deviceId` falls back to the bare `"aN"` form.
+
+-}
+mintAidId : String -> Int -> String
+mintAidId deviceId seq =
+    let
+        bare =
+            "a" ++ String.fromInt seq
+
+        tag =
+            String.left 8 deviceId
+    in
+    if tag == "" then
+        bare
+
+    else
+        bare ++ "-" ++ tag
 
 
 {-| The mergeable subset of a `Race`. Excludes the frozen course, the identity

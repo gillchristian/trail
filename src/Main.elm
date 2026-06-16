@@ -35,6 +35,7 @@ import Html.Events as E exposing (onBlur, onClick, onInput, preventDefaultOn)
 import Html.Lazy
 import Json.Decode as D
 import Json.Encode as Encode
+import Merge
 import Planning exposing (Km, KmResult, KmSource(..))
 import Predictor
 import Process
@@ -98,6 +99,7 @@ type alias Flags =
     , now : Int
     , incomingStravaToken : Maybe String
     , backendUrl : String
+    , deviceId : String
     }
 
 
@@ -199,6 +201,7 @@ type alias Model =
     , profileSaved : Bool
     , stravaToken : Maybe String
     , backendUrl : String
+    , deviceId : String
     , stravaPicker : StravaPicker
     , stravaPickerSearch : String
     , sliderDraft : Maybe Float
@@ -240,6 +243,7 @@ init flags url key =
       , profileSaved = False
       , stravaToken = flags.incomingStravaToken
       , backendUrl = flags.backendUrl
+      , deviceId = flags.deviceId
       , stravaPicker = PickerClosed
       , stravaPickerSearch = ""
       , sliderDraft = Nothing
@@ -666,7 +670,7 @@ update msg model =
         AidSubmit ->
             case ( model.aidEditor, currentRace model ) of
                 ( AidOpen form, Just race ) ->
-                    case validateAidForm form race of
+                    case validateAidForm model.deviceId form race of
                         Err err ->
                             ( updateAidForm (\f -> { f | error = Just err }) model, Cmd.none )
 
@@ -746,7 +750,7 @@ update msg model =
                 ( AidImportPreview preview, Just race ) ->
                     let
                         ( stations, nextSeq ) =
-                            assignAidIds race.aidStationSeq preview.result.stations
+                            assignAidIds model.deviceId race.aidStationSeq preview.result.stations
 
                         updatedRace =
                             { race
@@ -1912,8 +1916,8 @@ toggleService s services =
         s :: services
 
 
-validateAidForm : AidForm -> Race -> Result String AidStation
-validateAidForm form race =
+validateAidForm : String -> AidForm -> Race -> Result String AidStation
+validateAidForm deviceId form race =
     let
         trimmedName =
             String.trim form.name
@@ -1980,7 +1984,7 @@ validateAidForm form race =
                                             let
                                                 id =
                                                     Maybe.withDefault
-                                                        ("a" ++ String.fromInt race.aidStationSeq)
+                                                        (Merge.mintAidId deviceId race.aidStationSeq)
                                                         form.editing
                                             in
                                             Ok
@@ -2027,13 +2031,13 @@ previousAidDistance editing race =
 sequence so a later manual add can't collide. Returns the stations with
 ids plus the next free sequence number.
 -}
-assignAidIds : Int -> List AidStation -> ( List AidStation, Int )
-assignAidIds startSeq stations =
+assignAidIds : String -> Int -> List AidStation -> ( List AidStation, Int )
+assignAidIds deviceId startSeq stations =
     let
         ( reversed, nextSeq ) =
             List.foldl
                 (\station ( acc, seq ) ->
-                    ( { station | id = "a" ++ String.fromInt seq } :: acc, seq + 1 )
+                    ( { station | id = Merge.mintAidId deviceId seq } :: acc, seq + 1 )
                 )
                 ( [], startSeq )
                 stations
