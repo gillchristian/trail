@@ -6,8 +6,9 @@
 //     fingerprint), and distinct for a genuinely different course;
 //   - TrailSync.classify returns the right typed verdict (Mergeable /
 //     DifferentRace / DifferentCourse), and an empty shareId never matches;
-//   - ProjectFile.decode reads both v1 (no shareId/courseHash) and v2 docs and
-//     still rejects an unknown version.
+//   - ProjectFile.decode reads both v1 (no shareId/courseHash/owner) and v2 docs,
+//     defaults each missing field to "", round-trips them on re-export, and
+//     still rejects an unknown version (owner: WI-5 / TASK-054 / ADR-0012).
 // (Foundation guard for the coach-collaboration arc, TASK-047 / ADR-0010.)
 //
 // Run with: node scripts/smoke-trailsync.mjs
@@ -90,7 +91,7 @@ const raceCore = {
 }
 const trailV2 = JSON.stringify({
   format: 'trail-project', version: 2,
-  race: { ...raceCore, shareId: 'share-xyz', courseHash: 'hash-abc' },
+  race: { ...raceCore, shareId: 'share-xyz', courseHash: 'hash-abc', owner: 'user-42' },
 })
 const trailV1 = JSON.stringify({
   format: 'trail-project', version: 1, race: raceCore, // no shareId / courseHash
@@ -142,12 +143,14 @@ const run = async () => {
     check('v2 decodes ok', r.ok === true, JSON.stringify(r))
     check('v2 preserves shareId', r.shareId === 'share-xyz', r.shareId)
     check('v2 preserves courseHash', r.courseHash === 'hash-abc', r.courseHash)
+    check('v2 preserves owner (WI-5)', r.owner === 'user-42', JSON.stringify(r.owner))
   }
   {
     const r = await call({ op: 'decode', trail: trailV1 })
     check('v1 decodes ok (back-compat)', r.ok === true, JSON.stringify(r))
     check('v1 shareId defaults to ""', r.shareId === '', JSON.stringify(r.shareId))
     check('v1 courseHash defaults to ""', r.courseHash === '', JSON.stringify(r.courseHash))
+    check('v1 owner defaults to "" (WI-5 back-compat)', r.owner === '', JSON.stringify(r.owner))
     check('v1 race body still read (name)', r.name === 'Demo Race', r.name)
   }
   {
@@ -163,9 +166,10 @@ const run = async () => {
     check('export version is 2', doc.version === 2, String(doc.version))
     check('export carries shareId', doc.race.shareId === 'share-xyz', doc.race.shareId)
     check('export carries courseHash', doc.race.courseHash === 'hash-abc', doc.race.courseHash)
+    check('export carries owner', doc.race.owner === 'user-42', doc.race.owner)
     // round-trip: decode what we just encoded
     const back = await call({ op: 'decode', trail: encoded })
-    check('encode→decode round-trip preserves identity', back.shareId === 'share-xyz' && back.courseHash === 'hash-abc', JSON.stringify(back))
+    check('encode→decode round-trip preserves identity + owner', back.shareId === 'share-xyz' && back.courseHash === 'hash-abc' && back.owner === 'user-42', JSON.stringify(back))
   }
   {
     // A v1 doc re-exports as v2 (the version is the build's currentVersion).

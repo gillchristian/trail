@@ -10,7 +10,7 @@ Three ops, dispatched on a `"op"` field:
 
   - `hash`     → `{ hash }` for a GPX string (`TrailSync.courseHashFromGpxText`)
   - `classify` → `{ verdict, message }` for an incoming/target identity pair
-  - `decode`   → `{ ok, shareId, courseHash, name }` for a `.trail` document
+  - `decode`   → `{ ok, shareId, courseHash, owner, name }` for a `.trail` document
 
 -}
 
@@ -134,6 +134,7 @@ handleDecode v =
                         [ ( "ok", E.bool True )
                         , ( "shareId", E.string race.shareId )
                         , ( "courseHash", E.string race.courseHash )
+                        , ( "owner", E.string race.owner )
                         , ( "name", E.string race.name )
                         ]
 
