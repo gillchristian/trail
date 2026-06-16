@@ -1954,3 +1954,64 @@ version}`, version-bump on edit, the import→merge entry point, the dedicated
 review screen, and appending `Merged` change-sets to the WI-4 feed. Q2–Q5
 already resolved; verification largely manual (browser). Epic so far: TASK-046
 ✓ 047 ✓ 048 ✓ 049 ✓ 050 ✓ 051 ✓ 053 ✓.
+
+---
+## 2026-06-16 — Intake: companion spec (identity + merge-review UI) → backlog
+
+**Task:** Not a TASK — meta-intake, like the engine-spec intake (#88). The user
+handed off `merge-ui-and-identity-spec.md` (companion to the already-ticketed
+`coach-collab-spec.md`): *"process my exploration on the next steps… for now
+just work on ingesting all of this into the backlog."* Scope this session was
+explicitly **backlog only** — not the ADR, not resolving the open questions, not
+implementation.
+
+**What I did (PR #104, merged `df5a8c9`):** docs-only, mirroring #88.
+- **Relocated the spec** → `reference/merge-ui-identity-spec.md` (durable home,
+  as `coach-collab-spec.md` is for the engine), fixed the companion cross-refs,
+  and added a **Reality corrections** callout grounding it against the code.
+- **Three tasks** under a new epic sub-section "Identity & merge-review UI":
+  **TASK-054** (WI-5 identity & authorship — foundation) · **TASK-055**
+  (home-view personal/other + filter by person) · **TASK-056** (WI-3·UI
+  suggestion-review surface). Acceptance from spec §1.6 / §1.5 / §2.6, plus the
+  two-mint-points discipline and the `nameUpdatedAt` LWW rule per the hand-off.
+- **Annotated TASK-052** (didn't gut it): its part (d) review screen is now
+  detailed by TASK-056 and its labels depend on TASK-054, so (d) is the
+  integration/apply seam TASK-056 drives. Refreshed `CURRENT.md`'s arc note
+  (it wrongly read "only TASK-052 remains").
+
+**The maze I recorded (spec premises vs. the actual code, verified 2026-06-16):**
+1. **A device-global id already *is* the author identity.** `deviceId`
+   (localStorage `trail.deviceId`, `main.js:188`) already keys the changelog
+   author (`authorLabel`, `Main.elm:6769`), the version vector
+   (`Merge.bumpVersion`), the aid-id prefix (`Merge.mintAidId`), and the
+   `entryId` (`author ++ "-" ++ seq`). The spec discards "device-id = person,"
+   but that's about *labels* — so WI-5 **adds a person-level `userId` over
+   `deviceId`, it does not replace it.** `userId` = human identity (owner,
+   labels, directory); `deviceId` stays the device-scoped collision key.
+   Re-keying `entryId` by `userId` would be a latent bug (two devices of one
+   person collide on seq → WI-4 union silently drops entries).
+2. **`me` ≠ the performance profile, and that collision is real here.**
+   `src/AthleteProfile.elm:46` already defines `type alias Profile`. §1.2's
+   "don't nest `me` in the performance profile" is concrete, not hypothetical.
+3. **No `owner` on `Race` yet** — WI-5 adds it; `shareId`/`raceId` already
+   exist per-race (identify the *document*, not the *person*).
+
+**Decisions / judgment calls (surfaced for the user):** the recommended
+sequencing **TASK-054 (WI-5) → 052 (integration) → 056 (review UI) → 055 (home
+view)** is recorded but not locked. The exact split between TASK-052(d) and
+TASK-056 is left to settle at promotion. TASK-052 was annotated, not rewritten.
+
+**Deferred per scope (flagged, not done):** the ADR promoting §1.2 identity +
+§2.2 UI reframe (extend ADR-0009 or a new ADR-0012) — pairs with the WI-5
+kickoff; resolving **Q-I1–Q-I3** (WI-5) and **Q-U1–Q-U5** (WI-3·UI) with the user
+at each gate.
+
+**Verification:** docs-only — `git diff --name-only` showed only `knowledge/`
+(no `framework/`, so the instance-free grep gate is N/A; no code CI gates apply).
+TASK ids 054–056 unique (max was 053) with one definition line each. The root
+duplicates `coach-collaboration-spec.md` + `merge-ui-and-identity-spec.md` are
+left untracked — now redundant with the `reference/` copies; the user can bin
+them.
+
+**Next:** the arc resumes with **TASK-054 (WI-5)** on the user's go-ahead —
+resolve Q-I1–Q-I3 and write the identity ADR first.
