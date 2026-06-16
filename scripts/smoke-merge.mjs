@@ -127,9 +127,90 @@ const run = async () => {
   check('roundtrip preserves plan', rt.plan.targetSeconds === local.plan.targetSeconds)
   check('roundtrip preserves shareId', rt.shareId === local.shareId)
 
+  // ---- WI-3 three-way merge engine (TASK-050) ----
+  const mkRace = (over) => ({
+    id: 'r', name: 'Race', date: null, location: '', url: '', notes: '',
+    coverImage: null, distance: 10000, gain: 500, loss: 500, gpxText: '<gpx/>',
+    createdAt: 0, aidStations: [], aidStationSeq: 0,
+    plan: { targetSeconds: null, kmPlans: [] }, actualSplits: null,
+    shareId: 's', courseHash: 'h', ...over,
+  })
+  const aid = (id, over = {}) => ({ id, name: id, distance: 1000, restSeconds: 120, services: [], notes: '', cutoff: null, ...over })
+  const km = (index, notes, time = { kind: 'auto' }) => ({ index, time, notes })
+  const kmNote = (race, i) => (race.plan.kmPlans.find((k) => k.index === i) || {}).notes
+  const aidById = (race, id) => race.aidStations.find((a) => a.id === id)
+  const aidIds = (race) => race.aidStations.map((a) => a.id).sort()
+
+  console.log('merge: disjoint edits (coach km-note + owner aid) → 0 conflicts, both land')
+  {
+    const base = mkRace({ aidStations: [aid('a0', { restSeconds: 120 })], plan: { targetSeconds: null, kmPlans: [km(5, '')] } })
+    const mine = mkRace({ aidStations: [aid('a0', { restSeconds: 300 })], plan: { targetSeconds: null, kmPlans: [km(5, '')] } }) // owner changed aid rest
+    const theirs = mkRace({ aidStations: [aid('a0', { restSeconds: 120 })], plan: { targetSeconds: null, kmPlans: [km(5, 'downhill')] } }) // coach changed note
+    const r = await call({ op: 'merge', base, mine, theirs })
+    check('0 conflicts', r.conflicts.length === 0, JSON.stringify(r.conflicts))
+    check("owner's aid edit landed (rest 300)", aidById(r.merged, 'a0').restSeconds === 300, String(aidById(r.merged, 'a0').restSeconds))
+    check("coach's note landed (km5 = downhill)", kmNote(r.merged, 5) === 'downhill', kmNote(r.merged, 5))
+  }
+
+  console.log('merge: both edit the SAME km note → 1 conflict, resolve flips it')
+  {
+    const base = mkRace({ plan: { targetSeconds: null, kmPlans: [km(5, 'base')] } })
+    const mine = mkRace({ plan: { targetSeconds: null, kmPlans: [km(5, 'mine note')] } })
+    const theirs = mkRace({ plan: { targetSeconds: null, kmPlans: [km(5, 'their note')] } })
+    const r = await call({ op: 'merge', base, mine, theirs })
+    check('exactly 1 conflict', r.conflicts.length === 1, JSON.stringify(r.conflicts))
+    check('conflict is the km note', r.conflicts[0] && r.conflicts[0].label === 'Km 6 note', JSON.stringify(r.conflicts[0]))
+    check('merged defaults to mine', kmNote(r.merged, 5) === 'mine note', kmNote(r.merged, 5))
+    check('resolve(theirs) flips it to theirs', kmNote(r.resolvedAll, 5) === 'their note', kmNote(r.resolvedAll, 5))
+    // determinism: same inputs → same conflict set
+    const r2 = await call({ op: 'merge', base, mine, theirs })
+    check('deterministic', JSON.stringify(r.conflicts) === JSON.stringify(r2.conflicts))
+  }
+
+  console.log('merge: disjoint aid adds (fork-safe ids) → both present')
+  {
+    const base = mkRace({ aidStations: [aid('a0')], aidStationSeq: 1 })
+    const mine = mkRace({ aidStations: [aid('a0'), aid('a1-devmine', { distance: 2000 })], aidStationSeq: 2 })
+    const theirs = mkRace({ aidStations: [aid('a0'), aid('a1-devtheir', { distance: 3000 })], aidStationSeq: 2 })
+    const r = await call({ op: 'merge', base, mine, theirs })
+    check('0 conflicts on disjoint adds', r.conflicts.length === 0, JSON.stringify(r.conflicts))
+    check('both added aids present', JSON.stringify(aidIds(r.merged)) === JSON.stringify(['a0', 'a1-devmine', 'a1-devtheir']), JSON.stringify(aidIds(r.merged)))
+    check('aidStationSeq = max', r.merged.aidStationSeq === 2, String(r.merged.aidStationSeq))
+  }
+
+  console.log('merge: theirs removes an aid mine left alone → honoured (dropped, 0 conflicts)')
+  {
+    const base = mkRace({ aidStations: [aid('a0'), aid('a1', { distance: 5000 })], aidStationSeq: 2 })
+    const mine = mkRace({ aidStations: [aid('a0'), aid('a1', { distance: 5000 })], aidStationSeq: 2 })
+    const theirs = mkRace({ aidStations: [aid('a0')], aidStationSeq: 2 }) // removed a1
+    const r = await call({ op: 'merge', base, mine, theirs })
+    check('removed aid is gone', JSON.stringify(aidIds(r.merged)) === JSON.stringify(['a0']), JSON.stringify(aidIds(r.merged)))
+    check('0 conflicts for a clean remove', r.conflicts.length === 0, JSON.stringify(r.conflicts))
+  }
+
+  console.log('merge: disjoint scalar edits (name vs date) → 0 conflicts, both land')
+  {
+    const base = mkRace({ name: 'Base', date: '2026-01-01' })
+    const mine = mkRace({ name: 'My Name', date: '2026-01-01' })
+    const theirs = mkRace({ name: 'Base', date: '2026-09-09' })
+    const r = await call({ op: 'merge', base, mine, theirs })
+    check('0 conflicts', r.conflicts.length === 0, JSON.stringify(r.conflicts))
+    check('name = mine', r.merged.name === 'My Name', r.merged.name)
+    check('date = theirs', r.merged.date === '2026-09-09', r.merged.date)
+  }
+
+  console.log('classify: version-vector relations (Q4)')
+  {
+    const c = async (mine, theirs) => (await call({ op: 'classify', mine, theirs })).rel
+    check('equal → Same', (await c({ m: 1 }, { m: 1 })) === 'Same')
+    check('theirs ahead → FastForward', (await c({ m: 1 }, { m: 1, c: 1 })) === 'FastForward')
+    check('mine ahead → Behind', (await c({ m: 2 }, { m: 1 })) === 'Behind')
+    check('concurrent → Diverged', (await c({ m: 1, c: 1 }, { m: 1, x: 1 })) === 'Diverged')
+  }
+
   console.log('')
   if (failures === 0) {
-    console.log('PASS — course-freeze boundary holds')
+    console.log('PASS — course-freeze + three-way merge engine hold')
     process.exit(0)
   } else {
     console.log(`FAIL — ${failures} check(s) failed`)
