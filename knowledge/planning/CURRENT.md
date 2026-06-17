@@ -14,24 +14,28 @@
 **Notes:** scope cuts, links, anything decided while planning.
 ```
 
-### TASK-055 — Home view: personal vs others' + filter by person
+### TASK-056 — WI-3 (part 2): merge integration + suggestion-review UI (ships LAST)
 
-**Source:** BACKLOG (coach-collab arc, companion spec §1.5) — pulled in on the TASK-054 close (build order: 054 → **055** → 056).
-**Branch:** `feat/task-055-home-owner-view` (to create).
-**Depends on:** TASK-054 ✓ (`Race.owner`, `me`, the directory, `Identity.resolveName` all shipped).
+**Source:** BACKLOG (coach-collab arc; absorbs the dropped TASK-052). The arc's final piece — wire the TASK-050 engine into the app *and* build the human review surface.
+**Branch:** `feat/task-056-merge-ui` (to create).
+**Depends on:** TASK-050 (engine ✓), TASK-054 (identity / person-named labels ✓), TASK-055 (home owner view ✓). Design reference: `reference/merge-review-prototype.html` (take the UX/layout, not the markup; its "Coach" role labels are the seat-relative bug WI-5 fixes → person names).
+**GATED on Q-U1–Q-U5** (spec "Shared open questions") — *resolving with the user this session before implementing*, as Q1–Q5 / Q-I1–Q-I3 were. **ADR pending:** promote the §2.2 merge-UI reframe (suggestions / person-not-role / card list / no red-green) to an ADR when built.
 
-**Acceptance criteria (spec §1.5):**
-- [ ] Home view distinguishes **personal** from **someone else's** races by **`owner`, not last-editor** — a race you own that your coach edited still reads as yours. *(Manual: import a race as "someone else", confirm it lands in the others' group; edit one of your own, confirm it stays personal.)*
-- [ ] "Personal" = `owner == me.userId` **or** unstamped (`owner == ""`) **or** no identity yet (`me == Nothing`) — so a solo user's unshared local races all read as personal and the others' grouping stays empty (no empty scaffolding for the common case). *(Manual: fresh/solo instance shows exactly today's layout.)*
-- [ ] When others' races exist, the view **filters / groups by person** on `owner`, labelled from the directory (`Identity.resolveName`) — nothing hardcoded "coach"/"athlete". On a coach's device every athlete plan reads as someone-else's, filterable by athlete and separated from the coach's own. *(Manual: with ≥1 others' race, the person filter/grouping appears and works.)*
-- [ ] **Composes with the existing Plans/Executions split** (TASK-028) without regressing it. *(Manual: both cuts still work.)*
-- [ ] Headless gates green; the owner-based split + person filter verified in-browser (home view isn't headlessly exercisable, like the feed/flows).
+**Open questions to resolve first:** Q-U1 placement (modal vs wide drawer) · Q-U2 default stance (forced per-card choice vs pre-select "you") · Q-U3 same-field note overlap (pick-one vs hand-merge textarea; carried from engine Q5) · Q-U4 confirm-on-dismiss (only when picks exist? + copy) · Q-U5 course-anchored renderer = explicit v2 (v1 cards already carry km/location).
 
-**Design notes (to settle when implementing):** keep the common solo path byte-identical to today (no person UI until an others'-owned race exists); decide filter-chips vs per-person sections then. `owner == ""` is **personal** (unstamped local races are yours), not "unknown". Home view consumes `owner` read-only — no new stamping here (that's TASK-054's job, done).
+**Acceptance criteria (spec §2.6) — to finalize once Q-U land:**
+- [ ] **Integration:** persist `mergeBase : PlanningLayer` + `version : VersionVector` on `Race`; `.trail` carries `{ base, current, version }` (Q2, additive — `D.oneOf` defaults, no format bump); bump `version[deviceId]` on each local plan/aid/metadata commit; set/advance `mergeBase` at share/merge points. *(Smoke the version bump + base persistence; manual round-trip.)*
+- [ ] **Entry point:** importing a `.trail` whose `shareId` matches an existing local race (courseHash matches per WI-1) routes to **merge**, not import-as-new; `classifyVersions` → FastForward applies directly (no UI), Diverged → review, Behind → no-op, Same → no-op; handle the dup-shareId self-reimport edge. *(Manual: the 4 classify branches.)*
+- [ ] **Review surface:** only the true-collision residue shown + a one-line "M other changes from `<name>` were added automatically" reassurance; **two equal, person-named options** per card (You / `<name>`, no red/green, identity tint + ring/check), forced per-card choice (per Q-U2), Apply enabled only once every card is resolved. *(Manual.)*
+- [ ] **Apply path:** `Merge.resolve` fold → `withPlanningLayer` → save → bump version → emit WI-4 `Merged` entries (person-named via the directory). **Keep my version** + close both reject the whole import with no state change; confirm only when picks exist (per Q-U4). *(Manual.)*
+- [ ] Labels resolve via the WI-5 directory (nothing hardcoded "coach"/"athlete"); each card carries km/location (forward-compat for the Q-U5 v2 renderer); single-column / mobile-safe. *(Manual.)*
+- [ ] Headless gates green (engine paths smoke-covered where pure); the import→classify→review→apply flow verified in-browser (like the feed/flows).
+
+**Notes:** ships LAST per the locked build order. `authorId` (TASK-054) is the foundation for person-named `Merged` labels. Write per-type merge/apply concretely (the engine already exists); the UI is new. Mobile-first, single column (never side-by-side).
 
 ---
 
-**Arc state (2026-06-17):** companion spec ingested (#104) → TASK-052 dropped, folded into TASK-056 (#106) → Q-I1–Q-I3 resolved + **ADR-0012**. Build order TASK-054 ✓ → **TASK-055 (active)** → TASK-056 (last). Done: TASK-046–051, 053, **054** ✓. **Q-U1–Q-U5 still gate TASK-056** — resolve with the user before that surface.
+**Arc state (2026-06-17):** companion spec ingested (#104) → TASK-052 dropped, folded into TASK-056 (#106) → Q-I1–Q-I3 resolved + **ADR-0012**. Build order TASK-054 ✓ → TASK-055 ✓ → **TASK-056 (active, LAST)**. Done: TASK-046–051, 053, 054, **055** ✓. **Q-U1–Q-U5 gate TASK-056** — resolving with the user now.
 
 **Recommended in-browser checks (standing, pre-arc):** TASK-040 IDB round-trip; TASK-042 print preview; TASK-045 section table/card with a linked actual.
 
