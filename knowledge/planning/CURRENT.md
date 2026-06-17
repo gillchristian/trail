@@ -17,7 +17,7 @@
 ### TASK-054 — WI-5: identity & authorship (foundation)
 
 **Source:** BACKLOG (coach-collab arc, companion spec Part 1)
-**Branch:** ships as per-slice PRs (pure-core-first). **Slice 1 ✓ PR #109 · Slice 2 ✓ PR #110**; slices 3–4 next.
+**Branch:** ships as per-slice PRs (pure-core-first). **Slice 1 ✓ #109 · Slice 2 ✓ #110 · Slice 3 ✓ #112**; slice 4 (flows) next.
 **Decisions:** ADR-0012 — **Q-I1** *build the explicit link action* · **Q-I2** *dedicated IDB store* · **Q-I3** *names-only* (user, 2026-06-16).
 
 **Acceptance criteria:**
@@ -34,10 +34,10 @@
 **Implementation plan — pure-core-first, mirroring the TASK-050/052 split (verifiability):**
 1. ✓ **Slice 1 — pure `Identity` core** (PR #109): types + name-LWW register + the mint/adopt **decision** as pure fns + `subsetFor` + codecs; new `smoke:identity` (21 checks). Headless-verified; no existing code touched.
 2. ✓ **Slice 2 — `owner` on Race** (PR #110): `owner : String` (a userId) + encoder + `decodeRace` back-compat default + `buildDraftRace` seed; `smoke:trailsync` owner round-trip/default checks. Headless-verified; rides `encodeRace` so the `.trail` carries it.
-3. **Slice 3 — IDB identity store + boot** *(browser-verified)*: the dedicated `identity` store (DB v3→v4) + `Storage` ports + `main.js` handlers; load `me : Maybe Me` + `directory` into the model at boot; `.trail` name (`people`) denormalization + import-merge into the directory. Store mechanics → `smoke` (fake-indexeddb); real boot → browser.
-4. **Slice 4 — flows** *(browser-verified)*: export-mint name prompt; import yourself/someone-else (adopt / mint / review); `owner` backfill on touch/export; the **Q-I1 link action**; `resolveName` wired into labels.
+3. ✓ **Slice 3 — IDB identity store + boot** (PR #112): the dedicated `identity` store (DB v3→v4) + `Storage` ports + `main.js` handlers; `me : Maybe Me` + `directory` loaded into the model at boot. Headless-verified (storage smoke: v4 store + bundle round-trip + v3→v4 migration); real boot = the user's browser check. (`.trail` `people` denormalization moved to slice 4, where the import flow consumes it.)
+4. **Slice 4 — flows** *(browser-verified — next)*: export-mint name prompt; import yourself/someone-else (adopt / mint / review); `owner` backfill on touch/export; the **Q-I1 link action**; `.trail` `people` denormalization + import-merge; `resolveName` wired into labels (changelog author, owner display).
 
-**Progress (2026-06-16):** slices 1–2 shipped + fully headless-verified (all 8 smokes green). Inert at runtime by design (deferred-mint: `me`/owner appear only at first share); slices 3–4 make it live and need in-browser verification (IDB upgrade, boot, prompts, link action) — like the WI-4 feed.
+**Progress (2026-06-17):** slices 1–3 shipped + headless-verified (all 8 smokes green; DB now v4 with the identity store). Still inert at runtime by design (deferred-mint: `me`/owner appear only at first share) — **slice 4 makes it live + visible** and needs in-browser verification (the prompts, owner stamping, names, the link action), like the WI-4 feed. UX is specced in companion §1.4 + the prototype; will draft and the user verifies in-browser.
 
 **Notes:** `userId` layers **over** the existing `deviceId` — do **not** remove `deviceId` or re-key `entryId`/the version vector by `userId` (ADR-0012 grounding). Home view (TASK-055) consumes `owner` but is a separate task. No role badge (Q-I3).
 
