@@ -6,11 +6,12 @@
 // split + migration. This file MIRRORS src/main.js's IDB logic (it can't
 // `import` it — main.js imports Main.elm + CSS); keep the two in sync.
 //
-// Coverage: v4 store layout (incl. the WI-5 identity store), save-assigns-id,
+// Coverage: v5 store layout (incl. the WI-5 identity store), save-assigns-id,
 // ~3 MB round-trip, the v3 split (races row carries no gpxText; gpx lives in
 // its own row), the LIGHT (meta) save that leaves the gpx row untouched
-// (TASK-040's win), orphan-free delete, the identity bundle round-trip, and the
-// v2 -> v3 + v3 -> v4 migrations.
+// (TASK-040's win), orphan-free delete, the identity bundle round-trip, the
+// v2 -> v3 + v3 -> v4 migrations, and the v4 -> v5 self-heal of a DB left
+// without the identity store (interrupted upgrade / dev HMR).
 //
 // Run with: node scripts/smoke-storage.mjs
 
@@ -29,68 +30,47 @@ const SETTINGS_STORE = 'settings'
 const IDENTITY_STORE = 'identity'
 const IDENTITY_KEY = 'me'
 
-// --- v3 schema + migration: mirrors src/main.js onupgradeneeded ---
-function openV3(name) {
-  return new Promise((res, rej) => {
-    const req = indexedDB.open(name, 3)
-    req.onupgradeneeded = (event) => {
-      const db = req.result
-      const tx = event.target.transaction
-      if (!db.objectStoreNames.contains(RACES_STORE)) db.createObjectStore(RACES_STORE, { keyPath: 'id' })
-      if (!db.objectStoreNames.contains(SETTINGS_STORE)) db.createObjectStore(SETTINGS_STORE, { keyPath: 'key' })
-      if (!db.objectStoreNames.contains(GPX_STORE)) {
-        db.createObjectStore(GPX_STORE, { keyPath: 'id' })
-        const racesStore = tx.objectStore(RACES_STORE)
-        const gpxStore = tx.objectStore(GPX_STORE)
-        racesStore.openCursor().onsuccess = (e) => {
-          const cursor = e.target.result
-          if (!cursor) return
-          const race = cursor.value
-          if (race && typeof race.gpxText === 'string') {
-            gpxStore.put({ id: race.id, gpxText: race.gpxText })
-            const { gpxText, ...meta } = race
-            cursor.update(meta)
-          }
-          cursor.continue()
-        }
+// --- shared migration, mirroring src/main.js onupgradeneeded ---
+// `withIdentity = false` reproduces a pre-WI-5 (v3) handler, or a *poisoned* v4
+// whose identity store-creation never ran — used below to test the heal.
+function migrate(db, tx, withIdentity) {
+  if (!db.objectStoreNames.contains(RACES_STORE)) db.createObjectStore(RACES_STORE, { keyPath: 'id' })
+  if (!db.objectStoreNames.contains(SETTINGS_STORE)) db.createObjectStore(SETTINGS_STORE, { keyPath: 'key' })
+  if (!db.objectStoreNames.contains(GPX_STORE)) {
+    db.createObjectStore(GPX_STORE, { keyPath: 'id' })
+    const racesStore = tx.objectStore(RACES_STORE)
+    const gpxStore = tx.objectStore(GPX_STORE)
+    racesStore.openCursor().onsuccess = (e) => {
+      const cursor = e.target.result
+      if (!cursor) return
+      const race = cursor.value
+      if (race && typeof race.gpxText === 'string') {
+        gpxStore.put({ id: race.id, gpxText: race.gpxText })
+        const { gpxText, ...meta } = race
+        cursor.update(meta)
       }
+      cursor.continue()
     }
+  }
+  if (withIdentity && !db.objectStoreNames.contains(IDENTITY_STORE)) db.createObjectStore(IDENTITY_STORE, { keyPath: 'key' })
+}
+
+function open(name, version, withIdentity = true) {
+  return new Promise((res, rej) => {
+    const req = indexedDB.open(name, version)
+    req.onupgradeneeded = (event) => migrate(req.result, event.target.transaction, withIdentity)
     req.onsuccess = () => res(req.result)
     req.onerror = () => rej(req.error)
   })
 }
 
-// --- v4 schema: v3 + a dedicated identity store; mirrors src/main.js (WI-5) ---
-function openV4(name) {
-  return new Promise((res, rej) => {
-    const req = indexedDB.open(name, 4)
-    req.onupgradeneeded = (event) => {
-      const db = req.result
-      const tx = event.target.transaction
-      if (!db.objectStoreNames.contains(RACES_STORE)) db.createObjectStore(RACES_STORE, { keyPath: 'id' })
-      if (!db.objectStoreNames.contains(SETTINGS_STORE)) db.createObjectStore(SETTINGS_STORE, { keyPath: 'key' })
-      if (!db.objectStoreNames.contains(GPX_STORE)) {
-        db.createObjectStore(GPX_STORE, { keyPath: 'id' })
-        const racesStore = tx.objectStore(RACES_STORE)
-        const gpxStore = tx.objectStore(GPX_STORE)
-        racesStore.openCursor().onsuccess = (e) => {
-          const cursor = e.target.result
-          if (!cursor) return
-          const race = cursor.value
-          if (race && typeof race.gpxText === 'string') {
-            gpxStore.put({ id: race.id, gpxText: race.gpxText })
-            const { gpxText, ...meta } = race
-            cursor.update(meta)
-          }
-          cursor.continue()
-        }
-      }
-      if (!db.objectStoreNames.contains(IDENTITY_STORE)) db.createObjectStore(IDENTITY_STORE, { keyPath: 'key' })
-    }
-    req.onsuccess = () => res(req.result)
-    req.onerror = () => rej(req.error)
-  })
-}
+const openV3 = (name) => open(name, 3, false) // v3 predates the identity store
+const openV4 = (name) => open(name, 4)
+const openV5 = (name) => open(name, 5)
+// A v4 DB whose identity store-creation never ran (an interrupted upgrade, or in
+// dev an HMR reload that caught the v4 version bump a beat before the
+// store-creation landed). Reopening at v5 re-runs the additive migration → heal.
+const openPoisonedV4 = (name) => open(name, 4, false)
 
 // --- the pre-split v2 schema: races + settings only, gpxText inline ---
 function openV2(name) {
@@ -159,8 +139,10 @@ function deleteRace(db, id) {
   })
 }
 
-// identity bundle: single row keyed IDENTITY_KEY; null until first mint (WI-5)
+// identity bundle: single row keyed IDENTITY_KEY; null until first mint (WI-5).
+// Mirrors main.js's guard: a missing store degrades to null, never throws.
 function loadIdentity(db) {
+  if (!db.objectStoreNames.contains(IDENTITY_STORE)) return Promise.resolve(null)
   return new Promise((res, rej) => {
     const tx = db.transaction(IDENTITY_STORE, 'readonly')
     const req = tx.objectStore(IDENTITY_STORE).get(IDENTITY_KEY)
@@ -224,10 +206,10 @@ const draft = {
   plan: { targetSeconds: null, kmPlans: [] },
 }
 
-const db = await openV4('trail')
+const db = await openV5('trail')
 
-// 0. v4 creates the dedicated identity store (WI-5 / TASK-054).
-assertEq(db.objectStoreNames.contains(IDENTITY_STORE), true, 'v4 creates the identity store')
+// 0. the schema creates the dedicated identity store (WI-5 / TASK-054).
+assertEq(db.objectStoreNames.contains(IDENTITY_STORE), true, 'schema creates the identity store')
 
 // 1. Empty DB → loadAll returns [].
 assertEq((await loadAll(db)).length, 0, 'empty DB returns []')
@@ -340,4 +322,24 @@ assertEq(await loadIdentity(db), null, 'identity store starts empty (loadIdentit
   assertEq(await loadIdentity(v4), null, 'identity store empty after migration')
 }
 
-console.log('\nSMOKE PASSED · v4 schema incl. the identity store, v3 GPX split, light (meta) save, orphan-free delete, and v2→v3 + v3→v4 migrations all round-trip — including UTMB-size payloads.')
+// 12. SELF-HEAL: a v4 DB that's missing the identity store (interrupted upgrade
+//     / dev HMR) gets it back on reopen at v5 — additively, no data loss — and
+//     loadIdentity degrades to null (not a throw) while the store is absent.
+{
+  const name = 'trail-poisoned-v4'
+  const poisoned = await openPoisonedV4(name)
+  const rid = webcrypto.randomUUID()
+  await saveRace(poisoned, { ...draft, id: rid, name: 'Survivor', gpxText: small })
+  await putRaw(poisoned, SETTINGS_STORE, { key: 'activeProfile', value: { keep: 1 } })
+  assertEq(poisoned.objectStoreNames.contains(IDENTITY_STORE), false, 'poisoned v4 lacks the identity store')
+  assertEq(await loadIdentity(poisoned), null, 'loadIdentity degrades to null on the missing store (no throw)')
+  poisoned.close()
+
+  const healed = await openV5(name)
+  assertEq(healed.objectStoreNames.contains(IDENTITY_STORE), true, 'reopen at v5 heals: identity store created')
+  assertEq((await loadAll(healed)).find(r => r.id === rid)?.gpxText, small, 'heal preserved races + gpx')
+  assertEq((await getRaw(healed, SETTINGS_STORE, 'activeProfile')).value.keep, 1, 'heal preserved settings')
+  assertEq(await loadIdentity(healed), null, 'healed identity store is present + empty')
+}
+
+console.log('\nSMOKE PASSED · v5 schema incl. the identity store, the v4→v5 self-heal of a missing store, v3 GPX split, light (meta) save, orphan-free delete, and v2→v3 + v3→v4 migrations all round-trip — including UTMB-size payloads.')
