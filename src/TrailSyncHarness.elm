@@ -10,8 +10,10 @@ Three ops, dispatched on a `"op"` field:
 
   - `hash`     → `{ hash }` for a GPX string (`TrailSync.courseHashFromGpxText`)
   - `classify` → `{ verdict, message }` for an incoming/target identity pair
-  - `decode`   → `{ ok, shareId, courseHash, owner, name, peopleCount }` for a `.trail`
-                 (`peopleCount` = the denormalized WI-5 name pairs the doc carries)
+  - `decode`   → `{ ok, shareId, courseHash, owner, name, peopleCount, versionCount,
+                 baseName }` for a `.trail` (`peopleCount` = the denormalized WI-5
+                 name pairs; `versionCount`/`baseName` = the WI-3 merge state — the
+                 version-vector size + the merge-ancestor's name, TASK-056)
 
 -}
 
@@ -139,6 +141,12 @@ handleDecode v =
                         , ( "owner", E.string race.owner )
                         , ( "name", E.string race.name )
                         , ( "peopleCount", E.int (Dict.size people) )
+                        , ( "versionCount", E.int (Dict.size race.version) )
+                        , ( "baseName"
+                          , race.mergeBase
+                                |> Maybe.map (\b -> E.string b.name)
+                                |> Maybe.withDefault E.null
+                          )
                         ]
 
 

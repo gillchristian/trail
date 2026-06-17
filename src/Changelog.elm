@@ -13,8 +13,9 @@ state; delete the whole history and a merge still works (ADR-0009). The merge
 The typed `ChangeDescriptor` / `ChangeEntry` and their codecs live in `Types`
 (so `Race` can carry the history without an import cycle); this module produces
 entries by a pure two-way `diff` of the mergeable planning layer
-(`Merge.PlanningLayer`), so a local commit logs `diff before after` and a merge
-(TASK-052) will log the diff it applied — no parallel diff engine.
+(`Types.PlanningLayer` — also defined there so `Race.mergeBase` can hold one),
+so a local commit logs `diff before after` and a merge (TASK-056) will log the
+diff it applied — no parallel diff engine.
 
 `diff` only emits the spec's taxonomy (aid stations, per-km note/pace, race
 name/date). Target-time, location, url and notes changes produce no descriptor —
@@ -24,7 +25,6 @@ descriptor→icon/phrasing mapping is a view concern and lives in `Main`.
 -}
 
 import Dict
-import Merge exposing (PlanningLayer)
 import Types
     exposing
         ( AidStation
@@ -33,6 +33,7 @@ import Types
         , KmPlan
         , KmTime(..)
         , Plan
+        , PlanningLayer
         )
 
 
