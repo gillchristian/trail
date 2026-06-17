@@ -2183,3 +2183,96 @@ store-creation, poisoning the DB. Land such edits atomically (or pause the dev
 server).
 
 **Next:** unchanged — slice 4 (the flows) is the remaining, visible piece.
+
+---
+## 2026-06-17 — TASK-054 (WI-5): slice 4 — flows (DONE, task complete)
+
+**Task:** the last slice of TASK-054 — make the identity foundation live + visible
+(user: "continue with Slice 4"). Slices 1–3 + the boot fix had shipped the pure
+core, `owner`, the IDB store, and boot loading; everything was inert by design
+(deferred mint). This slice wired the flows. **PR #116, merged `a3509ef`** →
+TASK-054 complete.
+
+**What I shipped (slice 4):**
+- **Mint discipline (AC1).** Export with no identity → a "What's your name?"
+  modal → mint a `userId`, stamp `owner`, export. Import-as-someone-else with no
+  identity → name modal → mint. The "yourself" path **adopts** the file's owner
+  id, never mints.
+- **Import branching (AC6).** `Identity.decideImport`/`resolveOwnership` drive a
+  `FlowOwnership` prompt: a file I own imports silently; owner ≠ me asks
+  yourself (adopt) / someone-else (review, minting if I have no identity). A
+  no-owner / v1 file adopts me on touch (AC3), no prompt.
+- **Q-I1 link action (AC8).** "Yourself" when I already have a *different*
+  identity → an explicit `FlowLink` confirm → adopt the file's id **and re-own my
+  local races** old-id→new-id (one fold builds the new list + the saves so they
+  can't drift). Plain adopt only when `me == Nothing`.
+- **`owner` backfill (AC3)** on first touch — in `commitRaceEdit` (any edit) and
+  at export — once an identity exists.
+- **`.trail` `people` (AC5/AC7).** `ProjectFile.encode` embeds
+  `Identity.subsetFor (owner :: authorIds) directory`; `decode` now returns
+  `(Race, Directory)`; import LWW-merges it. Signatures rippled to
+  `TrailSyncHarness`.
+- **Names into labels (AC4).** `ChangeEntry` gained a person-level `authorId`
+  (the `author`/`deviceId` field stays the entryId key — ADR-0012); `authorLabel`
+  resolves it through the directory, **retiring the seat-relative "Coach"** (the
+  exact bug WI-5 exists to fix). A "Plan by `<name>`" line on the race detail and
+  a rename card on `#/profile` (one directory row relabels every owned race).
+
+**Key design decisions (recorded in CURRENT.md before coding):**
+- **UUID mint via flags, not a port** — `newUserId = crypto.randomUUID()` rides
+  in flags; consumed ≤ once because both mint points gate on `me == Nothing`.
+  Keeps the mint flow synchronous (no async port state). Mirrors `deviceId`.
+- **Prompt state machine pauses the import** — the decoded draft + the file's
+  `people` + the resolved owner name live in `identityFlow`; the directory is
+  merged + the race saved **only on completion**, so cancel = no state change.
+- **Self-rename uses a strictly-monotonic stamp** (`max now (prev+1)`): `model.now`
+  is frozen at boot (as the changelog uses it), so a same-session rename would
+  otherwise tie and never propagate to an importer's LWW register.
+
+**The maze (what I considered + rejected):** minting the UUID via an async port
+(carrying a continuation) — rejected for the synchronous flags candidate (less
+compile-only surface). Re-keying `entryId` by `userId` — rejected (ADR-0012:
+two of one person's devices would collide on their local seq and the WI-4 union
+would silently drop entries); hence the *separate* `authorId` field. Deferring
+the changelog `authorId` to TASK-056 — rejected because the feed's "Coach" is
+the canonical WI-5 bug and 056 needs `authorId` anyway.
+
+**Independent review before hand-off.** Ran a multi-angle code review (line-scan,
+removed-behavior, cross-file, cleanup/altitude) over the diff and applied the
+real findings: (1) **adopt could leave my own identity absent from the directory**
+if a file under-denormalized → generalized the fix into `completeImport`, which
+now guarantees my id has a directory row after any import (also closes an
+empty-`people` export edge); (2) `authorLabel`'s legacy branch was resolving a
+`deviceId` through a `userId`-keyed dict (always "Someone") → made it explicit;
+(3) removed dead cross-flow `renameDraft` resets; (4) collapsed the `LinkConfirm`
+double-walk; (5) dropped a dead `navCmd` if/else. Rejected: the no-owner→claim
+path (that's AC3 by design) and the eager-`ownerName`-merge (tiny dicts).
+
+**Verified (headless, all green):**
+```
+type-check  Success!
+build       ✓ built
+smoke (8):  storage (v5) · aidcsv · sections · calibration ·
+            trailsync (+ new people round-trip) · changelog · identity · merge
+```
+The trailsync smoke gained `people` coverage: a v2 doc decodes its denormalized
+people (count), v1 defaults to none, and a re-export denormalizes the owner back
+into `people`. **In-browser: the user verified the flows work** ("All seems to
+work so far") — the prompts, mint, owner stamping, names, the link action — the
+unverifiable-by-me UI case, so I held the PR for their check (as TASK-051) then
+merged on their go-ahead.
+
+**Scope held for later:** import still creates a *new* race — the merge entry
+point + suggestion-review UI is **TASK-056** (which also populates `Merged`
+author labels; `authorId` is the foundation those need). A `.trail` with `owner`
+set but `people` stripped (this build never produces it) degrades a name to
+"Someone"/"Me" rather than crashing.
+
+**Delivery:** PR #116, merged `a3509ef`. Close PR (this entry + DONE move +
+BACKLOG tick + TASK-055 pulled into CURRENT): `docs/task-054-close`.
+
+**Next:** **TASK-055 — home view: personal vs others' + filter by person**
+(build order 054 ✓ → 055 → 056). Pulled into CURRENT with acceptance criteria.
+The common solo path must stay byte-identical to today (no person UI until an
+others'-owned race exists); `owner == ""` reads as personal. Then TASK-056 (merge
+UI, last) — still gated on Q-U1–Q-U5, to resolve with the user.
