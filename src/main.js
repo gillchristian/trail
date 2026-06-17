@@ -7,7 +7,13 @@ import { Elm } from './Main.elm'
 // ============================================================
 
 const DB_NAME = 'trail'
-const DB_VERSION = 4
+// v5 is schema-identical to v4. The bump exists only to re-run the additive,
+// idempotent migration so a DB left at v4 *without* the `identity` store heals on
+// next load with no data loss — e.g. an upgrade interrupted before its
+// createObjectStore ran, or (in dev) an HMR reload that applied the v4 version
+// bump a beat before the identity store-creation landed. onupgradeneeded fires
+// only on a version change, hence the bump. (WI-5 / TASK-054.)
+const DB_VERSION = 5
 const RACES_STORE = 'races'
 const GPX_STORE = 'gpx'
 const SETTINGS_STORE = 'settings'
@@ -182,6 +188,9 @@ async function saveStravaToken(token) {
 // settings-style single-row load/save.
 async function loadIdentity() {
   const db = await dbPromise
+  // Degrade gracefully if the store is somehow absent (it shouldn't be, given
+  // the version-bump heal above) — "no identity yet" rather than a boot error.
+  if (!db.objectStoreNames.contains(IDENTITY_STORE)) return null
   return new Promise((resolve, reject) => {
     const tx = db.transaction(IDENTITY_STORE, 'readonly')
     const req = tx.objectStore(IDENTITY_STORE).get(IDENTITY_KEY)
@@ -311,23 +320,33 @@ app.ports.storageSaveStravaToken.subscribe(async (token) => {
   }
 })
 
-app.ports.storageLoadIdentity.subscribe(async () => {
-  try {
-    const identity = await loadIdentity()
-    app.ports.storageIdentityLoaded.send(identity)
-  } catch (e) {
-    app.ports.storageError.send(`loadIdentity: ${e?.message || e}`)
-  }
-})
+// Guard the identity subscriptions: an outgoing Elm port that isn't *used* yet
+// (here `storageSaveIdentity` — saving identity lands with the WI-5 flows slice)
+// is stripped by Elm's dead-code elimination, so `app.ports.storageSaveIdentity`
+// is `undefined` and an unguarded `.subscribe` would throw and abort the rest of
+// the port wiring (downloadFile, print, …). The guard wires each only once Elm
+// actually exposes it; when the flows slice uses `saveIdentity`, it lights up.
+if (app.ports.storageLoadIdentity) {
+  app.ports.storageLoadIdentity.subscribe(async () => {
+    try {
+      const identity = await loadIdentity()
+      app.ports.storageIdentityLoaded.send(identity)
+    } catch (e) {
+      app.ports.storageError.send(`loadIdentity: ${e?.message || e}`)
+    }
+  })
+}
 
-app.ports.storageSaveIdentity.subscribe(async (identity) => {
-  try {
-    await saveIdentity(identity)
-    app.ports.storageIdentityLoaded.send(identity)
-  } catch (e) {
-    app.ports.storageError.send(`saveIdentity: ${e?.message || e}`)
-  }
-})
+if (app.ports.storageSaveIdentity) {
+  app.ports.storageSaveIdentity.subscribe(async (identity) => {
+    try {
+      await saveIdentity(identity)
+      app.ports.storageIdentityLoaded.send(identity)
+    } catch (e) {
+      app.ports.storageError.send(`saveIdentity: ${e?.message || e}`)
+    }
+  })
+}
 
 app.ports.downloadFile.subscribe(({ filename, content, mime }) => {
   const blob = new Blob([content], { type: mime || 'application/octet-stream' })
