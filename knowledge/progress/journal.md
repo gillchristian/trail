@@ -2276,3 +2276,53 @@ BACKLOG tick + TASK-055 pulled into CURRENT): `docs/task-054-close`.
 The common solo path must stay byte-identical to today (no person UI until an
 others'-owned race exists); `owner == ""` reads as personal. Then TASK-056 (merge
 UI, last) — still gated on Q-U1–Q-U5, to resolve with the user.
+
+---
+## 2026-06-17 — TASK-055: home view by owner (personal vs others')
+
+**Task:** the second identity/UI task (spec §1.5), straight after TASK-054.
+Distinguish your races from someone else's on the home view — **by `owner`, not
+last-editor**. **PR #118, merged `01f7a4f`.**
+
+**What I shipped:** a pure `isMyRace : Maybe Me -> Race -> Bool` (mine =
+`owner == me.userId`, or unstamped `""`, or no identity yet) and a refactor of
+`viewRaceSections`:
+- **Solo / common case (no others'-owned races): byte-identical to before** —
+  the Plans/Executions split, untouched. This was the design priority (most
+  users are solo; a coach-edited race you own still reads as yours, so even an
+  athlete with a coach stays "solo" on the home view).
+- **Coach case (you hold others' races): group by person** — "Your races"
+  first, then one group per other owner, named via the directory and sorted by
+  name, each keeping its Plans/Executions split. The old `viewRaceSections`
+  body became a reusable `viewPlansExecutions`.
+
+**Decision — grouping, not filter-chips (the maze).** Considered a stateful
+person-filter (chips: Everyone / You / `<name>`), but it needs model state + a
+Msg and a default-selection choice. Grouping is **stateless** (a pure partition +
+`Dict`-by-owner), directly realizes §1.5's "cleanly separated," and keeps the
+solo path a no-op. A filter is a clean fast-follow on top if wanted. Also chose
+**not** to add an owner label to the race *card* — the group header carries the
+owner, and the detail page already shows "Plan by `<name>`".
+
+**One compile snag worth noting:** replacing the `viewRaceSections` *body* left
+its old doc-comment dangling directly above the new `isMyRace` doc-comment — two
+`{-| -}` blocks with no declaration between them → Elm "UNEXPECTED SYMBOL { …
+expect a declaration". Fixed by removing the orphan (folded its
+Plans/Executions-cut rationale into `viewPlansExecutions`). Lesson: when
+replacing a function, check whether its preceding doc comment is in or out of the
+replaced span.
+
+**Verified:** type-check `Success!`, build `✓ built`, all 8 smokes PASS
+(view-only change — regression guard; no module logic/harness touched). The
+owner-based split + directory-named grouping confirmed **in-browser by the user**
+("055 is good to go") — the unverifiable-by-me layout case, held for their check
+then merged.
+
+**Delivery:** PR #118, merged `01f7a4f`. Close PR (this entry + DONE/BACKLOG +
+TASK-056 pulled into CURRENT): `docs/task-055-close`.
+
+**Next:** **TASK-056 — WI-3 part 2: merge integration + suggestion-review UI**,
+the arc's LAST task (absorbs the dropped TASK-052). **Gated on Q-U1–Q-U5** —
+resolving with the user now (placement / default stance / text-overlap handling /
+confirm-on-dismiss / course-anchored = v2), as Q1–Q5 and Q-I1–Q-I3 were. Then
+write the §2.2 merge-UI-reframe ADR and build it (engine exists; the UI is new).
