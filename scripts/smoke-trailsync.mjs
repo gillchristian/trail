@@ -11,7 +11,11 @@
 //     still rejects an unknown version (owner: WI-5 / TASK-054 / ADR-0012);
 //   - the v2 doc carries denormalized name `people` (Identity.subsetFor over the
 //     owner + change authors): decode recovers them, v1 defaults to none, and a
-//     re-export denormalizes the owner back into `people` (WI-5 / TASK-054).
+//     re-export denormalizes the owner back into `people` (WI-5 / TASK-054);
+//   - the v2 doc carries the WI-3 merge state — `version` (the version vector) +
+//     `mergeBase` (the merge ancestor, a nested PlanningLayer): decode recovers
+//     both, v1 defaults to empty/none, and they survive a re-export round-trip
+//     (WI-3 part 2 / TASK-056 / ADR-0013).
 // (Foundation guard for the coach-collaboration arc, TASK-047 / ADR-0010.)
 //
 // Run with: node scripts/smoke-trailsync.mjs
@@ -94,7 +98,12 @@ const raceCore = {
 }
 const trailV2 = JSON.stringify({
   format: 'trail-project', version: 2,
-  race: { ...raceCore, shareId: 'share-xyz', courseHash: 'hash-abc', owner: 'user-42' },
+  race: {
+    ...raceCore, shareId: 'share-xyz', courseHash: 'hash-abc', owner: 'user-42',
+    // WI-3 merge state (TASK-056): version vector + the merge ancestor.
+    version: { 'dev-1': 3 },
+    mergeBase: { name: 'Base name', date: null, location: '', url: '', notes: '', aidStations: [], aidStationSeq: 0, plan: { targetSeconds: null, kmPlans: [] } },
+  },
   // WI-5: the denormalized name pairs the file references (here, the owner).
   people: [{ userId: 'user-42', displayName: 'Alex', nameUpdatedAt: 100 }],
 })
@@ -150,6 +159,8 @@ const run = async () => {
     check('v2 preserves courseHash', r.courseHash === 'hash-abc', r.courseHash)
     check('v2 preserves owner (WI-5)', r.owner === 'user-42', JSON.stringify(r.owner))
     check('v2 decodes the denormalized people (WI-5)', r.peopleCount === 1, JSON.stringify(r.peopleCount))
+    check('v2 decodes the version vector (WI-3 / TASK-056)', r.versionCount === 1, JSON.stringify(r.versionCount))
+    check('v2 decodes the merge ancestor (WI-3 / TASK-056)', r.baseName === 'Base name', JSON.stringify(r.baseName))
   }
   {
     const r = await call({ op: 'decode', trail: trailV1 })
@@ -158,6 +169,8 @@ const run = async () => {
     check('v1 courseHash defaults to ""', r.courseHash === '', JSON.stringify(r.courseHash))
     check('v1 owner defaults to "" (WI-5 back-compat)', r.owner === '', JSON.stringify(r.owner))
     check('v1 has no people (defaults empty, WI-5 back-compat)', r.peopleCount === 0, JSON.stringify(r.peopleCount))
+    check('v1 has empty version (back-compat default)', r.versionCount === 0, JSON.stringify(r.versionCount))
+    check('v1 has no merge ancestor (back-compat default)', r.baseName === null, JSON.stringify(r.baseName))
     check('v1 race body still read (name)', r.name === 'Demo Race', r.name)
   }
   {
@@ -179,6 +192,7 @@ const run = async () => {
     const back = await call({ op: 'decode', trail: encoded })
     check('encode→decode round-trip preserves identity + owner', back.shareId === 'share-xyz' && back.courseHash === 'hash-abc' && back.owner === 'user-42', JSON.stringify(back))
     check('encode→decode round-trip preserves people (WI-5)', back.peopleCount === 1, JSON.stringify(back.peopleCount))
+    check('encode→decode round-trip preserves merge state (WI-3)', back.versionCount === 1 && back.baseName === 'Base name', JSON.stringify({ v: back.versionCount, b: back.baseName }))
   }
   {
     // A v1 doc re-exports as v2 (the version is the build's currentVersion).

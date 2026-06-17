@@ -6,6 +6,7 @@ module Types exposing
     , KmPlan
     , KmTime(..)
     , Plan
+    , PlanningLayer
     , Race
     , RaceId
     , Service(..)
@@ -235,6 +236,14 @@ pattern: defaults to `""` for pre-identity races / v1 files, rides in
 `raceMetaFields`, and is stamped once a device identity exists (the flows slice of
 TASK-054; cf. how `shareId`/`courseHash` were backfilled in TASK-053).
 
+`mergeBase` + `version` (WI-3 part 2 / TASK-056, ADR-0013) are the three-way-merge
+state: `mergeBase` is the last-synced common ancestor (the `PlanningLayer` you last
+shared/merged from; `Nothing` until a first share), and `version` is the per-device
+edit-count vector (`Merge.VersionVector` = `Dict deviceId Int`) that classifies a
+returned `.trail` as fast-forward vs divergent. Both ride `raceMetaFields` (so the
+`.trail` carries `{ base, current, version }`) with `D.oneOf` back-compat defaults
+(`Nothing` / empty). Inert until the merge entry point lands (slice 2).
+
 -}
 type alias Race =
     { id : RaceId
@@ -257,6 +266,8 @@ type alias Race =
     , courseHash : String
     , owner : String
     , history : List ChangeEntry
+    , mergeBase : Maybe PlanningLayer
+    , version : Dict String Int
     }
 
 
@@ -323,6 +334,55 @@ withKmPlan index kp plan =
 withTargetSeconds : Maybe Int -> Plan -> Plan
 withTargetSeconds t plan =
     { plan | targetSeconds = t }
+
+
+
+-- PLANNING LAYER (WI-2/WI-3) — the mergeable subset of a Race
+--
+-- The type alias lives here (not in `Merge`) so `Race.mergeBase` can hold one
+-- without an import cycle (`Merge` imports `Types`) — the same split used for
+-- `ChangeEntry`. The merge *logic* (project/rebuild/three-way) stays in `Merge`,
+-- which imports this. Codecs are here too, used by the Race encoder to carry the
+-- merge ancestor in `.trail` + IDB (TASK-056 / ADR-0013).
+
+
+type alias PlanningLayer =
+    { name : String
+    , date : Maybe String
+    , location : String
+    , url : String
+    , notes : String
+    , aidStations : List AidStation
+    , aidStationSeq : Int
+    , plan : Plan
+    }
+
+
+encodePlanningLayer : PlanningLayer -> Value
+encodePlanningLayer pl =
+    E.object
+        [ ( "name", E.string pl.name )
+        , ( "date", maybeString pl.date )
+        , ( "location", E.string pl.location )
+        , ( "url", E.string pl.url )
+        , ( "notes", E.string pl.notes )
+        , ( "aidStations", E.list encodeAidStation pl.aidStations )
+        , ( "aidStationSeq", E.int pl.aidStationSeq )
+        , ( "plan", planToValue pl.plan )
+        ]
+
+
+planningLayerDecoder : Decoder PlanningLayer
+planningLayerDecoder =
+    D.map8 PlanningLayer
+        (D.field "name" D.string)
+        (D.field "date" (D.nullable D.string))
+        (D.field "location" D.string)
+        (D.field "url" D.string)
+        (D.field "notes" D.string)
+        (D.oneOf [ D.field "aidStations" (D.list decodeAidStation), D.succeed [] ])
+        (D.oneOf [ D.field "aidStationSeq" D.int, D.succeed 0 ])
+        (D.oneOf [ D.field "plan" planFromValue, D.succeed defaultPlan ])
 
 
 
@@ -543,6 +603,15 @@ raceMetaFields r =
     , ( "courseHash", E.string r.courseHash )
     , ( "owner", E.string r.owner )
     , ( "history", E.list encodeChangeEntry r.history )
+    , ( "mergeBase"
+      , case r.mergeBase of
+            Just pl ->
+                encodePlanningLayer pl
+
+            Nothing ->
+                E.null
+      )
+    , ( "version", E.dict identity E.int r.version )
     ]
 
 
@@ -728,15 +797,24 @@ decodeRace =
     -- Overlay the `.trail`-sharing identity + owner onto the core race,
     -- defaulting each to "" / [] for v1 files / pre-existing IDB races
     -- (TASK-047 / ADR-0010; owner: TASK-054 / ADR-0012).
-    D.map5
-        (\race shareId courseHash owner history ->
-            { race | shareId = shareId, courseHash = courseHash, owner = owner, history = history }
+    D.map7
+        (\race shareId courseHash owner history mergeBase version ->
+            { race
+                | shareId = shareId
+                , courseHash = courseHash
+                , owner = owner
+                , history = history
+                , mergeBase = mergeBase
+                , version = version
+            }
         )
         raceCoreDecoder
         (D.oneOf [ D.field "shareId" D.string, D.succeed "" ])
         (D.oneOf [ D.field "courseHash" D.string, D.succeed "" ])
         (D.oneOf [ D.field "owner" D.string, D.succeed "" ])
         (D.oneOf [ D.field "history" (D.list changeEntryDecoder), D.succeed [] ])
+        (D.oneOf [ D.field "mergeBase" (D.nullable planningLayerDecoder), D.succeed Nothing ])
+        (D.oneOf [ D.field "version" (D.dict D.int), D.succeed Dict.empty ])
 
 
 raceCoreDecoder : Decoder Race
@@ -799,8 +877,9 @@ coreBuilder :
     -> (Float -> Float -> String -> Int -> List AidStation -> Int -> Plan -> Maybe ActualSplits -> Race)
 coreBuilder id name date location url notes cover dist =
     \gain loss gpx ts aids seq plan actual ->
-        -- shareId / courseHash / owner are overlaid by `decodeRace` (with
-        -- back-compat defaults); placeholders here keep this a complete `Race`.
+        -- shareId / courseHash / owner / history / mergeBase / version are
+        -- overlaid by `decodeRace` (with back-compat defaults); placeholders here
+        -- keep this a complete `Race`.
         { id = id
         , name = name
         , date = date
@@ -821,6 +900,8 @@ coreBuilder id name date location url notes cover dist =
         , courseHash = ""
         , owner = ""
         , history = []
+        , mergeBase = Nothing
+        , version = Dict.empty
         }
 
 

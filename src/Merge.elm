@@ -3,7 +3,6 @@ module Merge exposing
     , Conflict
     , ConflictKey(..)
     , MergeResult
-    , PlanningLayer
     , VersionRel(..)
     , VersionVector
     , bumpVersion
@@ -48,7 +47,7 @@ owner-only (Q3) — they're not in `PlanningLayer` at all.
 -}
 
 import Dict exposing (Dict)
-import Types exposing (AidStation, KmPlan, Plan, Race, emptyKmPlan, sortAidStations)
+import Types exposing (AidStation, KmPlan, Plan, PlanningLayer, Race, emptyKmPlan, sortAidStations)
 
 
 {-| Mint a fork-collision-safe aid-station id (TASK-049, ADR-0009 grounding #2).
@@ -80,22 +79,9 @@ mintAidId deviceId seq =
         bare ++ "-" ++ tag
 
 
-{-| The mergeable subset of a `Race`. Excludes the frozen course, the identity
-fields, and the owner-only `coverImage` / `actualSplits`.
--}
-type alias PlanningLayer =
-    { name : String
-    , date : Maybe String
-    , location : String
-    , url : String
-    , notes : String
-    , aidStations : List AidStation
-    , aidStationSeq : Int
-    , plan : Plan
-    }
-
-
-{-| Project the mergeable planning layer out of a race.
+{-| Project the mergeable planning layer out of a race. `PlanningLayer` (the
+mergeable subset of a `Race` — no frozen course, no identity/owner-only fields)
+is defined in `Types` so `Race.mergeBase` can hold one without an import cycle.
 -}
 planningLayer : Race -> PlanningLayer
 planningLayer race =

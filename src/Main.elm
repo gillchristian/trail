@@ -1132,16 +1132,22 @@ update msg model =
                                 stamped =
                                     TrailSync.ensureIdentity owned
 
+                                -- Record the shared state as the merge ancestor
+                                -- (the share point), so a returned `.trail` merges
+                                -- against what we sent (TASK-056 / ADR-0013).
+                                shared =
+                                    { stamped | mergeBase = Just (Merge.planningLayer stamped) }
+
                                 downloadCmd =
-                                    exportDownload model.directory stamped
+                                    exportDownload model.directory shared
                             in
-                            if stamped == race then
+                            if shared == race then
                                 ( model, downloadCmd )
 
                             else
-                                -- owner and/or identity changed → persist (light).
+                                -- owner / identity / mergeBase changed → persist (light).
                                 ( model
-                                , Cmd.batch [ downloadCmd, Storage.saveRaceMeta (encodeRaceMeta stamped) ]
+                                , Cmd.batch [ downloadCmd, Storage.saveRaceMeta (encodeRaceMeta shared) ]
                                 )
 
                 Nothing ->
@@ -1346,12 +1352,17 @@ update msg model =
                                 let
                                     stamped =
                                         TrailSync.ensureIdentity { race | owner = userId }
+
+                                    -- The share point: record what we sent as the
+                                    -- merge ancestor (TASK-056 / ADR-0013).
+                                    shared =
+                                        { stamped | mergeBase = Just (Merge.planningLayer stamped) }
                                 in
                                 ( baseModel
                                 , Cmd.batch
                                     [ saveId
-                                    , Storage.saveRaceMeta (encodeRaceMeta stamped)
-                                    , exportDownload dir stamped
+                                    , Storage.saveRaceMeta (encodeRaceMeta shared)
+                                    , exportDownload dir shared
                                     ]
                                 )
 
@@ -2239,6 +2250,11 @@ buildDraftRace deviceId authorId now track gpxText =
     -- authorId is the person (`me.userId`), "" before a first share — the feed
     -- then labels via the deviceId fallback (WI-5 / TASK-054).
     , history = [ Changelog.courseUploaded deviceId authorId now 0 ]
+
+    -- No merge ancestor / version yet — set at the first share, bumped on edits
+    -- (TASK-056 / ADR-0013). Inert until the merge entry point lands (slice 2).
+    , mergeBase = Nothing
+    , version = Dict.empty
     }
 
 
@@ -2260,7 +2276,7 @@ commitRaceEdit before after0 model =
         authorId =
             myUserId model
 
-        after =
+        afterOwned =
             case model.me of
                 Just m ->
                     if after0.owner == "" then
@@ -2271,6 +2287,18 @@ commitRaceEdit before after0 model =
 
                 Nothing ->
                     after0
+
+        -- Bump my version counter when the mergeable layer actually changed (a
+        -- plan/aid/metadata edit) — not on actual-run links or other no-op saves
+        -- (owner backfill isn't in the layer, so it doesn't count). This is what
+        -- lets a returned `.trail` classify as fast-forward vs divergent
+        -- (TASK-056 / ADR-0013). Inert until the merge entry point lands.
+        after =
+            if Merge.planningLayer before /= Merge.planningLayer afterOwned then
+                { afterOwned | version = Merge.bumpVersion model.deviceId afterOwned.version }
+
+            else
+                afterOwned
 
         changes =
             Changelog.diff (Merge.planningLayer before) (Merge.planningLayer after)
