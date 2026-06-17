@@ -2326,3 +2326,55 @@ the arc's LAST task (absorbs the dropped TASK-052). **Gated on Q-U1–Q-U5** —
 resolving with the user now (placement / default stance / text-overlap handling /
 confirm-on-dismiss / course-anchored = v2), as Q1–Q5 and Q-I1–Q-I3 were. Then
 write the §2.2 merge-UI-reframe ADR and build it (engine exists; the UI is new).
+
+---
+## 2026-06-17 — TASK-056: Q-U resolved + ADR-0013; slice 1 (merge state)
+
+The arc's last task, opened. Two clean steps this session.
+
+**Gate cleared (PR #120, `735db8c`).** Resolved **Q-U1–Q-U5** with the user and
+wrote **ADR-0013** (the §2.2 merge-review reframe: review *suggestions*,
+person-named, card list, no red/green) — mirroring how PR #108 cleared the WI-5
+gate before its slices. Answers: **modal** (not drawer) · **forced per-card
+choice** · same-km-note overlap = **hand-merge textarea** (the one departure from
+the spec's pick-one default — the user's call: prose is worth combining) ·
+confirm-on-dismiss **only when picks exist** · course-anchored renderer = explicit
+**v2**. The hand-merge textarea has an engine consequence recorded in the ADR:
+`Merge.resolve` only flips a key to *theirs*, so the apply path needs a
+custom-value set for the edited note (slice 2).
+
+**Slice 1 — merge state on Race + .trail (PR #121, `f330d68`).** Headless,
+**inert** integration plumbing (back-compat; nothing consumes it until slice 2):
+- Moved `PlanningLayer` `Merge`→`Types` — the **same import-cycle fix** WI-4 used
+  for `ChangeEntry` (`Race.mergeBase` can't hold a `Merge` type without
+  `Types`↔`Merge` cycling). Merge/Changelog now import it from Types.
+- `Race.mergeBase : Maybe PlanningLayer` (last-synced ancestor) + `Race.version :
+  Dict deviceId Int` (version vector); both ride `raceMetaFields` (so `.trail`
+  carries `{base, current, version}`), `D.oneOf` defaults.
+- `commitRaceEdit` bumps `version[deviceId]` only when the mergeable layer
+  actually changed; export records the shared state as `mergeBase` (share point).
+- `smoke:trailsync` extended: the version vector + the **nested** ancestor
+  round-trip through the Race codec, default empty/none on v1, survive re-export.
+  All 8 smokes + type-check + build green. **main.js untouched** (no port/DCE
+  risk — unlike the slice-3 boot crash).
+
+**Process slip + clean recovery (worth keeping):** after merging the ADR PR I
+forgot to branch and committed slice 1 onto **local** master. Caught it before it
+could matter — origin/master was untouched (the push failed: no such local
+branch). Fixed without any force-push to the remote: `git checkout -b
+feat/task-056-merge-ui` (commit now safe on the feature branch), then `git branch
+-f master origin/master` (repoint *local* master back to the remote). Sacred-master
+intact. **Lesson:** after merging a close/ADR PR and `git checkout master`, create
+the next feature branch *before* editing — the muscle-memory gap is right there.
+
+**Self-merged** slice 1 after headless gates (inert + back-compat + no main.js,
+like the WI-5 data slices #109–112).
+
+**Next — slice 2 (the capstone, browser-verified):** the import→merge entry point
+(match `shareId` → `classifyVersions`: FastForward auto-applies, Diverged opens
+the modal, Behind/Same no-op), the review **modal** (cards + the hand-merge
+textarea for same-km notes + forced choice + the reassurance line + Apply/Keep
+exits), and the apply path (`resolve` fold + the custom-value note set →
+`withPlanningLayer` → save → bump → `Merged` feed entries). Held a clean checkpoint
+at slice 1 rather than rush the arc's largest UI tired; it needs in-browser
+verification regardless (like the WI-4 feed / WI-5 flows / the home view).
