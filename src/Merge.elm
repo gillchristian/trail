@@ -13,6 +13,7 @@ module Merge exposing
     , mintAidId
     , planningLayer
     , resolve
+    , setKmNote
     , withPlanningLayer
     )
 
@@ -510,6 +511,17 @@ resolve key theirs acc =
 
         KAidPresence id ->
             { acc | aidStations = setAidPresence id theirs acc.aidStations }
+
+
+{-| Set a single km's note to an arbitrary string. The apply path for a
+hand-merged note (Q-U3 / ADR-0013): when the same km note was edited on both
+sides, the review UI lets the user splice the two into a custom string, which
+`resolve` (flip-to-theirs only) can't express. Goes through `updateKm`, so
+clearing both note and time back to `emptyKmPlan` drops the row, same as resolve.
+-}
+setKmNote : Int -> String -> PlanningLayer -> PlanningLayer
+setKmNote i note layer =
+    { layer | plan = updateKm i (\kp -> { kp | notes = note }) layer.plan }
 
 
 setTarget : Maybe Int -> Plan -> Plan
