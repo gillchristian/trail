@@ -44,3 +44,4 @@ What does this make easy? What does this make hard? What will I have to revisit 
 - [0010 — Course identity for `.trail` sharing: stable shareId + canonical course hash, hard-block on mismatch](0010-course-identity-and-guard.md)
 - [0011 — Three-way merge engine for coach collaboration (WI-3)](0011-three-way-merge-engine.md)
 - [0012 — Identity & authorship: person-level userId over device id (WI-5)](0012-identity-and-authorship.md)
+- [0013 — Merge-review UI: review suggestions, person-named, no red/green (WI-3 · UI)](0013-merge-review-ui.md)
