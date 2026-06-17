@@ -2099,3 +2099,43 @@ now already carries `owner` (forward-compat).
 in-browser verification (IDB upgrade, boot, the prompts/link action), as TASK-051
 did. A couple of slice-4 UX details (prompt copy, link-action placement) are
 worth a quick look with the user.
+
+---
+## 2026-06-17 — TASK-054 (WI-5): slice 3 — IDB identity store + boot
+
+**Context:** the user inspected IDB and (correctly) saw v3, no identity store,
+`owner: ""` in an export, and no prompts — and asked whether that was expected
+or broken. Confirmed against their exported `.trail` it was exactly the expected
+inert-foundation state (slices 1–2 are schema + pure logic only): `owner` is
+present-but-blank, the store/prompts are later slices. Then continued with slice
+3.
+
+**What I did (PR #112, merged `519611f`).** The persistence + boot wiring
+(ADR-0012 Q-I2 — a dedicated store):
+- **main.js:** DB **v3→v4** with a dedicated `identity` object store, created via
+  the same additive `if (!contains)` upgrade (existing races/gpx/settings
+  untouched; fresh-DB and v2/v3→v4 all covered). `loadIdentity`/`saveIdentity`
+  (single row, key `me`) + the `storageLoadIdentity`/`storageSaveIdentity` port
+  pair. `deviceId` unchanged (still localStorage).
+- **Identity:** `Stored = {me, directory}` bundle codec (the one IDB row).
+- **Storage.elm:** identity ports + wrappers.
+- **Main:** model holds `me : Maybe Me` + `directory`; `init` loads via
+  `Storage.loadIdentity`; `IdentityLoaded` decodes the bundle (null row → keep
+  Nothing/empty, the normal pre-mint case); subscription wired.
+- **smoke-storage** extended to v4: identity store created on upgrade, the bundle
+  round-trips, v3→v4 migration preserves races/gpx/settings. local-ci updated.
+
+**Verified (headless):** type-check Success; build ✓; all 8 smokes PASS (storage
+gained 10 checks: v4 store, bundle round-trip, v3→v4 migration). **Browser check
+handed to the user:** reload on an existing v3 DB → DevTools shows v4 + an empty
+`identity` store, data intact.
+
+**Still inert** by design: `me` loads as `Nothing`, the store is empty until the
+first mint. Slice 4 (the flows) makes it live + visible.
+
+**Next — slice 4 (flows), the visible/UX piece (browser-verified):** export-mint
+name prompt; import yourself/someone-else (adopt / mint / review); `owner`
+backfill on touch/export; the **Q-I1 link action**; `.trail` `people`
+denormalization + import-merge; `resolveName` into labels (changelog author,
+owner display). UX is specced in companion §1.4 — I'll draft from the spec +
+prototype and the user verifies in-browser.
