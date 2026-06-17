@@ -34,6 +34,7 @@ import Html exposing (Html, a, button, div, h1, h2, h3, input, label, p, span, t
 import Html.Attributes as A exposing (class, classList)
 import Html.Events as E exposing (onBlur, onClick, onInput, preventDefaultOn)
 import Html.Lazy
+import Identity
 import Json.Decode as D
 import Json.Encode as Encode
 import Merge
@@ -205,6 +206,8 @@ type alias Model =
     , stravaToken : Maybe String
     , backendUrl : String
     , deviceId : String
+    , me : Maybe Identity.Me
+    , directory : Identity.Directory
     , stravaPicker : StravaPicker
     , stravaPickerSearch : String
     , sliderDraft : Maybe Float
@@ -248,6 +251,8 @@ init flags url key =
       , stravaToken = flags.incomingStravaToken
       , backendUrl = flags.backendUrl
       , deviceId = flags.deviceId
+      , me = Nothing
+      , directory = Identity.emptyDirectory
       , stravaPicker = PickerClosed
       , stravaPickerSearch = ""
       , sliderDraft = Nothing
@@ -257,6 +262,7 @@ init flags url key =
     , Cmd.batch
         [ Storage.loadAll
         , Storage.loadProfile
+        , Storage.loadIdentity
         , case flags.incomingStravaToken of
             Just t ->
                 Storage.saveStravaToken (Encode.string t)
@@ -350,6 +356,8 @@ type Msg
     | GotActualGpxContent RaceId Int String
     | ClearActualRun RaceId
     | ActualGpxFailed String
+      -- identity (WI-5 / TASK-054)
+    | IdentityLoaded Encode.Value
       -- profile
     | ProfileLoaded Encode.Value
     | ProfilePickPreset Preset
@@ -1169,6 +1177,17 @@ update msg model =
 
         ActualGpxFailed err ->
             ( { model | actualRunError = Just err }, Cmd.none )
+
+        IdentityLoaded value ->
+            -- The dedicated identity store is empty until the first mint, so a
+            -- null row is the normal startup case → keep the Nothing/empty
+            -- defaults. WI-5 / TASK-054.
+            case D.decodeValue (D.nullable Identity.decodeStored) value of
+                Ok (Just stored) ->
+                    ( { model | me = stored.me, directory = stored.directory }, Cmd.none )
+
+                _ ->
+                    ( model, Cmd.none )
 
         ProfileLoaded value ->
             case D.decodeValue (D.nullable AthleteProfile.decode) value of
@@ -2118,6 +2137,7 @@ subscriptions _ =
         , Storage.gotRaceDeleted RaceDeleted
         , Storage.gotError StorageError
         , Storage.gotProfile ProfileLoaded
+        , Storage.gotIdentity IdentityLoaded
         , Storage.gotStravaToken StravaTokenLoaded
         , Download.imagePicked MetaCoverPicked
         , Browser.Events.onResize WindowResized
