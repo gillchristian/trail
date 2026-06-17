@@ -354,10 +354,17 @@ type ChangeDescriptor
 
 {-| One logical change-set (a local edit or a merge). `source` is
 "local" | "merge" | "import". Immutable; keyed by `entryId` for conflict-free union.
+
+`author` is the device-scoped `deviceId` (it keys `entryId` for collision-free
+union — ADR-0012). `authorId` is the person-level `userId` (WI-5 / TASK-054): it
+resolves the feed's *person* label through the directory, where `author` only
+ever distinguished "this device" from "another". Defaults `""` for pre-WI-5
+entries, which fall back to the `author == deviceId` comparison.
 -}
 type alias ChangeEntry =
     { entryId : String
     , author : String
+    , authorId : String
     , timestampMs : Int
     , source : String
     , changes : List ChangeDescriptor
@@ -369,6 +376,7 @@ encodeChangeEntry e =
     E.object
         [ ( "entryId", E.string e.entryId )
         , ( "author", E.string e.author )
+        , ( "authorId", E.string e.authorId )
         , ( "timestampMs", E.int e.timestampMs )
         , ( "source", E.string e.source )
         , ( "changes", E.list encodeDescriptor e.changes )
@@ -377,9 +385,10 @@ encodeChangeEntry e =
 
 changeEntryDecoder : Decoder ChangeEntry
 changeEntryDecoder =
-    D.map5 ChangeEntry
+    D.map6 ChangeEntry
         (D.field "entryId" D.string)
         (D.field "author" D.string)
+        (D.oneOf [ D.field "authorId" D.string, D.succeed "" ])
         (D.field "timestampMs" D.int)
         (D.oneOf [ D.field "source" D.string, D.succeed "local" ])
         (D.field "changes" (D.list descriptorDecoder))

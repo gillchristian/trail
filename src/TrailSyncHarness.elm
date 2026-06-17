@@ -10,10 +10,12 @@ Three ops, dispatched on a `"op"` field:
 
   - `hash`     → `{ hash }` for a GPX string (`TrailSync.courseHashFromGpxText`)
   - `classify` → `{ verdict, message }` for an incoming/target identity pair
-  - `decode`   → `{ ok, shareId, courseHash, owner, name }` for a `.trail` document
+  - `decode`   → `{ ok, shareId, courseHash, owner, name, peopleCount }` for a `.trail`
+                 (`peopleCount` = the denormalized WI-5 name pairs the doc carries)
 
 -}
 
+import Dict
 import Json.Decode as D
 import Json.Encode as E
 import Platform
@@ -129,13 +131,14 @@ handleDecode v =
                 Err err ->
                     E.object [ ( "ok", E.bool False ), ( "error", E.string err ) ]
 
-                Ok race ->
+                Ok ( race, people ) ->
                     E.object
                         [ ( "ok", E.bool True )
                         , ( "shareId", E.string race.shareId )
                         , ( "courseHash", E.string race.courseHash )
                         , ( "owner", E.string race.owner )
                         , ( "name", E.string race.name )
+                        , ( "peopleCount", E.int (Dict.size people) )
                         ]
 
 
@@ -154,5 +157,8 @@ handleEncode v =
                 Err err ->
                     E.object [ ( "error", E.string err ) ]
 
-                Ok race ->
-                    E.object [ ( "encoded", E.string (ProjectFile.encode race) ) ]
+                Ok ( race, people ) ->
+                    -- Re-encode with the decoded `people` as the directory, so the
+                    -- round-trip exercises the denormalization (subsetFor embeds
+                    -- the owner's entry) — WI-5 / TASK-054.
+                    E.object [ ( "encoded", E.string (ProjectFile.encode people race) ) ]

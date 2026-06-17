@@ -20,8 +20,18 @@ clear error instead of silently mis-decoding.
 document decodes through the same path — the only change here is widening
 the accepted version set to `{1, 2}` instead of an exact-match gate.
 
+**WI-5 / TASK-054** adds two more additive things to the v2 document, both
+`D.oneOf`-defaulted so no version bump is needed: the embedded race carries
+`owner` (a `userId`), and the document carries a top-level **`people`** array —
+the `(userId, displayName, nameUpdatedAt)` pairs the file references
+(`Identity.subsetFor` over the owner + change authors), so an importer can show
+names for people not yet in its own directory. `decode` therefore returns the
+race *and* that denormalized directory; `encode` takes the local directory and
+denormalizes from it.
+
 -}
 
+import Identity exposing (Directory)
 import Json.Decode as D
 import Json.Encode as E
 import Types exposing (Race, decodeRace, encodeRace)
@@ -40,28 +50,45 @@ isSupportedVersion v =
     v == 1 || v == 2
 
 
-encode : Race -> String
-encode race =
+{-| Encode a race as a `.trail`, embedding the denormalized name `people` it
+references — the owner plus every change author, resolved from `directory` via
+`Identity.subsetFor` (unknown/blank ids dropped). WI-5 / TASK-054.
+-}
+encode : Directory -> Race -> String
+encode directory race =
+    let
+        referencedIds =
+            (race.owner :: List.map .authorId race.history)
+                |> List.filter (\id -> id /= "")
+
+        people =
+            Identity.subsetFor referencedIds directory
+    in
     E.encode 2
         (E.object
             [ ( "format", E.string "trail-project" )
             , ( "version", E.int currentVersion )
             , ( "race", encodeRace race )
+            , ( "people", Identity.encodeDirectory people )
             ]
         )
 
 
-decode : String -> Result String Race
+{-| Decode a `.trail` into its race plus the denormalized name directory it
+carries (empty for v1 / pre-WI-5 docs). The importer LWW-merges the directory
+and branches on the race's `owner`.
+-}
+decode : String -> Result String ( Race, Directory )
 decode raw =
     case D.decodeString documentDecoder raw of
-        Ok race ->
-            Ok race
+        Ok pair ->
+            Ok pair
 
         Err err ->
             Err (D.errorToString err)
 
 
-documentDecoder : D.Decoder Race
+documentDecoder : D.Decoder ( Race, Directory )
 documentDecoder =
     D.field "format" D.string
         |> D.andThen
@@ -71,7 +98,13 @@ documentDecoder =
                         |> D.andThen
                             (\v ->
                                 if isSupportedVersion v then
-                                    D.field "race" decodeRace
+                                    D.map2 Tuple.pair
+                                        (D.field "race" decodeRace)
+                                        (D.oneOf
+                                            [ D.field "people" Identity.decodeDirectory
+                                            , D.succeed Identity.emptyDirectory
+                                            ]
+                                        )
 
                                 else
                                     D.fail

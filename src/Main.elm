@@ -104,6 +104,7 @@ type alias Flags =
     , incomingStravaToken : Maybe String
     , backendUrl : String
     , deviceId : String
+    , newUserId : String
     }
 
 
@@ -208,6 +209,10 @@ type alias Model =
     , deviceId : String
     , me : Maybe Identity.Me
     , directory : Identity.Directory
+    , freshUserId : String
+    , identityFlow : IdentityFlow
+    , nameDraft : String
+    , renameDraft : String
     , stravaPicker : StravaPicker
     , stravaPickerSearch : String
     , sliderDraft : Maybe Float
@@ -222,6 +227,41 @@ type StravaPicker
     | PickerShowing RaceId (List StravaApi.Activity)
     | PickerLoadingStreams RaceId Int
     | PickerError RaceId String
+
+
+{-| The identity prompt/flow state machine (WI-5 / TASK-054, ADR-0012). An
+export with no identity, or an import where the file's owner isn't me, *pauses*
+here; the side effect (mint, stamp, save) happens only when the prompt is
+answered, so cancelling leaves no state behind. Design note in
+`planning/CURRENT.md` (slice 4).
+-}
+type IdentityFlow
+    = FlowIdle
+    | FlowName PendingAfterName
+    | FlowOwnership PendingImport
+    | FlowLink PendingImport
+
+
+{-| What the "What's your name?" prompt resumes once a name is entered and a
+`userId` is minted: finish the export that triggered it, or finish importing a
+file as a reviewer (someone else's plan).
+-}
+type PendingAfterName
+    = ThenExport Race
+    | ThenImportReviewer PendingImport
+
+
+{-| An import paused on an identity prompt: the decoded draft (local id cleared,
+courseHash ensured), the source filename (for the persisting state), the file's
+denormalized name directory (LWW-merged into the local one **only on
+completion**), and the owner's resolved display name (for the prompt copy).
+-}
+type alias PendingImport =
+    { draft : Race
+    , fileName : String
+    , filePeople : Identity.Directory
+    , ownerName : String
+    }
 
 
 init : Flags -> Url -> Nav.Key -> ( Model, Cmd Msg )
@@ -253,6 +293,10 @@ init flags url key =
       , deviceId = flags.deviceId
       , me = Nothing
       , directory = Identity.emptyDirectory
+      , freshUserId = flags.newUserId
+      , identityFlow = FlowIdle
+      , nameDraft = ""
+      , renameDraft = ""
       , stravaPicker = PickerClosed
       , stravaPickerSearch = ""
       , sliderDraft = Nothing
@@ -358,6 +402,15 @@ type Msg
     | ActualGpxFailed String
       -- identity (WI-5 / TASK-054)
     | IdentityLoaded Encode.Value
+    | NameDraftInput String
+    | NamePromptConfirm
+    | NamePromptCancel
+    | OwnershipChoose Identity.OwnershipAnswer
+    | OwnershipCancel
+    | LinkConfirm
+    | LinkCancel
+    | RenameDraftInput String
+    | RenameMeCommit
       -- profile
     | ProfileLoaded Encode.Value
     | ProfilePickPreset Preset
@@ -462,7 +515,7 @@ update msg model =
                     Err err ->
                         ( { model | upload = UploadFailed fileName err }, Cmd.none )
 
-                    Ok importedRace ->
+                    Ok ( importedRace, filePeople ) ->
                         let
                             -- Drop the imported id so JS assigns a fresh one
                             -- (lets users import the same .trail twice safely)
@@ -482,10 +535,49 @@ update msg model =
                                         else
                                             importedRace.courseHash
                                 }
+
+                            -- Owner display name for the prompt copy: the file's
+                            -- denormalized names over what we already know. The
+                            -- model directory itself is touched only on completion.
+                            ownerName =
+                                Identity.resolveNameWith "this athlete"
+                                    (Identity.mergeDirectory filePeople model.directory)
+                                    draft.owner
+
+                            pending =
+                                { draft = draft
+                                , fileName = fileName
+                                , filePeople = filePeople
+                                , ownerName = ownerName
+                                }
                         in
-                        ( { model | upload = Persisting fileName }
-                        , Storage.saveRace (encodeRace draft)
-                        )
+                        if draft.owner == "" then
+                            -- Pre-identity / v1 file: no owner to attribute. It
+                            -- becomes mine on touch if I have an identity (AC3),
+                            -- else stays unowned until a first export stamps it.
+                            -- No prompt (there's no person to disambiguate).
+                            let
+                                claimed =
+                                    case model.me of
+                                        Just m ->
+                                            { pending | draft = { draft | owner = m.userId } }
+
+                                        Nothing ->
+                                            pending
+                            in
+                            completeImport claimed model
+
+                        else
+                            case Identity.decideImport model.me draft.owner of
+                                Identity.ImportAsOwner ->
+                                    -- A file I already own → import silently (AC6).
+                                    completeImport pending model
+
+                                Identity.AskOwnership ->
+                                    -- Owner ≠ me (or I have no identity) → ask.
+                                    ( { model | identityFlow = FlowOwnership pending, upload = NotUploading }
+                                    , Cmd.none
+                                    )
 
             else
                 case Gpx.parseGPX content of
@@ -495,7 +587,7 @@ update msg model =
                     Ok track ->
                         let
                             draft =
-                                buildDraftRace model.deviceId model.now track content
+                                buildDraftRace model.deviceId (myUserId model) model.now track content
                         in
                         ( { model | upload = Persisting fileName }
                         , Storage.saveRace (encodeRace draft)
@@ -572,22 +664,29 @@ update msg model =
                             cacheSparkline (raceIdToString race.id) nextTracks model.sparklineCoords
 
                         navCmd =
-                            case model.route of
-                                Route.RaceDetail rid ->
-                                    if raceIdToString rid == raceIdToString race.id then
+                            -- Only a *full* save (a new race — it carries gpxText)
+                            -- navigates. A light/meta echo has empty gpxText, so an
+                            -- edit (or the WI-5 link-action's owner re-own, which
+                            -- meta-saves several races) never hijacks navigation.
+                            if String.isEmpty decoded.gpxText then
+                                Cmd.none
+
+                            else
+                                -- Already on a race/plan page → don't yank focus.
+                                -- Elsewhere (e.g. the index after an import) → open
+                                -- the newly-saved race.
+                                case model.route of
+                                    Route.RaceDetail _ ->
                                         Cmd.none
 
-                                    else
+                                    Route.PlanTable _ ->
                                         Cmd.none
 
-                                Route.PlanTable _ ->
-                                    Cmd.none
+                                    Route.PlanKm _ _ ->
+                                        Cmd.none
 
-                                Route.PlanKm _ _ ->
-                                    Cmd.none
-
-                                _ ->
-                                    Nav.pushUrl model.key (Route.toString (Route.RaceDetail race.id))
+                                    _ ->
+                                        Nav.pushUrl model.key (Route.toString (Route.RaceDetail race.id))
                     in
                     ( { model
                         | races = LoadedRaces nextRaces
@@ -1009,28 +1108,41 @@ update msg model =
         ExportProjectFile ->
             case currentRace model of
                 Just race ->
-                    let
-                        -- Stamp identity (shareId + courseHash) onto a race that
-                        -- predates WI-1 so the exported v2 file isn't blank, and
-                        -- persist it (light save) so the local race keeps the
-                        -- same identity for the merge round-trip (TASK-053).
-                        stamped =
-                            TrailSync.ensureIdentity race
+                    case model.me of
+                        Nothing ->
+                            -- First share with no identity → mint #1: prompt for a
+                            -- name, then export (WI-5 / TASK-054, AC1). The export
+                            -- resumes in NamePromptConfirm.
+                            ( { model | identityFlow = FlowName (ThenExport race), nameDraft = "" }
+                            , Cmd.none
+                            )
 
-                        downloadCmd =
-                            Download.file
-                                { filename = ProjectFile.filenameFor stamped
-                                , content = ProjectFile.encode stamped
-                                , mime = "application/json"
-                                }
-                    in
-                    if stamped == race then
-                        ( model, downloadCmd )
+                        Just m ->
+                            let
+                                -- Owner backfill on share (AC3): an unowned race
+                                -- adopts my id. Then stamp shareId + courseHash for
+                                -- a race that predates WI-1 (TASK-053).
+                                owned =
+                                    if race.owner == "" then
+                                        { race | owner = m.userId }
 
-                    else
-                        ( model
-                        , Cmd.batch [ downloadCmd, Storage.saveRaceMeta (encodeRaceMeta stamped) ]
-                        )
+                                    else
+                                        race
+
+                                stamped =
+                                    TrailSync.ensureIdentity owned
+
+                                downloadCmd =
+                                    exportDownload model.directory stamped
+                            in
+                            if stamped == race then
+                                ( model, downloadCmd )
+
+                            else
+                                -- owner and/or identity changed → persist (light).
+                                ( model
+                                , Cmd.batch [ downloadCmd, Storage.saveRaceMeta (encodeRaceMeta stamped) ]
+                                )
 
                 Nothing ->
                     ( model, Cmd.none )
@@ -1187,6 +1299,225 @@ update msg model =
                     ( { model | me = stored.me, directory = stored.directory }, Cmd.none )
 
                 _ ->
+                    ( model, Cmd.none )
+
+        NameDraftInput s ->
+            ( { model | nameDraft = s }, Cmd.none )
+
+        NamePromptConfirm ->
+            case model.identityFlow of
+                FlowName after ->
+                    let
+                        name =
+                            String.trim model.nameDraft
+                    in
+                    if name == "" then
+                        ( model, Cmd.none )
+
+                    else
+                        let
+                            -- Mint (the one and only mint per device): the
+                            -- per-boot candidate is consumed here, ≤ once because
+                            -- both mint points gate on `me == Nothing` (AC1).
+                            userId =
+                                model.freshUserId
+
+                            me_ =
+                                { userId = userId, displayName = name }
+
+                            dir =
+                                Dict.insert userId
+                                    { displayName = name, nameUpdatedAt = model.now }
+                                    model.directory
+
+                            baseModel =
+                                { model
+                                    | me = Just me_
+                                    , directory = dir
+                                    , identityFlow = FlowIdle
+                                    , nameDraft = ""
+                                }
+
+                            saveId =
+                                Storage.saveIdentity (Identity.encodeStored { me = Just me_, directory = dir })
+                        in
+                        case after of
+                            ThenExport race ->
+                                let
+                                    stamped =
+                                        TrailSync.ensureIdentity { race | owner = userId }
+                                in
+                                ( baseModel
+                                , Cmd.batch
+                                    [ saveId
+                                    , Storage.saveRaceMeta (encodeRaceMeta stamped)
+                                    , exportDownload dir stamped
+                                    ]
+                                )
+
+                            ThenImportReviewer pending ->
+                                -- Identity established → import keeping the file's
+                                -- owner (I'm the reviewer). completeImport persists
+                                -- the bundle + saves the draft.
+                                completeImport pending baseModel
+
+                _ ->
+                    ( model, Cmd.none )
+
+        NamePromptCancel ->
+            ( { model | identityFlow = FlowIdle, nameDraft = "", upload = NotUploading }, Cmd.none )
+
+        OwnershipChoose answer ->
+            case model.identityFlow of
+                FlowOwnership pending ->
+                    case Identity.resolveOwnership answer model.me pending.draft.owner of
+                        Identity.Adopt ownerId ->
+                            case model.me of
+                                Nothing ->
+                                    -- New device claims this person: adopt the
+                                    -- file's owner id + denormalized name (the
+                                    -- device-link — never mints, AC1/AC6).
+                                    let
+                                        name =
+                                            Identity.resolveNameWith "Me"
+                                                (Identity.mergeDirectory pending.filePeople model.directory)
+                                                ownerId
+
+                                        me_ =
+                                            { userId = ownerId, displayName = name }
+                                    in
+                                    completeImport pending { model | me = Just me_ }
+
+                                Just _ ->
+                                    -- I already have a *different* identity → a
+                                    -- dual-id. Don't silently overwrite it; surface
+                                    -- the explicit link action (Q-I1 / AC8).
+                                    ( { model | identityFlow = FlowLink pending }, Cmd.none )
+
+                        Identity.ReviewAs _ ->
+                            -- Reviewer: keep the file's owner, my identity unchanged.
+                            completeImport pending model
+
+                        Identity.MintThenReview ->
+                            -- Reviewer with no identity → name prompt + mint #2.
+                            ( { model | identityFlow = FlowName (ThenImportReviewer pending), nameDraft = "" }
+                            , Cmd.none
+                            )
+
+                _ ->
+                    ( model, Cmd.none )
+
+        OwnershipCancel ->
+            ( { model | identityFlow = FlowIdle, upload = NotUploading, nameDraft = "" }, Cmd.none )
+
+        LinkConfirm ->
+            case model.identityFlow of
+                FlowLink pending ->
+                    case model.me of
+                        Just m ->
+                            let
+                                newId =
+                                    pending.draft.owner
+
+                                name =
+                                    Identity.resolveNameWith m.displayName
+                                        (Identity.mergeDirectory pending.filePeople model.directory)
+                                        newId
+
+                                me_ =
+                                    { userId = newId, displayName = name }
+
+                                oldId =
+                                    m.userId
+
+                                -- Re-own my local races from the old id to the
+                                -- linked id so they keep reading as mine — the
+                                -- dual-id reconciliation (Q-I1 / AC8). Bounded:
+                                -- only the races this device minted under `oldId`.
+                                -- One pass builds both the new list and the saves
+                                -- so the predicate can't drift between them.
+                                ( reowned, migrateCmds ) =
+                                    currentRaces model
+                                        |> List.foldr
+                                            (\r ( rs, cs ) ->
+                                                if r.owner == oldId then
+                                                    let
+                                                        moved =
+                                                            { r | owner = newId }
+                                                    in
+                                                    ( moved :: rs, Storage.saveRaceMeta (encodeRaceMeta moved) :: cs )
+
+                                                else
+                                                    ( r :: rs, cs )
+                                            )
+                                            ( [], [] )
+
+                                ( model_, importCmd ) =
+                                    completeImport pending
+                                        { model | me = Just me_, races = LoadedRaces reowned }
+                            in
+                            ( model_, Cmd.batch (importCmd :: migrateCmds) )
+
+                        Nothing ->
+                            ( { model | identityFlow = FlowIdle }, Cmd.none )
+
+                _ ->
+                    ( model, Cmd.none )
+
+        LinkCancel ->
+            -- Back out to the ownership choice (not the whole import) so the user
+            -- can pick "someone else" instead of linking.
+            case model.identityFlow of
+                FlowLink pending ->
+                    ( { model | identityFlow = FlowOwnership pending }, Cmd.none )
+
+                _ ->
+                    ( { model | identityFlow = FlowIdle }, Cmd.none )
+
+        RenameDraftInput s ->
+            ( { model | renameDraft = s }, Cmd.none )
+
+        RenameMeCommit ->
+            case model.me of
+                Just m ->
+                    let
+                        name =
+                            String.trim model.renameDraft
+                    in
+                    if name == "" then
+                        ( model, Cmd.none )
+
+                    else
+                        let
+                            me_ =
+                                { m | displayName = name }
+
+                            -- A strictly-monotonic timestamp: `model.now` is frozen
+                            -- at boot (as the changelog uses it), so a same-session
+                            -- rename would reuse it and lose the downstream LWW tie
+                            -- (an importer ignores an equal `nameUpdatedAt`). Force
+                            -- it past the prior value so every rename propagates.
+                            prevUpdated =
+                                Dict.get m.userId model.directory
+                                    |> Maybe.map .nameUpdatedAt
+                                    |> Maybe.withDefault 0
+
+                            stamp =
+                                Basics.max model.now (prevUpdated + 1)
+
+                            -- Self-rename is authoritative: a direct insert rather
+                            -- than the LWW `learn`. One row, and every owned race
+                            -- relabels through it with no per-race write (AC4).
+                            dir =
+                                Dict.insert m.userId
+                                    { displayName = name, nameUpdatedAt = stamp }
+                                    model.directory
+                        in
+                        ( { model | me = Just me_, directory = dir, renameDraft = "" }
+                        , Storage.saveIdentity (Identity.encodeStored { me = Just me_, directory = dir })
+                        )
+
+                Nothing ->
                     ( model, Cmd.none )
 
         ProfileLoaded value ->
@@ -1876,8 +2207,8 @@ buildKmsCache races tracks existing =
     List.foldl (\r acc -> cacheKms r tracks acc) existing races
 
 
-buildDraftRace : String -> Int -> Track -> String -> Race
-buildDraftRace deviceId now track gpxText =
+buildDraftRace : String -> String -> Int -> Track -> String -> Race
+buildDraftRace deviceId authorId now track gpxText =
     { id = raceIdFromString ""
     , name = track.name
     , date = Nothing
@@ -1905,7 +2236,9 @@ buildDraftRace deviceId now track gpxText =
     , owner = ""
 
     -- Seed the change history with the course-upload event (TASK-051).
-    , history = [ Changelog.courseUploaded deviceId now 0 ]
+    -- authorId is the person (`me.userId`), "" before a first share — the feed
+    -- then labels via the deviceId fallback (WI-5 / TASK-054).
+    , history = [ Changelog.courseUploaded deviceId authorId now 0 ]
     }
 
 
@@ -1915,15 +2248,35 @@ non-planning change (target time, the slider, linking actual splits, …) yields
 an empty diff and so appends no entry — the save still happens. Used in place of
 a bare `Storage.saveRaceMeta` at the edit sites; `before` is the race as it was,
 `after` the edited race.
+
+Also backfills `owner` on first touch: an unowned race adopts my `userId` once an
+identity exists (WI-5 / TASK-054, AC3). No-op when already owned or no identity
+yet (the deferred-mint case — owner is then stamped at the first export instead).
+`owner` isn't part of the planning layer, so this never affects the diff.
 -}
 commitRaceEdit : Race -> Race -> Model -> Cmd Msg
-commitRaceEdit before after model =
+commitRaceEdit before after0 model =
     let
+        authorId =
+            myUserId model
+
+        after =
+            case model.me of
+                Just m ->
+                    if after0.owner == "" then
+                        { after0 | owner = m.userId }
+
+                    else
+                        after0
+
+                Nothing ->
+                    after0
+
         changes =
             Changelog.diff (Merge.planningLayer before) (Merge.planningLayer after)
 
         withHistory =
-            case Changelog.entryFromChanges model.deviceId model.now (List.length after.history) "local" changes of
+            case Changelog.entryFromChanges model.deviceId authorId model.now (List.length after.history) "local" changes of
                 Just entry ->
                     { after | history = after.history ++ [ entry ] }
 
@@ -1931,6 +2284,78 @@ commitRaceEdit before after model =
                     after
     in
     Storage.saveRaceMeta (encodeRaceMeta withHistory)
+
+
+{-| My person-level `userId`, or `""` if no identity has been minted yet. Used
+to attribute changelog entries and to stamp `owner` (WI-5 / TASK-054).
+-}
+myUserId : Model -> String
+myUserId model =
+    model.me |> Maybe.map .userId |> Maybe.withDefault ""
+
+
+{-| Finish importing a paused `.trail` (WI-5 / TASK-054): LWW-merge the file's
+denormalized names into the local directory, persist the identity bundle, and
+full-save the draft as a new race. The draft's `owner` is already set by the
+calling branch (kept as the file owner for a reviewer, or my id when claimed).
+The directory is touched **only here**, so cancelling a prompt leaves no trace.
+-}
+completeImport : PendingImport -> Model -> ( Model, Cmd Msg )
+completeImport pending model =
+    let
+        merged =
+            Identity.mergeDirectory pending.filePeople model.directory
+
+        -- Guarantee my own identity has a directory row, so owner display / feed
+        -- labels never fall back to "Someone" for me. Normally the merge above
+        -- already carries it (an export denormalizes the owner), but a file that
+        -- under-denormalizes — or a claimed/adopted id the file didn't name —
+        -- would otherwise leave it absent. The mint and rename paths insert
+        -- authoritatively; this is the import-side equivalent (WI-5 / TASK-054).
+        dir =
+            case model.me of
+                Just m ->
+                    if Dict.member m.userId merged then
+                        merged
+
+                    else
+                        Dict.insert m.userId
+                            { displayName = m.displayName, nameUpdatedAt = model.now }
+                            merged
+
+                Nothing ->
+                    merged
+
+        -- Persist identity when there's something to keep: a learned name, or an
+        -- existing/just-set identity. Avoids writing an empty {me:null} row on a
+        -- plain v1 import with no identity yet.
+        saveIdCmd =
+            if dir /= model.directory || model.me /= Nothing then
+                Storage.saveIdentity (Identity.encodeStored { me = model.me, directory = dir })
+
+            else
+                Cmd.none
+    in
+    ( { model
+        | directory = dir
+        , identityFlow = FlowIdle
+        , upload = Persisting pending.fileName
+        , nameDraft = ""
+      }
+    , Cmd.batch [ saveIdCmd, Storage.saveRace (encodeRace pending.draft) ]
+    )
+
+
+{-| The `.trail` download command, denormalizing names from `directory` into the
+file's `people` (WI-5 / TASK-054).
+-}
+exportDownload : Identity.Directory -> Race -> Cmd Msg
+exportDownload directory race =
+    Download.file
+        { filename = ProjectFile.filenameFor race
+        , content = ProjectFile.encode directory race
+        , mime = "application/json"
+        }
 
 
 readFile : File -> Cmd Msg
@@ -2160,6 +2585,7 @@ view model =
             , viewFooter
             , viewDeleteModal model
             , viewHistoryDrawer model
+            , viewIdentityModals model
             , viewErrorToast model
             ]
         ]
@@ -2553,6 +2979,7 @@ viewProfileSettings model =
             [ h1 [ class "text-3xl font-bold tracking-tight text-slate-100" ] [ text "Profile" ]
             , p2 "Population-tier defaults seed the predictor. Tweak any field; values stick on save."
             ]
+        , viewIdentityCard model
         , profilePresetsRow
         , viewCalibrationPanel model
         , div [ class "rounded-2xl bg-slate-900 border border-slate-800 p-5 space-y-5" ]
@@ -2663,6 +3090,49 @@ viewProfileSettings model =
                 [ text "Save profile" ]
             ]
         , viewStravaSection model
+        ]
+
+
+{-| The WI-5 identity card (TASK-054): your collaboration name, distinct from
+the performance settings on the rest of this page (ADR-0012). Shows a rename
+control once an identity exists; before the first share there's nothing to name
+yet (deferred mint), so it just explains when the name is asked for.
+-}
+viewIdentityCard : Model -> Html Msg
+viewIdentityCard model =
+    div [ class "rounded-2xl bg-slate-900 border border-slate-800 p-5 space-y-3" ]
+        [ div []
+            [ p [ class "text-sm font-medium text-slate-100" ] [ text "Your name (for sharing)" ]
+            , p [ class "text-xs text-slate-500 mt-0.5" ]
+                [ text "How collaborators see your changes when you share a plan. Separate from the performance settings below — renaming relabels every plan you own." ]
+            ]
+        , case model.me of
+            Just m ->
+                div [ class "space-y-3" ]
+                    [ p [ class "text-sm text-slate-300" ]
+                        [ text "You are "
+                        , span [ class "font-semibold text-slate-100" ] [ text m.displayName ]
+                        , text "."
+                        ]
+                    , div [ class "flex items-center gap-2 flex-wrap" ]
+                        [ input
+                            [ A.type_ "text"
+                            , A.value model.renameDraft
+                            , A.placeholder "New name"
+                            , onInput RenameDraftInput
+                            , class "flex-1 min-w-40 bg-slate-950 border border-slate-700 rounded-md px-3 py-2 text-sm text-slate-100 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-rose-500/50"
+                            ]
+                            []
+                        , identityPrimaryButton RenameMeCommit "Rename" (String.trim model.renameDraft == "")
+                        ]
+                    ]
+
+            Nothing ->
+                p [ class "text-sm text-slate-400" ]
+                    [ text "We'll ask for your name the first time you share a plan (export a "
+                    , span [ class "text-slate-300" ] [ text ".trail" ]
+                    , text " file)."
+                    ]
         ]
 
 
@@ -3320,6 +3790,23 @@ miniStat value unit =
 -- ============================================================
 
 
+{-| "Plan by <name>" on the race detail — resolves `race.owner` (a userId)
+through the directory (WI-5 / TASK-054). Demonstrates that a self-rename
+relabels every owned race with no per-race write (one directory row drives them
+all). Hidden until the race has an owner (stamped at first edit/share).
+-}
+viewOwnerLine : Model -> Race -> Html Msg
+viewOwnerLine model race =
+    if race.owner == "" then
+        text ""
+
+    else
+        p [ class "mt-1 text-xs text-slate-500" ]
+            [ text "Plan by "
+            , span [ class "text-slate-400" ] [ text (Identity.resolveName model.directory race.owner) ]
+            ]
+
+
 viewRaceDetail : Model -> Race -> Html Msg
 viewRaceDetail model race =
     let
@@ -3362,6 +3849,7 @@ viewRaceDetail model race =
                             text ""
                     ]
                 , p [ class "mt-2 text-sm text-slate-500" ] [ text (raceSubtitle race) ]
+                , viewOwnerLine model race
                 , case ( race.url, race.notes ) of
                     ( "", "" ) ->
                         text ""
@@ -6623,13 +7111,13 @@ viewHistoryDrawer model =
                                 [ text "×" ]
                             ]
                         , div [ class "flex-1 overflow-y-auto px-6 py-5" ]
-                            [ viewHistoryFeed model.now model.deviceId race.history ]
+                            [ viewHistoryFeed model.now model.deviceId model.me model.directory race.history ]
                         ]
                     ]
 
 
-viewHistoryFeed : Int -> String -> List ChangeEntry -> Html Msg
-viewHistoryFeed now deviceId history =
+viewHistoryFeed : Int -> String -> Maybe Identity.Me -> Identity.Directory -> List ChangeEntry -> Html Msg
+viewHistoryFeed now deviceId me directory history =
     if List.isEmpty history then
         div [ class "text-center py-12" ]
             [ p [ class "text-4xl mb-3 opacity-60" ] [ text "🗺" ]
@@ -6644,11 +7132,11 @@ viewHistoryFeed now deviceId history =
             total =
                 List.length entries
         in
-        div [] (List.indexedMap (viewHistoryEntry now deviceId total) entries)
+        div [] (List.indexedMap (viewHistoryEntry now deviceId me directory total) entries)
 
 
-viewHistoryEntry : Int -> String -> Int -> Int -> ChangeEntry -> Html Msg
-viewHistoryEntry now deviceId total i entry =
+viewHistoryEntry : Int -> String -> Maybe Identity.Me -> Identity.Directory -> Int -> Int -> ChangeEntry -> Html Msg
+viewHistoryEntry now deviceId me directory total i entry =
     let
         isLast =
             i == total - 1
@@ -6667,7 +7155,7 @@ viewHistoryEntry now deviceId total i entry =
             [ span [ class "text-sm leading-none" ] [ text badgeIcon ] ]
         , div [ class "min-w-0 flex-1" ]
             [ div [ class "flex items-baseline justify-between gap-2" ]
-                [ span [ class "text-sm font-medium text-slate-200" ] [ text (authorLabel deviceId entry.author) ]
+                [ span [ class "text-sm font-medium text-slate-200" ] [ text (authorLabel deviceId me directory entry) ]
                 , span [ class "text-xs text-slate-500 whitespace-nowrap" ] [ text (relativeTime now entry.timestampMs) ]
                 ]
             , div [ class "mt-1.5 space-y-1" ] (List.map viewChangeRow entry.changes)
@@ -6789,13 +7277,33 @@ formatRestShort secs =
         String.fromInt secs ++ "s"
 
 
-authorLabel : String -> String -> String
-authorLabel deviceId author =
-    if author == deviceId then
+{-| The feed's *person* label for an entry's author (WI-5 / TASK-054). Prefers
+the person-level `authorId` resolved through the directory — "You" when it's my
+id, otherwise the person's name. Falls back to the device comparison for
+pre-WI-5 entries (no `authorId`), which are almost always this device's own.
+This is what retires the old hardcoded seat-relative "Coach" label.
+-}
+authorLabel : String -> Maybe Identity.Me -> Identity.Directory -> ChangeEntry -> String
+authorLabel deviceId me directory entry =
+    if entry.authorId /= "" then
+        case me of
+            Just m ->
+                if entry.authorId == m.userId then
+                    "You"
+
+                else
+                    Identity.resolveName directory entry.authorId
+
+            Nothing ->
+                Identity.resolveName directory entry.authorId
+
+    else if entry.author == deviceId then
         "You"
 
     else
-        "Coach"
+        -- A pre-WI-5 entry from another device: `author` is a deviceId, which the
+        -- userId-keyed directory can't resolve, and there's no person id to go on.
+        "Someone"
 
 
 {-| A coarse "Nd/Nh/Nm ago" from two epoch-ms timestamps.
@@ -6864,6 +7372,130 @@ viewModal cfg =
                 ]
             ]
         ]
+
+
+{-| The WI-5 identity prompts (TASK-054): the name prompt (mint), the
+yourself/someone-else ownership choice on import, and the Q-I1 link action. One
+at a time — driven by `model.identityFlow`.
+-}
+viewIdentityModals : Model -> Html Msg
+viewIdentityModals model =
+    case model.identityFlow of
+        FlowIdle ->
+            text ""
+
+        FlowName after ->
+            let
+                ( subtitle, confirmLabel ) =
+                    case after of
+                        ThenExport _ ->
+                            ( "Your plans and changes are labelled with this name when you share them. You can rename yourself any time on the Profile page."
+                            , "Save & export"
+                            )
+
+                        ThenImportReviewer _ ->
+                            ( "So your suggestions on this plan are attributed to you."
+                            , "Save & import"
+                            )
+
+                disabled =
+                    String.trim model.nameDraft == ""
+            in
+            identityModalShell "What's your name?"
+                [ p [ class "text-sm text-slate-400" ] [ text subtitle ]
+                , input
+                    [ A.type_ "text"
+                    , A.value model.nameDraft
+                    , A.placeholder "e.g. Alex"
+                    , A.autofocus True
+                    , onInput NameDraftInput
+                    , class "w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 text-slate-100 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-rose-500/50"
+                    ]
+                    []
+                , div [ class "flex justify-end gap-2" ]
+                    [ identitySecondaryButton NamePromptCancel "Cancel"
+                    , identityPrimaryButton NamePromptConfirm confirmLabel disabled
+                    ]
+                ]
+
+        FlowOwnership pending ->
+            identityModalShell "Whose plan is this?"
+                [ p [ class "text-sm text-slate-400" ]
+                    [ text "“"
+                    , span [ class "text-slate-200" ] [ text pending.draft.name ]
+                    , text ("” was shared by " ++ pending.ownerName ++ ".")
+                    ]
+                , button
+                    [ onClick (OwnershipChoose Identity.Myself)
+                    , class "w-full text-left px-4 py-3 rounded-lg bg-slate-950 hover:bg-slate-800 border border-slate-800 hover:border-rose-500/60 transition-colors"
+                    ]
+                    [ p [ class "font-medium text-slate-100" ] [ text ("I'm " ++ pending.ownerName) ]
+                    , p [ class "text-xs text-slate-500 mt-0.5" ] [ text "Claim it as yours — this device is recognized as the same person." ]
+                    ]
+                , button
+                    [ onClick (OwnershipChoose Identity.SomeoneElse)
+                    , class "w-full text-left px-4 py-3 rounded-lg bg-slate-950 hover:bg-slate-800 border border-slate-800 hover:border-rose-500/60 transition-colors"
+                    ]
+                    [ p [ class "font-medium text-slate-100" ] [ text "Someone else's plan" ]
+                    , p [ class "text-xs text-slate-500 mt-0.5" ] [ text ("Import it as " ++ pending.ownerName ++ "'s — you're reviewing.") ]
+                    ]
+                , div [ class "flex justify-end" ]
+                    [ identitySecondaryButton OwnershipCancel "Cancel" ]
+                ]
+
+        FlowLink pending ->
+            let
+                myName =
+                    model.me |> Maybe.map .displayName |> Maybe.withDefault "someone"
+            in
+            identityModalShell "Link this device?"
+                [ p [ class "text-sm text-slate-400" ]
+                    [ text ("This device is already " ++ myName ++ ". Link it to ")
+                    , span [ class "text-slate-200" ] [ text pending.ownerName ]
+                    , text " so they're recognized as the same person?"
+                    ]
+                , p [ class "text-xs text-slate-500" ]
+                    [ text ("Your plans on this device move to " ++ pending.ownerName ++ "'s identity. Use this when you've imported your own plan from another device.") ]
+                , div [ class "flex justify-end gap-2" ]
+                    [ identitySecondaryButton LinkCancel "Not now"
+                    , identityPrimaryButton LinkConfirm "Link" False
+                    ]
+                ]
+
+
+identityModalShell : String -> List (Html Msg) -> Html Msg
+identityModalShell heading body =
+    div [ class "fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center px-4" ]
+        [ div [ class "max-w-sm w-full bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4" ]
+            (h2 [ class "text-lg font-semibold text-slate-100" ] [ text heading ] :: body)
+        ]
+
+
+identityPrimaryButton : Msg -> String -> Bool -> Html Msg
+identityPrimaryButton msg label isDisabled =
+    button
+        [ onClick msg
+        , A.disabled isDisabled
+        , class
+            ("px-4 py-2 text-sm rounded-md text-white "
+                ++ (if isDisabled then
+                        "bg-slate-700 cursor-not-allowed opacity-60"
+
+                    else
+                        "bg-rose-600 hover:bg-rose-500"
+                   )
+            )
+        ]
+        [ text label ]
+
+
+identitySecondaryButton : Msg -> String -> Html Msg
+identitySecondaryButton msg label =
+    button
+        [ onClick msg
+        , class "px-4 py-2 text-sm border border-slate-700 rounded-md hover:bg-slate-800 text-slate-200"
+        ]
+        [ text label ]
 
 
 viewErrorToast : Model -> Html msg
