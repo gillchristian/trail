@@ -7,12 +7,15 @@ import { Elm } from './Main.elm'
 // ============================================================
 
 const DB_NAME = 'trail'
-const DB_VERSION = 3
+const DB_VERSION = 4
 const RACES_STORE = 'races'
 const GPX_STORE = 'gpx'
 const SETTINGS_STORE = 'settings'
+const IDENTITY_STORE = 'identity'
 const ACTIVE_PROFILE_KEY = 'activeProfile'
 const STRAVA_TOKEN_KEY = 'stravaSessionToken'
+// One row holds the device-global identity bundle ({me, directory}); WI-5.
+const IDENTITY_KEY = 'me'
 const BACKEND_URL =
   import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001'
 
@@ -47,6 +50,14 @@ const dbPromise = new Promise((resolve, reject) => {
         }
         cursor.continue()
       }
+    }
+    // v4: dedicated store for the device identity bundle ({me, directory}) —
+    // person-level userId + name directory, kept out of `settings` and out of
+    // the race performance profile (WI-5 / TASK-054 / ADR-0012). Additive: the
+    // contains-check makes the upgrade a no-op for a DB that already has it, and
+    // creating it on a populated DB leaves races/gpx/settings untouched.
+    if (!db.objectStoreNames.contains(IDENTITY_STORE)) {
+      db.createObjectStore(IDENTITY_STORE, { keyPath: 'key' })
     }
   }
   req.onsuccess = () => resolve(req.result)
@@ -166,6 +177,29 @@ async function saveStravaToken(token) {
   })
 }
 
+// Device identity bundle ({me, directory}) in its own store (WI-5 / TASK-054).
+// One row keyed IDENTITY_KEY; null until the first mint. Mirrors the
+// settings-style single-row load/save.
+async function loadIdentity() {
+  const db = await dbPromise
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(IDENTITY_STORE, 'readonly')
+    const req = tx.objectStore(IDENTITY_STORE).get(IDENTITY_KEY)
+    req.onsuccess = () => resolve(req.result ? req.result.value : null)
+    req.onerror = () => reject(req.error)
+  })
+}
+
+async function saveIdentity(value) {
+  const db = await dbPromise
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(IDENTITY_STORE, 'readwrite')
+    tx.objectStore(IDENTITY_STORE).put({ key: IDENTITY_KEY, value })
+    tx.oncomplete = () => resolve(value)
+    tx.onerror = () => reject(tx.error)
+  })
+}
+
 // ============================================================
 // Capture ?token=… from the OAuth callback URL before Elm boots.
 // Cadence's callback redirects to FRONTEND_URL_TRAIL?token=… so
@@ -274,6 +308,24 @@ app.ports.storageSaveStravaToken.subscribe(async (token) => {
     app.ports.storageStravaTokenLoaded.send(token)
   } catch (e) {
     app.ports.storageError.send(`saveStravaToken: ${e?.message || e}`)
+  }
+})
+
+app.ports.storageLoadIdentity.subscribe(async () => {
+  try {
+    const identity = await loadIdentity()
+    app.ports.storageIdentityLoaded.send(identity)
+  } catch (e) {
+    app.ports.storageError.send(`loadIdentity: ${e?.message || e}`)
+  }
+})
+
+app.ports.storageSaveIdentity.subscribe(async (identity) => {
+  try {
+    await saveIdentity(identity)
+    app.ports.storageIdentityLoaded.send(identity)
+  } catch (e) {
+    app.ports.storageError.send(`saveIdentity: ${e?.message || e}`)
   }
 })
 

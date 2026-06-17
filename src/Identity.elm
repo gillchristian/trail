@@ -5,6 +5,7 @@ module Identity exposing
     , ImportDecision(..), decideImport
     , OwnershipAnswer(..), OwnershipResult(..), resolveOwnership
     , encodeMe, decodeMe, encodeDirEntry, decodeDirEntry, encodeDirectory, decodeDirectory
+    , Stored, encodeStored, decodeStored
     )
 
 {-| WI-5 — identity & authorship (TASK-054, ADR-0012). The pure core: who
@@ -264,3 +265,27 @@ decodeDirectory =
             decodeDirEntry
         )
         |> D.map Dict.fromList
+
+
+{-| The device-global identity bundle as persisted in its dedicated IDB store
+(one row): `me` (absent until the first mint) plus the name directory. Both
+fields tolerate absence so an empty / partial row decodes to a clean default. -}
+type alias Stored =
+    { me : Maybe Me
+    , directory : Directory
+    }
+
+
+encodeStored : Stored -> E.Value
+encodeStored s =
+    E.object
+        [ ( "me", s.me |> Maybe.map encodeMe |> Maybe.withDefault E.null )
+        , ( "directory", encodeDirectory s.directory )
+        ]
+
+
+decodeStored : D.Decoder Stored
+decodeStored =
+    D.map2 Stored
+        (D.oneOf [ D.field "me" (D.nullable decodeMe), D.succeed Nothing ])
+        (D.oneOf [ D.field "directory" decodeDirectory, D.succeed Dict.empty ])

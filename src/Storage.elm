@@ -1,14 +1,17 @@
 port module Storage exposing
     ( deleteRace
     , gotError
+    , gotIdentity
     , gotProfile
     , gotRace
     , gotRaceDeleted
     , gotRaces
     , gotStravaToken
     , loadAll
+    , loadIdentity
     , loadProfile
     , loadStravaToken
+    , saveIdentity
     , saveProfile
     , saveRace
     , saveRaceMeta
@@ -70,6 +73,15 @@ port storageSaveStravaToken : Value -> Cmd msg
 port storageStravaTokenLoaded : (Value -> msg) -> Sub msg
 
 
+port storageLoadIdentity : () -> Cmd msg
+
+
+port storageSaveIdentity : Value -> Cmd msg
+
+
+port storageIdentityLoaded : (Value -> msg) -> Sub msg
+
+
 loadAll : Cmd msg
 loadAll =
     storageLoadAll ()
@@ -103,6 +115,26 @@ saveStravaToken =
 gotStravaToken : (Value -> msg) -> Sub msg
 gotStravaToken =
     storageStravaTokenLoaded
+
+
+{-| The device-global identity record (`me`) + name directory (WI-5 / TASK-054,
+ADR-0012). One row in a dedicated IDB store, loaded at boot and saved on
+mint/rename/import-merge. Distinct from `Profile` (the race performance profile)
+and from `deviceId` (a localStorage device fingerprint set in flags).
+-}
+loadIdentity : Cmd msg
+loadIdentity =
+    storageLoadIdentity ()
+
+
+saveIdentity : Value -> Cmd msg
+saveIdentity =
+    storageSaveIdentity
+
+
+gotIdentity : (Value -> msg) -> Sub msg
+gotIdentity =
+    storageIdentityLoaded
 
 
 saveRace : Value -> Cmd msg

@@ -6,10 +6,11 @@
 // split + migration. This file MIRRORS src/main.js's IDB logic (it can't
 // `import` it — main.js imports Main.elm + CSS); keep the two in sync.
 //
-// Coverage: v3 store layout, save-assigns-id, ~3 MB round-trip, the v3
-// split (races row carries no gpxText; gpx lives in its own row), the
-// LIGHT (meta) save that leaves the gpx row untouched (TASK-040's win),
-// orphan-free delete, and the v2 -> v3 migration of inline gpxText.
+// Coverage: v4 store layout (incl. the WI-5 identity store), save-assigns-id,
+// ~3 MB round-trip, the v3 split (races row carries no gpxText; gpx lives in
+// its own row), the LIGHT (meta) save that leaves the gpx row untouched
+// (TASK-040's win), orphan-free delete, the identity bundle round-trip, and the
+// v2 -> v3 + v3 -> v4 migrations.
 //
 // Run with: node scripts/smoke-storage.mjs
 
@@ -25,6 +26,8 @@ const repoRoot = resolve(here, '..')
 const RACES_STORE = 'races'
 const GPX_STORE = 'gpx'
 const SETTINGS_STORE = 'settings'
+const IDENTITY_STORE = 'identity'
+const IDENTITY_KEY = 'me'
 
 // --- v3 schema + migration: mirrors src/main.js onupgradeneeded ---
 function openV3(name) {
@@ -51,6 +54,38 @@ function openV3(name) {
           cursor.continue()
         }
       }
+    }
+    req.onsuccess = () => res(req.result)
+    req.onerror = () => rej(req.error)
+  })
+}
+
+// --- v4 schema: v3 + a dedicated identity store; mirrors src/main.js (WI-5) ---
+function openV4(name) {
+  return new Promise((res, rej) => {
+    const req = indexedDB.open(name, 4)
+    req.onupgradeneeded = (event) => {
+      const db = req.result
+      const tx = event.target.transaction
+      if (!db.objectStoreNames.contains(RACES_STORE)) db.createObjectStore(RACES_STORE, { keyPath: 'id' })
+      if (!db.objectStoreNames.contains(SETTINGS_STORE)) db.createObjectStore(SETTINGS_STORE, { keyPath: 'key' })
+      if (!db.objectStoreNames.contains(GPX_STORE)) {
+        db.createObjectStore(GPX_STORE, { keyPath: 'id' })
+        const racesStore = tx.objectStore(RACES_STORE)
+        const gpxStore = tx.objectStore(GPX_STORE)
+        racesStore.openCursor().onsuccess = (e) => {
+          const cursor = e.target.result
+          if (!cursor) return
+          const race = cursor.value
+          if (race && typeof race.gpxText === 'string') {
+            gpxStore.put({ id: race.id, gpxText: race.gpxText })
+            const { gpxText, ...meta } = race
+            cursor.update(meta)
+          }
+          cursor.continue()
+        }
+      }
+      if (!db.objectStoreNames.contains(IDENTITY_STORE)) db.createObjectStore(IDENTITY_STORE, { keyPath: 'key' })
     }
     req.onsuccess = () => res(req.result)
     req.onerror = () => rej(req.error)
@@ -124,6 +159,25 @@ function deleteRace(db, id) {
   })
 }
 
+// identity bundle: single row keyed IDENTITY_KEY; null until first mint (WI-5)
+function loadIdentity(db) {
+  return new Promise((res, rej) => {
+    const tx = db.transaction(IDENTITY_STORE, 'readonly')
+    const req = tx.objectStore(IDENTITY_STORE).get(IDENTITY_KEY)
+    req.onsuccess = () => res(req.result ? req.result.value : null)
+    req.onerror = () => rej(req.error)
+  })
+}
+
+function saveIdentity(db, value) {
+  return new Promise((res, rej) => {
+    const tx = db.transaction(IDENTITY_STORE, 'readwrite')
+    tx.objectStore(IDENTITY_STORE).put({ key: IDENTITY_KEY, value })
+    tx.oncomplete = () => res(value)
+    tx.onerror = () => rej(tx.error)
+  })
+}
+
 function getRaw(db, store, id) {
   return new Promise((res, rej) => {
     const tx = db.transaction(store, 'readonly')
@@ -170,7 +224,10 @@ const draft = {
   plan: { targetSeconds: null, kmPlans: [] },
 }
 
-const db = await openV3('trail')
+const db = await openV4('trail')
+
+// 0. v4 creates the dedicated identity store (WI-5 / TASK-054).
+assertEq(db.objectStoreNames.contains(IDENTITY_STORE), true, 'v4 creates the identity store')
 
 // 1. Empty DB → loadAll returns [].
 assertEq((await loadAll(db)).length, 0, 'empty DB returns []')
@@ -253,4 +310,34 @@ assertEq(await getRaw(db, GPX_STORE, saved.id), undefined, 'deleted race left no
   assertEq((await loadAll(v3)).find(r => r.id === legacyId)?.gpxText?.length, fixtureUtmb.length, 'migrated race re-joins its gpx on load')
 }
 
-console.log('\nSMOKE PASSED · v3 GPX split, light (meta) save, orphan-free delete, and v2→v3 migration all round-trip — including UTMB-size payloads.')
+// 10. IDENTITY STORE (v4, WI-5 / TASK-054): empty until first mint, then the
+//     {me, directory} bundle round-trips.
+assertEq(await loadIdentity(db), null, 'identity store starts empty (loadIdentity → null)')
+{
+  const bundle = { me: { userId: 'u1', displayName: 'Alex' }, directory: [{ userId: 'u1', displayName: 'Alex', nameUpdatedAt: 1 }] }
+  await saveIdentity(db, bundle)
+  const back = await loadIdentity(db)
+  assertEq(back?.me?.userId, 'u1', 'identity round-trips: me.userId')
+  assertEq(back?.me?.displayName, 'Alex', 'identity round-trips: me.displayName')
+  assertEq(back?.directory?.length, 1, 'identity round-trips: directory entries')
+}
+
+// 11. MIGRATION v3 -> v4: an existing v3 DB gains the identity store on upgrade,
+//     with races / gpx / settings preserved (additive, like v2→v3).
+{
+  const name = 'trail-v3-to-v4'
+  const v3 = await openV3(name)
+  const rid = webcrypto.randomUUID()
+  await saveRace(v3, { ...draft, id: rid, name: 'Before v4', gpxText: small })
+  await putRaw(v3, SETTINGS_STORE, { key: 'activeProfile', value: { fromV3: true } })
+  assertEq(v3.objectStoreNames.contains(IDENTITY_STORE), false, 'v3 has no identity store')
+  v3.close() // release the connection so the version upgrade isn't blocked
+
+  const v4 = await openV4(name)
+  assertEq(v4.objectStoreNames.contains(IDENTITY_STORE), true, 'v3→v4 adds the identity store')
+  assertEq((await loadAll(v4)).find(r => r.id === rid)?.gpxText, small, 'v3→v4 preserves races + gpx')
+  assertEq((await getRaw(v4, SETTINGS_STORE, 'activeProfile')).value.fromV3, true, 'v3→v4 preserves settings')
+  assertEq(await loadIdentity(v4), null, 'identity store empty after migration')
+}
+
+console.log('\nSMOKE PASSED · v4 schema incl. the identity store, v3 GPX split, light (meta) save, orphan-free delete, and v2→v3 + v3→v4 migrations all round-trip — including UTMB-size payloads.')
