@@ -3348,15 +3348,56 @@ viewEmptyState =
         ]
 
 
-{-| Partition races into "Plans" (no actualSplits) and "Executions"
-(linked to a completed run), render each as its own section. The
-cut matches the data model rather than dates: a plan whose race
-date already passed but was never linked stays in Plans (the user
-might still revisit it); a recently-logged training loop with an
-actual shows up in Executions even though it has no future date.
+{-| Is this race the local user's own? **Owner-based, never last-editor**
+(TASK-055, spec §1.5): my `userId`, or unstamped (`owner == ""`), or no identity
+yet — all read as personal. A race someone else owns (`owner` set and ≠ me) is the
+only "someone else's" case, so a race you own that a coach edited still reads as
+yours.
+-}
+isMyRace : Maybe Identity.Me -> Race -> Bool
+isMyRace me race =
+    case me of
+        Just m ->
+            race.owner == "" || race.owner == m.userId
+
+        Nothing ->
+            True
+
+
+{-| The home grid. Solo / common case (no one else's races): exactly the
+Plans/Executions layout (TASK-028), unchanged. When you also hold races owned by
+other people (the coach case — every athlete plan reads as theirs), group by
+**person**: "Your races" first, then one group per other owner, named from the
+directory. The Plans/Executions split lives inside each group. TASK-055, spec §1.5.
 -}
 viewRaceSections : Model -> List Race -> Html Msg
 viewRaceSections model races =
+    let
+        ( mine, others ) =
+            List.partition (isMyRace model.me) races
+    in
+    if List.isEmpty others then
+        viewPlansExecutions model races
+
+    else
+        div [ class "space-y-12" ]
+            ((if List.isEmpty mine then
+                []
+
+              else
+                [ viewOwnerGroup model "Your races" mine ]
+             )
+                ++ viewOtherOwnerGroups model others
+            )
+
+
+{-| The Plans/Executions split (TASK-028) for a set of races — formerly the body
+of `viewRaceSections`, now reused inside each owner group (TASK-055). The cut is
+by `actualSplits` presence, not dates: a plan whose date passed but was never
+linked stays in Plans; a logged training loop with an actual shows in Executions.
+-}
+viewPlansExecutions : Model -> List Race -> Html Msg
+viewPlansExecutions model races =
     let
         ( executions, plans ) =
             List.partition (\r -> r.actualSplits /= Nothing) races
@@ -3379,6 +3420,46 @@ viewRaceSections model races =
           else
             viewRaceSection model "Executions" "Runs you came back from — linked to an actual activity." sortedExecutions
         ]
+
+
+{-| One person's race group: a name header + their Plans/Executions split. -}
+viewOwnerGroup : Model -> String -> List Race -> Html Msg
+viewOwnerGroup model heading races =
+    let
+        n =
+            List.length races
+    in
+    div [ class "space-y-4" ]
+        [ div [ class "flex items-baseline gap-3 border-b border-slate-800 pb-2" ]
+            [ h2 [ class "text-xl font-bold tracking-tight text-slate-100" ] [ text heading ]
+            , span [ class "text-sm text-slate-500 tabular-nums" ]
+                [ text
+                    (String.fromInt n
+                        ++ (if n == 1 then
+                                " race"
+
+                            else
+                                " races"
+                           )
+                    )
+                ]
+            ]
+        , viewPlansExecutions model races
+        ]
+
+
+{-| Others' races grouped by owner, each group named from the directory and
+sorted by that name (TASK-055). -}
+viewOtherOwnerGroups : Model -> List Race -> List (Html Msg)
+viewOtherOwnerGroups model others =
+    others
+        |> List.foldr
+            (\r acc -> Dict.update r.owner (\ex -> Just (r :: Maybe.withDefault [] ex)) acc)
+            Dict.empty
+        |> Dict.toList
+        |> List.map (\( ownerId, rs ) -> ( Identity.resolveName model.directory ownerId, rs ))
+        |> List.sortBy Tuple.first
+        |> List.map (\( name, rs ) -> viewOwnerGroup model (name ++ "’s races") rs)
 
 
 viewRaceSection : Model -> String -> String -> List Race -> Html Msg
