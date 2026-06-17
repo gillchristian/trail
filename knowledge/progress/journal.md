@@ -2139,3 +2139,47 @@ backfill on touch/export; the **Q-I1 link action**; `.trail` `people`
 denormalization + import-merge; `resolveName` into labels (changelog author,
 owner display). UX is specced in companion §1.4 — I'll draft from the spec +
 prototype and the user verifies in-browser.
+
+---
+## 2026-06-17 — Fix: WI-5 slice-3 boot crash + DB self-heal (in-browser bugs)
+
+**Found by the user in-browser** after slice 3: a "Storage error" toast
+(`loadIdentity: ... object store not found`) and **both export buttons (.trail /
+.gpx) doing nothing** — on a fresh instance too. Console: `Cannot read
+properties of undefined (reading 'subscribe') at main.js:323`.
+
+**Two real bugs (PR #114, merged `b1a057a`):**
+
+1. **The download killer — Elm dead-code elimination drops unused ports.**
+   `main.js` subscribed to `storageSaveIdentity`, but *saving* identity isn't
+   used in Elm until the flows slice — so Elm DCE stripped the port,
+   `app.ports.storageSaveIdentity` was `undefined`, and the unguarded
+   `.subscribe` **threw at boot**, aborting the rest of the port wiring
+   (`downloadFile`, `print`, …). Hence both exports did nothing, regardless of
+   the DB. **Lesson worth keeping: a `port` only appears in `app.ports` if it's
+   actually used in Elm; guard JS `.subscribe` for ports that may not be wired
+   yet during an incremental build.** Fixed by `if (app.ports.X)` guards on the
+   identity subscriptions.
+
+2. **A v4 DB missing the identity store didn't self-heal.** The user's existing
+   DB upgraded to v4 *without* the identity store (my incremental `main.js` edits
+   with their dev server live → an HMR reload applied the `DB_VERSION = 4` bump a
+   beat before the store-creation line landed; `onupgradeneeded` only fires on a
+   version change, so it never re-ran). Result: the toast + no place to persist
+   identity. **Fix:** `DB_VERSION` 4→5 (schema-identical) so the additive,
+   idempotent migration re-runs on reload and creates the missing store with no
+   data loss; plus a defensive `loadIdentity` guard (missing store → `null`, not
+   a throw). The committed slice-3 code was self-consistent (a clean v3→v4 makes
+   the store — the smoke proved it); only the half-applied-during-dev DB was bad.
+
+**smoke-storage** refactored to a shared `migrate`/`open`; new checks: a poisoned
+v4 (no identity store) heals on reopen at v5 with races/gpx/settings preserved,
+and `loadIdentity` degrades to `null`. All 8 smokes + type-check + build green.
+`deviceId` untouched.
+
+**Process lesson:** don't edit `main.js` IDB version/store logic in multiple
+steps with the user's dev server live — HMR can apply a version bump before its
+store-creation, poisoning the DB. Land such edits atomically (or pause the dev
+server).
+
+**Next:** unchanged — slice 4 (the flows) is the remaining, visible piece.
