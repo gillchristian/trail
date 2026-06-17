@@ -8,7 +8,10 @@
 //     DifferentRace / DifferentCourse), and an empty shareId never matches;
 //   - ProjectFile.decode reads both v1 (no shareId/courseHash/owner) and v2 docs,
 //     defaults each missing field to "", round-trips them on re-export, and
-//     still rejects an unknown version (owner: WI-5 / TASK-054 / ADR-0012).
+//     still rejects an unknown version (owner: WI-5 / TASK-054 / ADR-0012);
+//   - the v2 doc carries denormalized name `people` (Identity.subsetFor over the
+//     owner + change authors): decode recovers them, v1 defaults to none, and a
+//     re-export denormalizes the owner back into `people` (WI-5 / TASK-054).
 // (Foundation guard for the coach-collaboration arc, TASK-047 / ADR-0010.)
 //
 // Run with: node scripts/smoke-trailsync.mjs
@@ -92,6 +95,8 @@ const raceCore = {
 const trailV2 = JSON.stringify({
   format: 'trail-project', version: 2,
   race: { ...raceCore, shareId: 'share-xyz', courseHash: 'hash-abc', owner: 'user-42' },
+  // WI-5: the denormalized name pairs the file references (here, the owner).
+  people: [{ userId: 'user-42', displayName: 'Alex', nameUpdatedAt: 100 }],
 })
 const trailV1 = JSON.stringify({
   format: 'trail-project', version: 1, race: raceCore, // no shareId / courseHash
@@ -144,6 +149,7 @@ const run = async () => {
     check('v2 preserves shareId', r.shareId === 'share-xyz', r.shareId)
     check('v2 preserves courseHash', r.courseHash === 'hash-abc', r.courseHash)
     check('v2 preserves owner (WI-5)', r.owner === 'user-42', JSON.stringify(r.owner))
+    check('v2 decodes the denormalized people (WI-5)', r.peopleCount === 1, JSON.stringify(r.peopleCount))
   }
   {
     const r = await call({ op: 'decode', trail: trailV1 })
@@ -151,6 +157,7 @@ const run = async () => {
     check('v1 shareId defaults to ""', r.shareId === '', JSON.stringify(r.shareId))
     check('v1 courseHash defaults to ""', r.courseHash === '', JSON.stringify(r.courseHash))
     check('v1 owner defaults to "" (WI-5 back-compat)', r.owner === '', JSON.stringify(r.owner))
+    check('v1 has no people (defaults empty, WI-5 back-compat)', r.peopleCount === 0, JSON.stringify(r.peopleCount))
     check('v1 race body still read (name)', r.name === 'Demo Race', r.name)
   }
   {
@@ -167,9 +174,11 @@ const run = async () => {
     check('export carries shareId', doc.race.shareId === 'share-xyz', doc.race.shareId)
     check('export carries courseHash', doc.race.courseHash === 'hash-abc', doc.race.courseHash)
     check('export carries owner', doc.race.owner === 'user-42', doc.race.owner)
+    check('export denormalizes the owner into people (WI-5)', Array.isArray(doc.people) && doc.people.length === 1 && doc.people[0].userId === 'user-42' && doc.people[0].displayName === 'Alex', JSON.stringify(doc.people))
     // round-trip: decode what we just encoded
     const back = await call({ op: 'decode', trail: encoded })
     check('encode→decode round-trip preserves identity + owner', back.shareId === 'share-xyz' && back.courseHash === 'hash-abc' && back.owner === 'user-42', JSON.stringify(back))
+    check('encode→decode round-trip preserves people (WI-5)', back.peopleCount === 1, JSON.stringify(back.peopleCount))
   }
   {
     // A v1 doc re-exports as v2 (the version is the build's currentVersion).

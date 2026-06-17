@@ -38,10 +38,12 @@ import Types
 
 {-| Build an entry from a set of changes, or `Nothing` when there were none
 (so callers can skip logging a no-op). `seq` only has to be locally monotonic;
-combined with `author` it makes a globally-unique immutable id.
+combined with `author` (the `deviceId`) it makes a globally-unique immutable id.
+`authorId` is the person-level `userId` for the feed's name label (WI-5), `""`
+when no identity exists yet (the entry then labels via the `author`/device path).
 -}
-entryFromChanges : String -> Int -> Int -> String -> List ChangeDescriptor -> Maybe ChangeEntry
-entryFromChanges author nowMs seq source changes =
+entryFromChanges : String -> String -> Int -> Int -> String -> List ChangeDescriptor -> Maybe ChangeEntry
+entryFromChanges author authorId nowMs seq source changes =
     if List.isEmpty changes then
         Nothing
 
@@ -49,6 +51,7 @@ entryFromChanges author nowMs seq source changes =
         Just
             { entryId = author ++ "-" ++ String.fromInt seq
             , author = author
+            , authorId = authorId
             , timestampMs = nowMs
             , source = source
             , changes = changes
@@ -57,10 +60,11 @@ entryFromChanges author nowMs seq source changes =
 
 {-| The structural "course uploaded" event seeded when a race is created.
 -}
-courseUploaded : String -> Int -> Int -> ChangeEntry
-courseUploaded author nowMs seq =
+courseUploaded : String -> String -> Int -> Int -> ChangeEntry
+courseUploaded author authorId nowMs seq =
     { entryId = author ++ "-" ++ String.fromInt seq
     , author = author
+    , authorId = authorId
     , timestampMs = nowMs
     , source = "local"
     , changes = [ CourseUploaded ]

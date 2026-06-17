@@ -245,6 +245,12 @@ const app = Elm.Main.init({
     incomingStravaToken: incomingStravaToken,
     backendUrl: BACKEND_URL,
     deviceId: deviceId,
+    // A fresh person-id candidate for WI-5 identity minting (TASK-054). Elm
+    // consumes it only at a mint point, and `me` mints at most once per device
+    // (both mint points gate on no-identity-yet), so a per-boot candidate is
+    // consumed ≤ once. Unlike `deviceId` it is NOT persisted here — the minted
+    // identity persists in its IDB store via the saveIdentity port.
+    newUserId: crypto.randomUUID(),
   },
 })
 

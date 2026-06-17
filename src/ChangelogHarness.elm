@@ -54,7 +54,7 @@ handle v =
 
                         -- Round-trip through the entry codec so a bad encoder/decoder is caught too.
                         entry =
-                            { entryId = "t-0", author = "t", timestampMs = 0, source = "local", changes = changes }
+                            { entryId = "t-0", author = "t", authorId = "t-u", timestampMs = 0, source = "local", changes = changes }
                     in
                     case D.decodeValue changeEntryDecoder (encodeChangeEntry entry) of
                         Ok back ->
