@@ -14,15 +14,18 @@
 **Notes:** scope cuts, links, anything decided while planning.
 ```
 
-### (no active task)
+### TASK-058 — WI-1: `Language` type + codec
 
-The **coach-collaboration arc is complete** (2026-06-17): TASK-046–051, 053, 054,
-055, 056 all shipped + verified. The active BACKLOG queue is exhausted. Pull the
-next item only on a fresh steer from the user — the candidates are the **parking
-lot** (light/dark toggle, multi-language, GAP descent slider, per-km gain/loss
-for the slope factor) and roadmap §7's remaining calibration fits, none of which
-is prioritized. **Calibration stays paused** (user, 2026-06-15). Do **not**
-auto-promote a parking-lot item; surface options and let the user choose.
+**Source:** BACKLOG (i18n epic) — explicit user steer, 2026-06-18
+**Branch:** `feat/task-058-language-type`
+**Acceptance criteria:**
+- [ ] `Language.elm` exposes `Language(..)`, `toCode`, `fromCode`, `encode`, `decoder` and compiles into the app (verify: `npx elm make src/Main.elm --output=/dev/null` once it's imported, and the harness compiles).
+- [ ] `toCode`/`fromCode` round-trip for every constructor (verify: `smoke:i18n` asserts `English↔"en"`, `Spanish↔"es"`).
+- [ ] `decoder` fails on an unknown code (verify: `smoke:i18n` decodes `"de"` → `Err`).
+- [ ] `toCode` has no `_ ->` fallthrough, so a third constructor would fail to compile (verify: code review of the `case`; the full add-a-constructor sweep is TASK-069's DoD).
+- [ ] CI green: type-check, `npm run build`, `npm run smoke`, and the new `npm run smoke:i18n`.
+
+**Notes:** Self-contained, no deps. Codec keyed on **ISO codes** (stable serialization), not constructor names (refactorable). Strict, total leaf decoder; back-compat/migration tolerance lives one level up in WI-2's `settingsDecoder` (TASK-059). New harness `src/I18nHarness.elm` + `scripts/smoke-i18n.mjs` + a `smoke:i18n` package script, mirroring the established compiled-`Platform.worker` harness pattern (`reference/local-ci.md`); it will grow to cover `Settings` (059) and `Format` (060). Spec WI-1; ADR-0014. **The i18n epic (058–069) is the active arc** — on close, the close PR pulls the next i18n task into this file.
 
 ---
 
@@ -39,6 +42,13 @@ is live and user-verified in-browser.
 
 ## Standing reminders (not active tasks)
 
+- **i18n epic is the active arc (started 2026-06-18).** English + Spanish,
+  type-driven, no library — TASK-058–069, sequenced machinery (058→060) →
+  translation sweep (061→069). Spec `reference/i18n-spec.md` (read its *Resolved
+  decisions* callout), ADR-0014, glossary `reference/i18n-glossary.md`. **Units
+  (metric/imperial) are descoped** to TASK-070 (parking lot) — language only.
+  Translation PRs are large-surface and user-reviewed; keep terms consistent via
+  the glossary.
 - **Calibration is paused (user, 2026-06-15).** The two core continuous rates
   shipped (TASK-043 vmh, TASK-044 flat pace); the harder roadmap §7 fits
   (descent / fatigue / Riegel / sustainable-HR / decoupling) stay queued —
