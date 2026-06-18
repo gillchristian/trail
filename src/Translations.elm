@@ -3369,3 +3369,15 @@ applyChanges language =
 
         Spanish ->
             "Aplicar cambios"
+
+
+{-| Owner attribution on a race ("Plan by <name>") — prefix; the name follows.
+-}
+planBy : Language -> String
+planBy language =
+    case language of
+        English ->
+            "Plan by "
+
+        Spanish ->
+            "Plan de "
