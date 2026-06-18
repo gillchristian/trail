@@ -2643,3 +2643,33 @@ deleted.
 **Next:** TASK-061 — `Translations` module (function-per-key, total over `Language`,
 `plural` helper) + the global chrome (header/nav/footer/title). Starts the
 translation sweep; reuses this task's `Context` threading.
+
+---
+## 2026-06-18 17:02 — TASK-061: WI-4 Translations module + global chrome
+
+**Task:** TASK-061 (i18n epic, WI-4)
+**What I did:** Created `Translations.elm` — function-per-key, each `case`-matching
+`Language` with no `_ ->` (a third language → non-exhaustive everywhere). Added the
+`plural` helper and the global-chrome strings: `documentTitle`/`headerSubtitle`
+(route-switched, so `Translations` imports `Route`), `profileNav`, `footerPrivacy`.
+Migrated `Main`: `viewHeader` takes `Language`; the doc title comes from
+`Translations.documentTitle` (retired the local `title`); footer line localized.
+**What I verified:** `elm make src/Main.elm` → Success; `npm run build` → OK;
+`smoke:i18n` unaffected. (Translation strings are verified by review + the compiler's
+exhaustiveness, not brittle string-equality smokes.)
+**What changed in the repo:** new `src/Translations.elm`; `src/Main.elm` (import,
+`view`, `viewHeader`, footer). Commit on `feat/task-061-translations-chrome`. PR
+#134, merged `be53916`.
+**What I learned:** Chose the spec's **per-key `case language of`** style over a
+compact `tr lang {english=, spanish=}` record helper. The record helper would also
+be exhaustive (adding a constructor breaks the helper's case, which forces a new
+record field, which breaks every literal), and far less verbose — but the per-key
+style is what the user specced, is maximally greppable, and matches the type-first
+ethos. Verbosity is the known cost of library-free type-driven i18n; accepted. Let
+`Translations` import `Route` so the two route-switched strings live in one place
+(no cycle: `Translations → Route → Types`; `Main` → all). Threading rule settled:
+**text-only views take `Language`, quantity-rendering views take `Context`** — each
+takes exactly what it needs (footer/header = `Language`; race card = `Context`).
+**Next:** TASK-062 — translate home / upload / race cards (hero + race-count plural,
+upload states, density/category/aid-count labels). `viewRaceCard`/`viewRaceGrid`
+already thread `Context` from TASK-060.
