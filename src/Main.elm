@@ -57,6 +57,7 @@ import Svg.Attributes as SA
 import Task
 import Time
 import TrailSync
+import Translations
 import Types
     exposing
         ( AidStation
@@ -3034,10 +3035,10 @@ subscriptions _ =
 
 view : Model -> Browser.Document Msg
 view model =
-    { title = title model.route
+    { title = Translations.documentTitle model.settings.language model.route
     , body =
         [ div [ class "min-h-screen flex flex-col" ]
-            [ viewHeader model.route
+            [ viewHeader model.settings.language model.route
             , div [ class "flex-1 pb-10" ] [ viewContent model ]
             , viewFooter model.settings.language
             , viewDeleteModal model
@@ -3050,36 +3051,8 @@ view model =
     }
 
 
-title : Route -> String
-title route =
-    case route of
-        Route.Index ->
-            "Trail"
-
-        Route.RaceDetail _ ->
-            "Trail — race"
-
-        Route.RaceMap _ ->
-            "Trail — map"
-
-        Route.PlanTable _ ->
-            "Trail — plan"
-
-        Route.PlanKm _ _ ->
-            "Trail — plan km"
-
-        Route.PlanSection _ _ ->
-            "Trail — plan section"
-
-        Route.ProfileSettings ->
-            "Trail — profile"
-
-        Route.NotFound ->
-            "Trail — not found"
-
-
-viewHeader : Route -> Html Msg
-viewHeader route =
+viewHeader : Language -> Route -> Html Msg
+viewHeader language route =
     div [ class "px-6 py-4 border-b border-slate-800/60 bg-slate-950/95 backdrop-blur sticky top-0 z-30 print:hidden" ]
         [ div [ class "max-w-screen-2xl mx-auto flex items-center gap-4" ]
             [ a
@@ -3092,33 +3065,7 @@ viewHeader route =
                 ]
             , span [ class "text-slate-700" ] [ text "·" ]
             , p [ class "text-sm text-slate-400" ]
-                [ text
-                    (case route of
-                        Route.Index ->
-                            "Your races."
-
-                        Route.RaceDetail _ ->
-                            "Race detail."
-
-                        Route.RaceMap _ ->
-                            "Map view."
-
-                        Route.PlanTable _ ->
-                            "Plan · table view."
-
-                        Route.PlanKm _ _ ->
-                            "Plan · per km."
-
-                        Route.PlanSection _ _ ->
-                            "Plan · section."
-
-                        Route.ProfileSettings ->
-                            "Profile · settings."
-
-                        Route.NotFound ->
-                            "Lost?"
-                    )
-                ]
+                [ text (Translations.headerSubtitle language route) ]
             , div [ class "flex-1" ] []
             , a
                 [ Route.href Route.ProfileSettings
@@ -3127,7 +3074,7 @@ viewHeader route =
                     , ( "text-slate-100", route == Route.ProfileSettings )
                     ]
                 ]
-                [ text "Profile" ]
+                [ text (Translations.profileNav language) ]
             ]
         ]
 
@@ -3188,10 +3135,9 @@ viewFooter : Language -> Html Msg
 viewFooter language =
     div [ class "px-6 py-4 text-xs text-slate-500 border-t border-slate-800/60 bg-slate-950 print:hidden" ]
         [ div [ class "max-w-screen-2xl mx-auto flex flex-wrap items-center justify-between gap-3" ]
-            -- Privacy line stays English until the global-chrome translation pass
-            -- (TASK-061); the toggle labels are endonyms, so they read the same in
-            -- either language and need no translation.
-            [ span [] [ text "Local-first. Your GPX never leaves the browser." ]
+            -- The toggle labels are endonyms (English / Español), so they read the
+            -- same in either language and need no translation.
+            [ span [] [ text (Translations.footerPrivacy language) ]
             , viewLanguageToggle language
             ]
         ]
