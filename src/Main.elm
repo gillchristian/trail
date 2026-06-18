@@ -3682,63 +3682,57 @@ p2 s =
 viewIndex : Model -> List Race -> Html Msg
 viewIndex model races =
     div [ class "max-w-screen-2xl mx-auto mt-10 space-y-10" ]
-        [ viewIndexHero (List.length races)
+        [ viewIndexHero model.settings.language (List.length races)
         , viewUploadBanner model
         , if List.isEmpty races then
-            viewEmptyState
+            viewEmptyState model.settings.language
 
           else
             viewRaceSections model races
         ]
 
 
-viewIndexHero : Int -> Html msg
-viewIndexHero count =
+viewIndexHero : Language -> Int -> Html msg
+viewIndexHero language count =
     div [ class "flex items-end justify-between flex-wrap gap-4" ]
         [ div []
             [ h1 [ class "text-4xl font-bold tracking-tight text-slate-100" ]
-                [ text "Your races" ]
+                [ text (Translations.homeTitle language) ]
             , p [ class "mt-2 text-slate-400" ]
-                [ text "Upload a GPX, plan the day, export Coros-ready files." ]
+                [ text (Translations.homeSubtitle language) ]
             ]
         , p [ class "text-sm text-slate-500" ]
-            [ text
-                (if count == 0 then
-                    "no races yet"
-
-                 else if count == 1 then
-                    "1 race"
-
-                 else
-                    String.fromInt count ++ " races"
-                )
-            ]
+            [ text (Translations.heroRaceCount language count) ]
         ]
 
 
 viewUploadBanner : Model -> Html Msg
 viewUploadBanner model =
     let
+        language =
+            model.settings.language
+
         ( labelText, sub, disabled ) =
             case model.upload of
                 NotUploading ->
-                    ( "Drop a .gpx or .trail file", "or click to choose one", False )
+                    ( Translations.uploadDropTitle language, Translations.uploadDropSub language, False )
 
                 Parsing fname ->
-                    ( "Processing " ++ fname ++ "…", "Crunching the track — this can take a moment on a long course.", True )
+                    ( Translations.uploadProcessing language fname, Translations.uploadProcessingSub language, True )
 
                 Persisting fname ->
-                    ( "Saving " ++ fname ++ "…", "Writing to local storage.", True )
+                    ( Translations.uploadSaving language fname, Translations.uploadSavingSub language, True )
 
                 UploadFailed fname err ->
-                    ( "Couldn't read " ++ fname, err, False )
+                    -- `err` is a dynamic parse/decode message, not app chrome — left as-is.
+                    ( Translations.uploadFailed language fname, err, False )
 
         inner =
             if disabled then
                 viewUploadSkeleton labelText sub
 
             else
-                viewUploadIdle labelText sub
+                viewUploadIdle language labelText sub
     in
     div
         [ classList
@@ -3755,15 +3749,15 @@ viewUploadBanner model =
         inner
 
 
-viewUploadIdle : String -> String -> List (Html Msg)
-viewUploadIdle labelText sub =
+viewUploadIdle : Language -> String -> String -> List (Html Msg)
+viewUploadIdle language labelText sub =
     [ p [ class "text-slate-200 font-medium" ] [ text labelText ]
     , p [ class "text-sm text-slate-500 mt-1" ] [ text sub ]
     , button
         [ onClick OpenPicker
         , class "mt-4 px-4 py-2 bg-rose-600 text-white rounded-md hover:bg-rose-500 text-sm font-medium"
         ]
-        [ text "Choose a file" ]
+        [ text (Translations.chooseFile language) ]
     ]
 
 
@@ -3785,11 +3779,11 @@ dropDecoder =
         |> D.map (\m -> ( m, True ))
 
 
-viewEmptyState : Html msg
-viewEmptyState =
+viewEmptyState : Language -> Html msg
+viewEmptyState language =
     div [ class "border border-dashed border-slate-800 rounded-2xl py-20 text-center text-slate-500" ]
-        [ p [ class "text-lg" ] [ text "No races yet." ]
-        , p [ class "text-sm mt-2" ] [ text "Drop in a GPX above to get started." ]
+        [ p [ class "text-lg" ] [ text (Translations.emptyTitle language) ]
+        , p [ class "text-sm mt-2" ] [ text (Translations.emptySub language) ]
         ]
 
 
@@ -3830,7 +3824,7 @@ viewRaceSections model races =
                 []
 
               else
-                [ viewOwnerGroup model "Your races" mine ]
+                [ viewOwnerGroup model (Translations.homeTitle model.settings.language) mine ]
              )
                 ++ viewOtherOwnerGroups model others
             )
@@ -3852,18 +3846,21 @@ viewPlansExecutions model races =
 
         sortedExecutions =
             List.sortWith compareExecutions executions
+
+        language =
+            model.settings.language
     in
     div [ class "space-y-10" ]
         [ if List.isEmpty sortedPlans then
             text ""
 
           else
-            viewRaceSection model "Plans" "Courses you've prepared but haven't run yet." sortedPlans
+            viewRaceSection model (Translations.sectionPlans language) (Translations.sectionPlansSub language) sortedPlans
         , if List.isEmpty sortedExecutions then
             text ""
 
           else
-            viewRaceSection model "Executions" "Runs you came back from — linked to an actual activity." sortedExecutions
+            viewRaceSection model (Translations.sectionExecutions language) (Translations.sectionExecutionsSub language) sortedExecutions
         ]
 
 
@@ -3878,16 +3875,7 @@ viewOwnerGroup model heading races =
         [ div [ class "flex items-baseline gap-3 border-b border-slate-800 pb-2" ]
             [ h2 [ class "text-xl font-bold tracking-tight text-slate-100" ] [ text heading ]
             , span [ class "text-sm text-slate-500 tabular-nums" ]
-                [ text
-                    (String.fromInt n
-                        ++ (if n == 1 then
-                                " race"
-
-                            else
-                                " races"
-                           )
-                    )
-                ]
+                [ text (Translations.raceCount model.settings.language n) ]
             ]
         , viewPlansExecutions model races
         ]
@@ -3904,7 +3892,7 @@ viewOtherOwnerGroups model others =
         |> Dict.toList
         |> List.map (\( ownerId, rs ) -> ( Identity.resolveName model.directory ownerId, rs ))
         |> List.sortBy Tuple.first
-        |> List.map (\( name, rs ) -> viewOwnerGroup model (name ++ "’s races") rs)
+        |> List.map (\( name, rs ) -> viewOwnerGroup model (Translations.othersRacesHeading model.settings.language name) rs)
 
 
 viewRaceSection : Model -> String -> String -> List Race -> Html Msg
@@ -3993,7 +3981,7 @@ viewRaceCard : Context -> Maybe (List ( Float, Float )) -> Race -> Html Msg
 viewRaceCard ctx maybeCoords race =
     let
         ( catLetter, catColor, catLabel ) =
-            distanceCategory race.distance
+            distanceCategory ctx.language race.distance
     in
     div
         [ class "trail-card-in group relative bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden hover:border-rose-500/60 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-rose-500/10 transition-all duration-200 flex flex-col" ]
@@ -4030,7 +4018,7 @@ viewRaceCard ctx maybeCoords race =
                             elevationDensity race.distance race.gain
 
                         ( densText, densTone ) =
-                            densityLabel dens
+                            densityLabel ctx.language dens
                       in
                       p [ class "text-[10px] uppercase tracking-wider text-slate-500 truncate" ]
                         [ text catLabel
@@ -4048,21 +4036,11 @@ viewRaceCard ctx maybeCoords race =
                 ]
             , if List.isEmpty race.aidStations then
                 p [ class "text-xs text-slate-600" ]
-                    [ text "No aid stations yet." ]
+                    [ text (Translations.cardNoAid ctx.language) ]
 
               else
                 p [ class "text-xs text-amber-400/70" ]
-                    [ text
-                        ("★ "
-                            ++ String.fromInt (List.length race.aidStations)
-                            ++ (if List.length race.aidStations == 1 then
-                                    " aid station planned"
-
-                                else
-                                    " aid stations planned"
-                               )
-                        )
-                    ]
+                    [ text (Translations.cardAidCount ctx.language (List.length race.aidStations)) ]
             ]
         , button
             [ onClick (RequestDelete race.id)
@@ -4074,23 +4052,31 @@ viewRaceCard ctx maybeCoords race =
         ]
 
 
-distanceCategory : Float -> ( String, String, String )
-distanceCategory meters =
+distanceCategory : Language -> Float -> ( String, String, String )
+distanceCategory language meters =
     let
         km =
             meters / 1000
+
+        tr en es =
+            case language of
+                English ->
+                    en
+
+                Spanish ->
+                    es
     in
     if km < 30 then
-        ( "S", "bg-sky-500", "Short" )
+        ( "S", "bg-sky-500", tr "Short" "Corta" )
 
     else if km < 70 then
-        ( "M", "bg-amber-500", "Medium" )
+        ( "M", "bg-amber-500", tr "Medium" "Media" )
 
     else if km < 120 then
-        ( "L", "bg-orange-500", "Long" )
+        ( "L", "bg-orange-500", tr "Long" "Larga" )
 
     else
-        ( "XL", "bg-rose-600", "Ultra" )
+        ( "XL", "bg-rose-600", tr "Ultra" "Ultra" )
 
 
 {-| Elevation density in meters of gain per kilometer of distance.
@@ -4109,25 +4095,34 @@ elevationDensity distanceMeters gainMeters =
 so the eye finds steep races on the index. Cutoffs match
 pace-prediction-roadmap.md §11.A.
 -}
-densityLabel : Float -> ( String, String )
-densityLabel mPerKm =
+densityLabel : Language -> Float -> ( String, String )
+densityLabel language mPerKm =
+    let
+        tr en es =
+            case language of
+                English ->
+                    en
+
+                Spanish ->
+                    es
+    in
     if mPerKm < 5 then
-        ( "Flat", "text-slate-400" )
+        ( tr "Flat" "Llano", "text-slate-400" )
 
     else if mPerKm < 20 then
-        ( "Rolling", "text-sky-400" )
+        ( tr "Rolling" "Ondulado", "text-sky-400" )
 
     else if mPerKm < 40 then
-        ( "Hilly", "text-amber-400" )
+        ( tr "Hilly" "Accidentado", "text-amber-400" )
 
     else if mPerKm < 55 then
-        ( "Mountainous", "text-orange-400" )
+        ( tr "Mountainous" "Montañoso", "text-orange-400" )
 
     else if mPerKm < 70 then
-        ( "Very mountainous", "text-rose-400" )
+        ( tr "Very mountainous" "Muy montañoso", "text-rose-400" )
 
     else
-        ( "Extreme", "text-rose-500" )
+        ( tr "Extreme" "Extremo", "text-rose-500" )
 
 
 {-| Refined Naismith-Scarf flat-equivalent distance in km:

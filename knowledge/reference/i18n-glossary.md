@@ -77,6 +77,8 @@ Water→Agua · Food→Comida · Warm food→Comida caliente · Medical→Asiste
 | Target time | Tiempo objetivo |
 | Activity (feed) | Actividad |
 | Settings | Ajustes |
+| Plans (home section) | Planes |
+| Executions (home section) | Completadas |
 
 ## Split terms — chosen value (flag if you'd prefer the alternative)
 
@@ -86,6 +88,7 @@ These have a real ES-ES vs ES-419 split; one was picked for consistency:
 - **Ajustes** (not "Configuración") for *settings*.
 - **Baño** (not "WC"/"Aseo") for the WC service.
 - **Eliminar** (not "Borrar") for *delete*.
+- **Completadas** (not literal "Ejecuciones") for the *Executions* home section — reads naturally for "runs you came back from"; the English label was itself flagged provisional (TASK-028).
 
 ## Formatting conventions (Format.elm — see ADR-0014 / WI-5)
 
