@@ -1558,12 +1558,7 @@ update msg model =
                                                     Merge.resolve c.key theirsLayer acc
 
                                                 Just (ChooseCustom noteText) ->
-                                                    case c.key of
-                                                        Merge.KKmNote km ->
-                                                            Merge.setKmNote km noteText acc
-
-                                                        _ ->
-                                                            acc
+                                                    Merge.setNote c.key noteText acc
 
                                                 _ ->
                                                     -- ChooseMine (or, defensively,
@@ -2550,12 +2545,11 @@ openReview local incoming filePeople result =
             result.conflicts
                 |> List.indexedMap
                     (\i c ->
-                        case c.key of
-                            Merge.KKmNote _ ->
-                                Just ( i, ChooseCustom (combineNotes c.mine c.theirs) )
+                        if isProseConflict c.key then
+                            Just ( i, ChooseCustom (combineNotes c.mine c.theirs) )
 
-                            _ ->
-                                Nothing
+                        else
+                            Nothing
                     )
                 |> List.filterMap identity
                 |> Dict.fromList
@@ -8085,16 +8079,33 @@ viewConflictCard name review i conflict =
     in
     div [ class "rounded-xl border border-slate-800 bg-slate-950/50 p-3 space-y-2" ]
         [ p [ class "text-xs font-medium text-slate-400" ] [ text conflict.label ]
-        , case conflict.key of
-            Merge.KKmNote _ ->
-                viewNoteMerge name i conflict choice
+        , if isProseConflict conflict.key then
+            viewNoteMerge name i conflict choice
 
-            _ ->
-                div [ class "grid grid-cols-1 sm:grid-cols-2 gap-2" ]
-                    [ mergeOption (MergePickMine i) "You" "text-sky-300" conflict.mine (choice == Just ChooseMine)
-                    , mergeOption (MergePickTheirs i) name "text-amber-300" conflict.theirs (choice == Just ChooseTheirs)
-                    ]
+          else
+            div [ class "grid grid-cols-1 sm:grid-cols-2 gap-2" ]
+                [ mergeOption (MergePickMine i) "You" "text-sky-300" conflict.mine (choice == Just ChooseMine)
+                , mergeOption (MergePickTheirs i) name "text-amber-300" conflict.theirs (choice == Just ChooseTheirs)
+                ]
         ]
+
+
+{-| Prose fields get the hand-merge textarea (Q-U3) rather than a binary pick:
+race notes, a per-km note, or an aid station's notes. -}
+isProseConflict : Merge.ConflictKey -> Bool
+isProseConflict key =
+    case key of
+        Merge.KNotes ->
+            True
+
+        Merge.KKmNote _ ->
+            True
+
+        Merge.KAid _ Merge.AidNotes ->
+            True
+
+        _ ->
+            False
 
 
 {-| One tappable option on a binary card — identity-tinted (no red/green),

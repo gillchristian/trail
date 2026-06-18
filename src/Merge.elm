@@ -13,7 +13,7 @@ module Merge exposing
     , mintAidId
     , planningLayer
     , resolve
-    , setKmNote
+    , setNote
     , withPlanningLayer
     )
 
@@ -513,15 +513,38 @@ resolve key theirs acc =
             { acc | aidStations = setAidPresence id theirs acc.aidStations }
 
 
-{-| Set a single km's note to an arbitrary string. The apply path for a
-hand-merged note (Q-U3 / ADR-0013): when the same km note was edited on both
-sides, the review UI lets the user splice the two into a custom string, which
-`resolve` (flip-to-theirs only) can't express. Goes through `updateKm`, so
-clearing both note and time back to `emptyKmPlan` drops the row, same as resolve.
+{-| Set a prose field (race notes, a km note, or an aid's notes) to an arbitrary
+string — the apply path for a hand-merged note (Q-U3 / ADR-0013): when the same
+prose field was edited on both sides, the review UI lets the user splice the two
+into a custom string, which `resolve` (flip-to-theirs only) can't express.
+Non-prose keys are a no-op (the UI only offers the textarea for prose). The km
+case goes through `updateKm`, so emptying both note and time drops the row.
 -}
-setKmNote : Int -> String -> PlanningLayer -> PlanningLayer
-setKmNote i note layer =
-    { layer | plan = updateKm i (\kp -> { kp | notes = note }) layer.plan }
+setNote : ConflictKey -> String -> PlanningLayer -> PlanningLayer
+setNote key note layer =
+    case key of
+        KNotes ->
+            { layer | notes = note }
+
+        KKmNote i ->
+            { layer | plan = updateKm i (\kp -> { kp | notes = note }) layer.plan }
+
+        KAid id AidNotes ->
+            { layer
+                | aidStations =
+                    List.map
+                        (\a ->
+                            if a.id == id then
+                                { a | notes = note }
+
+                            else
+                                a
+                        )
+                        layer.aidStations
+            }
+
+        _ ->
+            layer
 
 
 setTarget : Maybe Int -> Plan -> Plan
@@ -694,9 +717,41 @@ showTime t =
             showSeconds s
 
 
+{-| A duration at the coarsest sensible frame for the review cards: exact
+minutes collapse to `5m`, otherwise `5:30`; an hour or more reads `13:59:00`
+(targets / cutoffs). Used for pace, aid rest, cutoff, and target conflicts.
+-}
 showSeconds : Int -> String
-showSeconds s =
-    String.fromInt s ++ "s"
+showSeconds totalSecs =
+    if totalSecs <= 0 then
+        "0"
+
+    else
+        let
+            pad n =
+                if n < 10 then
+                    "0" ++ String.fromInt n
+
+                else
+                    String.fromInt n
+
+            h =
+                totalSecs // 3600
+
+            m =
+                modBy 60 (totalSecs // 60)
+
+            s =
+                modBy 60 totalSecs
+        in
+        if h > 0 then
+            String.fromInt h ++ ":" ++ pad m ++ ":" ++ pad s
+
+        else if s == 0 then
+            String.fromInt m ++ "m"
+
+        else
+            String.fromInt m ++ ":" ++ pad s
 
 
 showMeters : Float -> String
