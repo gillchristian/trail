@@ -14,18 +14,19 @@
 **Notes:** scope cuts, links, anything decided while planning.
 ```
 
-### TASK-064 — Translate: aid stations + CSV preview + service labels
+### TASK-065 — Translate: plan table + per-km + per-section (the big one)
 
 **Source:** BACKLOG (i18n epic). **Deps:** TASK-061 (done, PR #134).
-**Branch:** `feat/task-064-aid-translations`
+**Branch:** `feat/task-065-plan-translations`
 **Acceptance criteria:**
-- [ ] Aid-stations section (`viewAidStationsSection`): title, count ("none yet"/"1 stop"/"N stops"), Import/Export CSV + "+ Add" buttons, the "Reading {file}…" state, the aid editor form (labels/placeholders/buttons), empty-state copy.
-- [ ] CSV import preview: status line (counts + error/warning suffixes with their own plurals), "Nothing parsed — fix the file and try Import again.", "Replace with N" / "Import N" confirm buttons.
-- [ ] `Types.serviceLabel` (Water/Food/Warm food/Medical/WC/Drop bag/Crew access) localizes — `serviceLabel` gains a `Language` arg (mind all callers, incl. any export path — exports keep the canonical `serviceToString`, not the label).
-- [ ] New Spanish terms appended to `reference/i18n-glossary.md`; no `_ ->` in new `Translations` fns.
-- [ ] CI green: type-check, build, `smoke`, `smoke:i18n`, **`smoke:aidcsv`** (serviceLabel change must not break AidCsv). **Manual browser check:** aid section + CSV import preview + service chips read Spanish.
+- [ ] Plan table view: target-time UI + hint, Download CSV / Print buttons, by-km/by-section toggle, the "Tap a row to edit…" hint, all column headers (Km/Span/Δ ele/Grade/Pace/Time/Cum/Notes / stops/Actual/Δ vs plan/Avg HR), section headers + "Section time"/"Cum" help.
+- [ ] Per-km view (`viewPlanKm`): "Km N of M" breadcrumb, "Plan this km", Manual/Auto tabs, "Reset to auto (GAP)" + its note, "Aid stations in this km", clock-time note, the "Actual run linked…" messages.
+- [ ] Per-section view (`viewPlanSection`): "Section N of M" breadcrumb, "Section plan", "Ends at" label, "Edit aid station →", "🏁 finishes the race", section stats labels.
+- [ ] `gradeClass` (Steep climb/Climb/Runnable/Descent/Steep descent) localizes via the inline `tr` helper (threshold-derived, like density). Effort tiers (Conservative/Goal/Push/All-in) + "Effort"/"Predicted finish" labels. The `serviceLabel` at the plan-section aid header (the 6891 holdover) + **`formatRest`** localize here (5 of its 7 callers are these views; thread `Language` through `kmsWithCumulative`/`viewKmRow`).
+- [ ] Actual-run linking panel (`viewActualRun`-ish): section title, "Actual run linked", "Distance run"/"vs Target" headers, Replace/Unlink.
+- [ ] New Spanish terms in `reference/i18n-glossary.md`; no `_ ->` in new fns; CI green incl. `smoke:sections`, `smoke:calibration`. **Manual browser check:** all three plan views read Spanish.
 
-**Notes:** **Care:** `Types.serviceLabel` may be used by `AidCsv`/`GpxExport`/CSV — the *display* label localizes, but exports must keep using `serviceToString` (canonical, English/stable). Verify `serviceLabel` callers before adding the param; if export paths call `serviceLabel`, leave them on `serviceToString`. Run `smoke:aidcsv`. Service Spanish terms in the glossary (Agua/Comida/…). The aid editor reuses `cancel`/`save`. Spec WI-4 surface task. On close, pull TASK-065 (plan table + per-km + per-section — the big one).
+**Notes:** Biggest surface — may take a large diff. Thread `Language`/`Context` into `viewPlanTable`/`viewPlanKm`/`viewPlanSection` and their row helpers (`viewKmRow`, `kmsWithCumulative`, section-row helpers). Localize `formatRest` here (the deferred TASK-064 item) + its plan-view callers + the 2 aid-section callers (revert them to the localized form). Decimal displays (km distances, gradient %) route through `Format`; pace/clock/HR stay as-is (colon/integer). Dynamic predictor confidence strings — check if app-defined or computed. Spec WI-4 surface task. On close, pull TASK-066 (profile / calibration / Strava / elevation toolbar).
 
 ---
 

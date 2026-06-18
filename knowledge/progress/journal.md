@@ -2720,3 +2720,31 @@ distance in the finish marker now goes through `Format.number` (Spanish comma).
 **Next:** TASK-064 — aid stations + CSV preview + `Types.serviceLabel`. Watch that
 `serviceLabel` callers in export paths keep `serviceToString` (canonical), and run
 `smoke:aidcsv`.
+
+---
+## 2026-06-18 17:37 — TASK-064: translate aid stations + CSV preview + service labels
+
+**Task:** TASK-064 (i18n epic, surface)
+**What I did:** Localized the aid-station surface (section, CSV import preview, aid
+rows/preview rows, the editor) via `Translations` (threaded `Language` into
+`viewAidStationsSection`/`viewAidImportPreview`/`viewPreviewRow`/`viewIssueBlock`/
+`viewAidRow`/`viewAidForm`/`serviceChip`). New `Translations.serviceLabel` localizes
+display chips; exports keep `Types.serviceLabel` (GPX `<desc>`, English) +
+`serviceToString` (CSV, canonical).
+**What I verified:** type-check Success, build OK, smoke:i18n + **smoke:aidcsv** +
+storage smoke all PASS. (aidcsv proves the export path is untouched.)
+**What changed in the repo:** `src/Translations.elm` (+aid strings + `serviceLabel`,
+now imports `Types`), `src/Main.elm`, `reference/i18n-glossary.md`. PR #140, merged
+`38f28cd`.
+**What I learned:** **Tried to localize `formatRest` and hit a cascade** — it embeds
+the word "rest", and its plan-view callers live in `viewKmRow`, which is reached via
+`kmsWithCumulative` (neither takes `model`/`language`). Threading `Language` that
+deep is TASK-065's plan-table work (5 of `formatRest`'s 7 callers are there). So I
+reverted `formatRest` to English and deferred it to 065; the aid rows show the rest
+*value* English until then. Lesson for shared formatters with embedded words: localize
+them in the task that owns the majority of their callers, not the first one that
+touches them. Also: dropped the redundant "rest " prefix in the preview row (it would
+have read "· descanso … descanso" once localized).
+**Next:** TASK-065 — plan table + per-km + per-section (largest surface). Localizes
+`formatRest` (+ threads it through `kmsWithCumulative`/`viewKmRow`), `gradeClass`,
+effort tiers, the 6891 `serviceLabel` holdover, and all the plan columns/breadcrumbs.
