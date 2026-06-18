@@ -776,7 +776,9 @@ showServices services =
             "none"
 
         _ ->
-            String.join "+" (List.map Types.serviceToString services)
+            -- Icons, matching how services render everywhere else in the app
+            -- (the conflict value is a plain string, so no per-icon hover title).
+            String.join " " (List.map Types.serviceIcon services)
 
 
 sortedUnique : List comparable -> List comparable
