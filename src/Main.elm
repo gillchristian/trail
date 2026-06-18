@@ -37,6 +37,7 @@ import Html.Lazy
 import Identity
 import Json.Decode as D
 import Json.Encode as Encode
+import Language exposing (Language(..))
 import Merge
 import Planning exposing (Km, KmResult, KmSource(..))
 import Predictor
@@ -45,6 +46,7 @@ import ProjectFile
 import Profile exposing (Marker, ScaleMode(..))
 import Route exposing (Route)
 import Http
+import Settings exposing (Settings)
 import Storage
 import StravaApi
 import StravaStreams
@@ -106,6 +108,11 @@ type alias Flags =
     , backendUrl : String
     , deviceId : String
     , newUserId : String
+
+    -- i18n (WI-2): the raw IDB `deviceSettings` record (or null on first run),
+    -- read by JS before init, plus navigator.language for the first-run default.
+    , settings : D.Value
+    , browserLanguage : String
     }
 
 
@@ -220,6 +227,7 @@ type alias Model =
     , sliderDraft : Maybe Float
     , sparklineCoords : Dict String (List ( Float, Float ))
     , historyOpen : Bool
+    , settings : Settings
     }
 
 
@@ -299,6 +307,10 @@ type MergeChoice
 
 init : Flags -> Url -> Nav.Key -> ( Model, Cmd Msg )
 init flags url key =
+    let
+        settings =
+            Settings.fromFlags flags.settings flags.browserLanguage
+    in
     ( { key = key
       , route = Route.fromUrl url
       , now = flags.now
@@ -336,11 +348,13 @@ init flags url key =
       , sliderDraft = Nothing
       , sparklineCoords = Dict.empty
       , historyOpen = False
+      , settings = settings
       }
     , Cmd.batch
         [ Storage.loadAll
         , Storage.loadProfile
         , Storage.loadIdentity
+        , Dom.setHtmlLang (Language.toCode settings.language)
         , case flags.incomingStravaToken of
             Just t ->
                 Storage.saveStravaToken (Encode.string t)
@@ -363,6 +377,7 @@ type Msg
     | NavigateTo Route
     | WindowResized Int Int
     | SetScaleMode ScaleMode
+    | ChangeLanguage Language
       -- upload
     | DragEnter
     | DragLeave
@@ -516,6 +531,23 @@ update msg model =
 
         SetScaleMode m ->
             ( { model | scaleMode = m }, Cmd.none )
+
+        ChangeLanguage lang ->
+            let
+                settings =
+                    model.settings
+
+                next =
+                    { settings | language = lang }
+            in
+            -- Persist + sync <html lang>. Touches no race/`.trail` data: language
+            -- is a device preference (ADR-0014).
+            ( { model | settings = next }
+            , Cmd.batch
+                [ Storage.saveSettings (Settings.encode next)
+                , Dom.setHtmlLang (Language.toCode lang)
+                ]
+            )
 
         DragEnter ->
             ( { model | dragOver = True }, Cmd.none )
@@ -2997,7 +3029,7 @@ view model =
         [ div [ class "min-h-screen flex flex-col" ]
             [ viewHeader model.route
             , div [ class "flex-1 pb-10" ] [ viewContent model ]
-            , viewFooter
+            , viewFooter model.settings.language
             , viewDeleteModal model
             , viewHistoryDrawer model
             , viewIdentityModals model
@@ -3142,11 +3174,52 @@ viewLogo =
         ]
 
 
-viewFooter : Html msg
-viewFooter =
+viewFooter : Language -> Html Msg
+viewFooter language =
     div [ class "px-6 py-4 text-xs text-slate-500 border-t border-slate-800/60 bg-slate-950 print:hidden" ]
-        [ div [ class "max-w-screen-2xl mx-auto" ]
-            [ text "Local-first. Your GPX never leaves the browser." ]
+        [ div [ class "max-w-screen-2xl mx-auto flex flex-wrap items-center justify-between gap-3" ]
+            -- Privacy line stays English until the global-chrome translation pass
+            -- (TASK-061); the toggle labels are endonyms, so they read the same in
+            -- either language and need no translation.
+            [ span [] [ text "Local-first. Your GPX never leaves the browser." ]
+            , viewLanguageToggle language
+            ]
+        ]
+
+
+viewLanguageToggle : Language -> Html Msg
+viewLanguageToggle current =
+    let
+        option lang lbl =
+            let
+                active =
+                    lang == current
+            in
+            button
+                [ class "px-1.5 py-0.5 rounded transition-colors"
+                , classList
+                    [ ( "text-emerald-400 font-semibold", active )
+                    , ( "text-slate-400 hover:text-slate-200", not active )
+                    ]
+                , onClick (ChangeLanguage lang)
+                , A.attribute "aria-pressed"
+                    (if active then
+                        "true"
+
+                     else
+                        "false"
+                    )
+                ]
+                [ text lbl ]
+    in
+    div
+        [ class "flex items-center gap-1"
+        , A.attribute "role" "group"
+        , A.attribute "aria-label" "Language / Idioma"
+        ]
+        [ option English "English"
+        , span [ class "text-slate-700", A.attribute "aria-hidden" "true" ] [ text "/" ]
+        , option Spanish "Español"
         ]
 
 

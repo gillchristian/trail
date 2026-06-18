@@ -61,9 +61,34 @@ const run = async () => {
     check('"english" fails', (await call({ op: 'decode', code: 'english' })).ok === false)
   }
 
+  console.log('Settings: a stored record wins via per-field defaults (back-compat)')
+  {
+    check('{} (no language field) → English', (await call({ op: 'resolveSettings', raw: {}, browser: 'fr-FR' })).code === 'en')
+    check('{language:"es"} → Spanish', (await call({ op: 'resolveSettings', raw: { language: 'es' }, browser: 'en-US' })).code === 'es')
+    check('{language:"de"} (invalid) → English (oneOf fallback)', (await call({ op: 'resolveSettings', raw: { language: 'de' }, browser: 'es-AR' })).code === 'en')
+  }
+
+  console.log('Settings: first run (null) derives from the browser primary subtag')
+  {
+    check('null + "es-AR" → Spanish', (await call({ op: 'resolveSettings', raw: null, browser: 'es-AR' })).code === 'es')
+    check('null + "es" → Spanish', (await call({ op: 'resolveSettings', raw: null, browser: 'es' })).code === 'es')
+    check('null + "en-US" → English', (await call({ op: 'resolveSettings', raw: null, browser: 'en-US' })).code === 'en')
+    check('null + "fr-FR" (unshipped) → English', (await call({ op: 'resolveSettings', raw: null, browser: 'fr-FR' })).code === 'en')
+    check('null + "" → English', (await call({ op: 'resolveSettings', raw: null, browser: '' })).code === 'en')
+  }
+
+  console.log('Settings: encode → decode is identity')
+  {
+    for (const c of ['en', 'es']) {
+      const enc = (await call({ op: 'encodeSettings', code: c })).encoded
+      const back = await call({ op: 'resolveSettings', raw: enc, browser: 'xx' })
+      check(`round-trip ${c}`, back.code === c, JSON.stringify({ enc, back }))
+    }
+  }
+
   console.log('')
   if (failures === 0) {
-    console.log('PASS — Language codec round-trips and rejects unknown codes')
+    console.log('PASS — Language codec + Settings resolution/codec hold')
     process.exit(0)
   } else {
     console.log(`FAIL — ${failures} check(s) failed`)

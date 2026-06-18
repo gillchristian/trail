@@ -15,6 +15,7 @@ port module Storage exposing
     , saveProfile
     , saveRace
     , saveRaceMeta
+    , saveSettings
     , saveStravaToken
     )
 
@@ -82,6 +83,9 @@ port storageSaveIdentity : Value -> Cmd msg
 port storageIdentityLoaded : (Value -> msg) -> Sub msg
 
 
+port storageSaveSettings : Value -> Cmd msg
+
+
 loadAll : Cmd msg
 loadAll =
     storageLoadAll ()
@@ -130,6 +134,16 @@ loadIdentity =
 saveIdentity : Value -> Cmd msg
 saveIdentity =
     storageSaveIdentity
+
+
+{-| Persist device UI settings (the `Settings` record — currently just language)
+to the `deviceSettings` key of the IDB `settings` store. Outbound only: settings
+are hydrated through flags at boot (the JS reads them before `Elm.Main.init`), so
+there is no load/loaded port — see `main.js` and ADR-0014.
+-}
+saveSettings : Value -> Cmd msg
+saveSettings =
+    storageSaveSettings
 
 
 gotIdentity : (Value -> msg) -> Sub msg

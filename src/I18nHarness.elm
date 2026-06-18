@@ -6,13 +6,17 @@ real compiled modules from Node via `scripts/smoke-i18n.mjs`, the same
 
 Grows with the machinery tasks:
 
-  - TASK-058 (this slice): `Language` — codec round-trip + strict decode.
-  - TASK-059 will add `Settings` (back-compat `D.oneOf` decode + round-trip).
+  - TASK-058: `Language` — codec round-trip + strict decode.
+  - TASK-059 (this slice): `Settings` — first-run/back-compat resolution + codec.
   - TASK-060 will add `Format` (decimal-separator localization).
 
 Never imported by the app.
 
-Ops: `decode` (Language code → ok? + re-encoded code).
+Ops:
+
+  - `decode` (Language code → ok? + re-encoded code)
+  - `resolveSettings` (raw value + browser locale → resolved language code)
+  - `encodeSettings` (language code → the encoded Settings JSON)
 
 -}
 
@@ -20,6 +24,7 @@ import Json.Decode as D
 import Json.Encode as E
 import Language
 import Platform
+import Settings
 
 
 port run : (D.Value -> msg) -> Sub msg
@@ -66,6 +71,29 @@ handle v =
 
                         Err _ ->
                             E.object [ ( "ok", E.bool False ) ]
+
+        Ok "resolveSettings" ->
+            case D.decodeValue (D.map2 Tuple.pair (D.field "raw" D.value) (D.field "browser" D.string)) v of
+                Err e ->
+                    err (D.errorToString e)
+
+                Ok ( raw, browser ) ->
+                    -- The real boot path: a stored object wins (field defaults),
+                    -- null routes to the browser primary-subtag default.
+                    E.object
+                        [ ( "code", E.string (Language.toCode (Settings.fromFlags raw browser).language) ) ]
+
+        Ok "encodeSettings" ->
+            case D.decodeValue (D.field "code" D.string) v of
+                Err e ->
+                    err (D.errorToString e)
+
+                Ok code ->
+                    let
+                        lang =
+                            Language.fromCode code |> Maybe.withDefault Language.English
+                    in
+                    E.object [ ( "encoded", Settings.encode { language = lang } ) ]
 
         Ok other ->
             err ("unknown op: " ++ other)

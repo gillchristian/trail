@@ -22,6 +22,9 @@ const ACTIVE_PROFILE_KEY = 'activeProfile'
 const STRAVA_TOKEN_KEY = 'stravaSessionToken'
 // One row holds the device-global identity bundle ({me, directory}); WI-5.
 const IDENTITY_KEY = 'me'
+// Device UI settings (language now; unit system later — TASK-070) as one record
+// in the settings store, keyed here. (i18n WI-2 / ADR-0014.)
+const DEVICE_SETTINGS_KEY = 'deviceSettings'
 const BACKEND_URL =
   import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001'
 
@@ -159,6 +162,29 @@ async function saveProfile(value) {
   })
 }
 
+// Device settings (language) live as one record in the settings store, keyed
+// DEVICE_SETTINGS_KEY. Read once at boot (before Elm.Main.init) and written on
+// every language change. null until the user has ever changed it. (i18n WI-2.)
+async function loadSettings() {
+  const db = await dbPromise
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(SETTINGS_STORE, 'readonly')
+    const req = tx.objectStore(SETTINGS_STORE).get(DEVICE_SETTINGS_KEY)
+    req.onsuccess = () => resolve(req.result ? req.result.value : null)
+    req.onerror = () => reject(req.error)
+  })
+}
+
+async function saveSettings(value) {
+  const db = await dbPromise
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(SETTINGS_STORE, 'readwrite')
+    tx.objectStore(SETTINGS_STORE).put({ key: DEVICE_SETTINGS_KEY, value })
+    tx.oncomplete = () => resolve(value)
+    tx.onerror = () => reject(tx.error)
+  })
+}
+
 async function loadStravaToken() {
   const db = await dbPromise
   return new Promise((resolve, reject) => {
@@ -238,6 +264,15 @@ if (!deviceId) {
 // Elm boot + port wiring
 // ============================================================
 
+// Boot Elm + wire ports inside an async IIFE so we can read device settings
+// (language) from IDB BEFORE init — Elm's first paint is then already in the
+// right language (no flash, no async port round-trip). `null` on first run routes
+// Elm to the navigator.language default. An IIFE rather than top-level await
+// because TLA isn't in the Vite build target; the synchronous token/deviceId
+// capture above already ran. (i18n WI-2 / ADR-0014.)
+;(async () => {
+const storedSettings = await loadSettings()
+
 const app = Elm.Main.init({
   flags: {
     width: window.innerWidth,
@@ -251,6 +286,10 @@ const app = Elm.Main.init({
     // consumed ≤ once. Unlike `deviceId` it is NOT persisted here — the minted
     // identity persists in its IDB store via the saveIdentity port.
     newUserId: crypto.randomUUID(),
+    // i18n (WI-2): the raw deviceSettings record (or null on first run) +
+    // navigator.language for the first-run default.
+    settings: storedSettings,
+    browserLanguage: navigator.language || 'en',
   },
 })
 
@@ -354,6 +393,22 @@ if (app.ports.storageSaveIdentity) {
   })
 }
 
+// Persist device settings (language). Outbound only — Elm updates its model
+// optimistically and hydrates from flags at boot, so there's no loaded echo.
+app.ports.storageSaveSettings.subscribe(async (settings) => {
+  try {
+    await saveSettings(settings)
+  } catch (e) {
+    app.ports.storageError.send(`saveSettings: ${e?.message || e}`)
+  }
+})
+
+// Keep <html lang> in sync with the resolved/selected language — a11y and
+// suppressing browser auto-translate. Elm pushes the code at boot and on toggle.
+app.ports.setHtmlLang.subscribe((code) => {
+  document.documentElement.lang = code
+})
+
 app.ports.downloadFile.subscribe(({ filename, content, mime }) => {
   const blob = new Blob([content], { type: mime || 'application/octet-stream' })
   const url = URL.createObjectURL(blob)
@@ -403,6 +458,7 @@ app.ports.scrollIntoView.subscribe((id) => {
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   })
 })
+})()
 
 // ============================================================
 // Service worker registration (production only).

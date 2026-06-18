@@ -304,6 +304,17 @@ assertEq(await loadIdentity(db), null, 'identity store starts empty (loadIdentit
   assertEq(back?.directory?.length, 1, 'identity round-trips: directory entries')
 }
 
+// 10b. DEVICE SETTINGS (i18n WI-2 / ADR-0014): the language record round-trips in
+//      the settings store under DEVICE_SETTINGS_KEY — absent until first write,
+//      so first run reads null and Elm falls back to navigator.language. Mirrors
+//      main.js loadSettings/saveSettings.
+{
+  const DEVICE_SETTINGS_KEY = 'deviceSettings'
+  assertEq(await getRaw(db, SETTINGS_STORE, DEVICE_SETTINGS_KEY), undefined, 'device settings absent until first write (first run → null)')
+  await putRaw(db, SETTINGS_STORE, { key: DEVICE_SETTINGS_KEY, value: { language: 'es' } })
+  assertEq((await getRaw(db, SETTINGS_STORE, DEVICE_SETTINGS_KEY)).value.language, 'es', 'device settings round-trip: language persisted')
+}
+
 // 11. MIGRATION v3 -> v4: an existing v3 DB gains the identity store on upgrade,
 //     with races / gpx / settings preserved (additive, like v2→v3).
 {
