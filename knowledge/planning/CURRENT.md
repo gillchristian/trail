@@ -14,7 +14,32 @@
 **Notes:** scope cuts, links, anything decided while planning.
 ```
 
-### (no active task)
+### TASK-057 — Fix Vercel build: declare `elm` as an npm dependency
+
+**Source:** user request (preparing the app for Vercel deployment, 2026-06-18)
+**Branch:** fix/task-057-vercel-elm-dependency
+**Problem:** Vercel's `npm run build` fails with `spawn elm ENOENT`. `vite-plugin-elm`
+→ `node-elm-compiler` spawns a bare `elm` binary from `PATH`; it's never declared
+as a dependency, so a clean `npm install` doesn't provide it. It only worked
+locally because the user has a global elm (`~/.yarn/bin/elm`). Reproduced locally
+on a PATH with no global elm — identical `spawn elm ENOENT`.
+**Acceptance criteria:**
+- [ ] `elm` declared in `devDependencies` (pinned `0.19.1-6`, the `latest` tag wrapping the 0.19.1 compiler) so a clean install drops the binary in `node_modules/.bin/` (verify: `node_modules/.bin/elm --version` → `0.19.1`).
+- [ ] `npm run build` succeeds on a PATH with **no** global elm (Vercel-equivalent) and emits `dist/` (verify: clean-PATH build → `dist/index.html` + hashed assets).
+- [ ] Full local CI green from a clean `npm ci` with no global elm — type-check + build + all 8 smoke harnesses — proving the harnesses (which call `npx --no-install elm`) are now hermetic and no longer need a global elm.
+- [ ] `reference/local-ci.md` Prerequisites corrected: elm is now an npm dep; `npm install`/`npm ci` provides it (the old "install Elm globally, npm won't provide it" note is now false).
+**Notes:** Scope is the missing compiler dependency only. No `vercel.json` needed —
+the router is hash-based (`Route.elm`: "works as a static bundle without
+server-side rewrites"), so Vite's default `dist/` static output is enough.
+Frontend↔backend wiring (set `VITE_BACKEND_URL`; on cadence add the Vercel origin
+to CORS + set `FRONTEND_URL_TRAIL`) is deployment config, not a code change —
+tracked separately. Observed but out of scope: Vercel ran the build on Node
+v24.15.0 while `.nvmrc`/dev pin to v22 — consider an `engines.node` pin as a
+follow-up (not required for the build to pass).
+
+---
+
+### (backlog context — no queued task)
 
 The **coach-collaboration arc is complete** (2026-06-17): TASK-046–051, 053, 054,
 055, 056 all shipped + verified. The active BACKLOG queue is exhausted. Pull the

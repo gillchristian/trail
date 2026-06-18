@@ -19,6 +19,7 @@
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.0.0",
+    "elm": "0.19.1-6",
     "fake-indexeddb": "^6.2.5",
     "tailwindcss": "^4.0.0",
     "vite": "^6.0.0",

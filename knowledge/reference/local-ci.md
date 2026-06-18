@@ -7,16 +7,19 @@ exit 0 before a PR opens.
 
 ## Prerequisites
 
-- **Elm 0.19.1 installed globally / on `PATH`.** It is *not* an npm dependency
-  of this project — `npm install` will **not** provide it. Gate 1 (`elm make`)
-  and gate 2 (`vite-plugin-elm` during the build) both need `elm`, and gates
-  4–10 shell out to `npx --no-install elm make` (`scripts/smoke-aid-csv.mjs`,
-  `scripts/smoke-sections.mjs`, `scripts/smoke-calibration.mjs`,
-  `scripts/smoke-trailsync.mjs`, `scripts/smoke-merge.mjs`,
-  `scripts/smoke-changelog.mjs`, `scripts/smoke-identity.mjs`), which by design
-  will not auto-download it. So with only `npm install` done, gates 1, 2, and
-  4–10 all fail until Elm is on
-  `PATH`. Install via `npm i -g elm` (pin 0.19.1) or the platform binary.
+- **Elm 0.19.1 — a dev dependency** (`elm@0.19.1-6` in `package.json`: the npm
+  wrapper that downloads the 0.19.1 compiler binary on install — TASK-057).
+  A plain `npm install` / `npm ci` drops it at `node_modules/.bin/elm`, so every
+  gate works from a clean checkout with **no global Elm**: gate 1 and the smoke
+  harnesses (`scripts/smoke-aid-csv.mjs`, `scripts/smoke-sections.mjs`,
+  `scripts/smoke-calibration.mjs`, `scripts/smoke-trailsync.mjs`,
+  `scripts/smoke-merge.mjs`, `scripts/smoke-changelog.mjs`,
+  `scripts/smoke-identity.mjs`) call `npx --no-install elm`, which resolves the
+  local binary, and gate 2's `vite-plugin-elm` spawns `elm` off the
+  `node_modules/.bin` that `npm run` puts on `PATH`. This is also what makes the
+  Vercel/CI build pass — before TASK-057, `npm install` did not provide `elm`
+  and the cloud build died with `spawn elm ENOENT`. A globally-installed Elm
+  still works as a fallback but is no longer required.
 - **Node pinned to v22** via `.nvmrc` (`nvm use`); the smoke harnesses run on it.
 
 ## The gates
