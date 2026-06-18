@@ -2696,3 +2696,27 @@ stay exhaustive (a third language breaks the inner `case`/the `tr` helper). "Exe
 → "Completadas" (not literal) — the English label was always provisional (TASK-028).
 **Next:** TASK-063 — race detail / edit dialog / map view; defines the shared
 `save`/`cancel`/`close` keys (first multi-use) in `Translations`.
+
+---
+## 2026-06-18 17:21 — TASK-063: translate race detail / edit dialog / map view
+
+**Task:** TASK-063 (i18n epic, surface)
+**What I did:** Localized the race-viewing surface — detail page (breadcrumb,
+"Edit details", 5 reusable bigStat labels, plan/map CTAs, export panel, elevation
+header), the edit dialog (`viewMetaForm` + `Language`, shared `cancel` key), the map
+view (breadcrumb, summary, "Salida"/"Meta" markers, OSM attribution), and folded in
+the loading/404/race-not-found status views.
+**What I verified:** type-check Success, build OK, smoke:i18n unaffected; grep shows
+remaining "Distance"/"Save changes" are the plan table/km + aid editor (064/065).
+**What changed in the repo:** `src/Translations.elm` (+detail/map/export/dialog/
+status), `src/Main.elm`, `reference/i18n-glossary.md` (stat labels). PR #138, merged
+`9ebb2c3`.
+**What I learned:** Kept **Coros UI terms verbatim** ("Waypoint Alerts", "Pace
+Strategy") in the export copy — they're the literal settings the user must find in
+the COROS app, so translating them would mislead. Same logic for example values
+(Chamonix, the UTMB URL): they're illustrative, not chrome. Map marker names flow
+through JSON to the Leaflet element but are still app-defined text → localized; the
+distance in the finish marker now goes through `Format.number` (Spanish comma).
+**Next:** TASK-064 — aid stations + CSV preview + `Types.serviceLabel`. Watch that
+`serviceLabel` callers in export paths keep `serviceToString` (canonical), and run
+`smoke:aidcsv`.

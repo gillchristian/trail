@@ -14,18 +14,18 @@
 **Notes:** scope cuts, links, anything decided while planning.
 ```
 
-### TASK-063 — Translate: race detail / edit dialog / map view
+### TASK-064 — Translate: aid stations + CSV preview + service labels
 
 **Source:** BACKLOG (i18n epic). **Deps:** TASK-061 (done, PR #134).
-**Branch:** `feat/task-063-detail-translations`
+**Branch:** `feat/task-064-aid-translations`
 **Acceptance criteria:**
-- [ ] Race detail (`viewRaceDetail`, already threads `Context`): bigStat labels (Distance/Gain/Loss/Density/Flat eq. — labels localize; units `km`/`m`/`m/km` stay), the CTA cards (plan/map/export prose), the "Edit details" button, breadcrumb.
-- [ ] Edit dialog (`MetaEditor`): field labels (Name, Date/Location/URL optional, Notes) + placeholders, cover-image controls (Pick/Replace/Remove), Cancel/Save. (Shared buttons Save/Cancel land in `Translations` here — first multi-use.)
-- [ ] Map view (`viewRaceMap`): breadcrumb, title, OSM attribution/offline-cache prose.
+- [ ] Aid-stations section (`viewAidStationsSection`): title, count ("none yet"/"1 stop"/"N stops"), Import/Export CSV + "+ Add" buttons, the "Reading {file}…" state, the aid editor form (labels/placeholders/buttons), empty-state copy.
+- [ ] CSV import preview: status line (counts + error/warning suffixes with their own plurals), "Nothing parsed — fix the file and try Import again.", "Replace with N" / "Import N" confirm buttons.
+- [ ] `Types.serviceLabel` (Water/Food/Warm food/Medical/WC/Drop bag/Crew access) localizes — `serviceLabel` gains a `Language` arg (mind all callers, incl. any export path — exports keep the canonical `serviceToString`, not the label).
 - [ ] New Spanish terms appended to `reference/i18n-glossary.md`; no `_ ->` in new `Translations` fns.
-- [ ] CI green: type-check, build, `smoke`, `smoke:i18n`. **Manual browser check:** detail page, edit dialog, and map view read Spanish.
+- [ ] CI green: type-check, build, `smoke`, `smoke:i18n`, **`smoke:aidcsv`** (serviceLabel change must not break AidCsv). **Manual browser check:** aid section + CSV import preview + service chips read Spanish.
 
-**Notes:** `viewRaceDetail` has `ctx` (TASK-060). The edit dialog + map view fns gain `Language`. Placeholders ("Chamonix, FR", URL example) — translate the *hint* nature but keep example values plausible; the OSM attribution proper noun ("OpenStreetMap") stays. Define shared `save`/`cancel`/`close` in `Translations` here (used by the dialog; reused by 064/068). Spec WI-4 surface task. On close, pull TASK-064 (aid stations + service labels).
+**Notes:** **Care:** `Types.serviceLabel` may be used by `AidCsv`/`GpxExport`/CSV — the *display* label localizes, but exports must keep using `serviceToString` (canonical, English/stable). Verify `serviceLabel` callers before adding the param; if export paths call `serviceLabel`, leave them on `serviceToString`. Run `smoke:aidcsv`. Service Spanish terms in the glossary (Agua/Comida/…). The aid editor reuses `cancel`/`save`. Spec WI-4 surface task. On close, pull TASK-065 (plan table + per-km + per-section — the big one).
 
 ---
 
