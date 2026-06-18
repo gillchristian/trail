@@ -4140,22 +4140,31 @@ Cutoffs at ±0.04 and ±0.10 from spec §3.2. Tone intensifies at
 the extremes; the runnable band stays neutral so the table doesn't
 shout when nothing notable is happening.
 -}
-gradeClass : Float -> ( String, String )
-gradeClass slope =
+gradeClass : Language -> Float -> ( String, String )
+gradeClass language slope =
+    let
+        tr en es =
+            case language of
+                English ->
+                    en
+
+                Spanish ->
+                    es
+    in
     if slope >= 0.1 then
-        ( "Steep climb", "text-rose-300 bg-rose-500/15 ring-rose-500/30" )
+        ( tr "Steep climb" "Subida pronunciada", "text-rose-300 bg-rose-500/15 ring-rose-500/30" )
 
     else if slope >= 0.04 then
-        ( "Climb", "text-rose-400 bg-rose-500/10 ring-rose-500/20" )
+        ( tr "Climb" "Subida", "text-rose-400 bg-rose-500/10 ring-rose-500/20" )
 
     else if slope > -0.04 then
-        ( "Runnable", "text-slate-400 bg-slate-500/10 ring-slate-500/20" )
+        ( tr "Runnable" "Corrible", "text-slate-400 bg-slate-500/10 ring-slate-500/20" )
 
     else if slope > -0.1 then
-        ( "Descent", "text-emerald-400 bg-emerald-500/10 ring-emerald-500/20" )
+        ( tr "Descent" "Bajada", "text-emerald-400 bg-emerald-500/10 ring-emerald-500/20" )
 
     else
-        ( "Steep descent", "text-emerald-300 bg-emerald-500/15 ring-emerald-500/30" )
+        ( tr "Steep descent" "Bajada pronunciada", "text-emerald-300 bg-emerald-500/15 ring-emerald-500/30" )
 
 
 {-| Race-card "cover" when there's no user image: a real silhouette
@@ -5009,7 +5018,7 @@ viewPreviewRow language index aid =
                 [ text
                     (Format.number language 1 (aid.distance / 1000)
                         ++ " km · "
-                        ++ formatRest aid.restSeconds
+                        ++ formatRest language aid.restSeconds
                         ++ (case aid.cutoff of
                                 Just secs ->
                                     " · " ++ Translations.cutoffLabel language ++ " " ++ AidCsv.formatClock secs
@@ -5138,7 +5147,7 @@ viewAidRow language allAids totalDistance index aid =
             ]
         , div [ class "flex items-center gap-2 flex-shrink-0" ]
             [ span [ class "text-xs text-slate-500" ]
-                [ text (formatRest aid.restSeconds) ]
+                [ text (formatRest language aid.restSeconds) ]
             , button
                 [ onClick (OpenEditAid aid)
                 , class "px-2 py-1 text-xs border border-slate-700 rounded hover:bg-slate-800 text-slate-200 opacity-0 group-hover:opacity-100 transition-opacity"
@@ -5357,22 +5366,25 @@ viewPlanTable model race =
 
         currentSum =
             Dict.foldl (\_ r acc -> acc + r.seconds) 0 results + aidRest
+
+        language =
+            model.settings.language
     in
     div [ class "max-w-screen-2xl mx-auto mt-8 space-y-6 px-6 plan-print" ]
-        [ viewPlanCrumb race
-        , viewPlanHeader race
+        [ viewPlanCrumb language race
+        , viewPlanHeader language race
         , div [ class "space-y-6 print:hidden" ]
-            [ viewPlanTargetPanel race aidRest currentSum model.targetTimeText
+            [ viewPlanTargetPanel language race aidRest currentSum model.targetTimeText
             , viewPredictorStrip model race kms
             , viewActualRunStrip model race
             ]
-        , viewPlanTabs race model.planTableMode
+        , viewPlanTabs language model.planTableMode
         , case model.planTableMode of
             ByKm ->
-                viewKmTable race kms results
+                viewKmTable language race kms results
 
             BySection ->
-                viewSectionTable race kms results
+                viewSectionTable language race kms results
         ]
 
 
@@ -5571,8 +5583,11 @@ viewPredictorStrip model race kms =
         prediction =
             Predictor.predict model.profile race kms i
 
+        language =
+            model.settings.language
+
         ( bandLabel, bandTone ) =
-            intensityBand i
+            intensityBand language i
     in
     if List.isEmpty kms then
         text ""
@@ -5585,14 +5600,14 @@ viewPredictorStrip model race kms =
         div [ class "rounded-2xl bg-slate-900 border border-slate-800 p-5 space-y-4" ]
             [ div [ class "flex items-baseline justify-between gap-4 flex-wrap" ]
                 [ div []
-                    [ p [ class "text-xs text-slate-500 uppercase tracking-wider" ] [ text "Effort" ]
+                    [ p [ class "text-xs text-slate-500 uppercase tracking-wider" ] [ text (Translations.effortLabel language) ]
                     , p [ class ("text-2xl font-semibold tabular-nums " ++ bandTone) ]
                         [ text bandLabel ]
                     , p [ class "text-xs text-slate-500 mt-0.5" ]
-                        [ text ("Profile: " ++ profileBriefLabel model.profile) ]
+                        [ text (Translations.profileNav language ++ ": " ++ profileBriefLabel model.profile) ]
                     ]
                 , div [ class "text-right" ]
-                    [ p [ class "text-xs text-slate-500 uppercase tracking-wider" ] [ text "Predicted finish" ]
+                    [ p [ class "text-xs text-slate-500 uppercase tracking-wider" ] [ text (Translations.predictedFinish language) ]
                     , p [ class "text-2xl font-semibold text-slate-100 tabular-nums" ]
                         [ text (formatHhmm prediction.totalS) ]
                     , p [ class "text-xs text-slate-500 mt-0.5 tabular-nums" ]
@@ -5600,7 +5615,7 @@ viewPredictorStrip model race kms =
                         , span [ class ("ml-2 " ++ confTone) ] [ text ("· " ++ confLabel) ]
                         ]
                     , p [ class "text-[10px] text-slate-600 mt-0.5" ]
-                        [ text (predictionBreakdown prediction) ]
+                        [ text (predictionBreakdown language prediction) ]
                     ]
                 ]
             , div [ class "space-y-2" ]
@@ -5616,20 +5631,20 @@ viewPredictorStrip model race kms =
                     ]
                     []
                 , div [ class "flex items-center justify-between text-[10px] uppercase tracking-wider text-slate-500" ]
-                    [ span [] [ text "Conservative" ]
-                    , span [] [ text "Goal" ]
-                    , span [] [ text "Push" ]
-                    , span [] [ text "All-in" ]
+                    [ span [] [ text (Translations.effortConservative language) ]
+                    , span [] [ text (Translations.effortGoal language) ]
+                    , span [] [ text (Translations.effortPush language) ]
+                    , span [] [ text (Translations.effortAllIn language) ]
                     ]
                 ]
             , div [ class "text-xs text-slate-500" ]
                 [ text
                     (case race.plan.targetSeconds of
                         Just _ ->
-                            "Drag the slider to dial effort up or down — the target time updates to match."
+                            Translations.sliderHelp language
 
                         Nothing ->
-                            "No target set yet. Drag the slider to lock one in, or type a target above."
+                            Translations.sliderHelpNoTarget language
                     )
                 ]
             ]
@@ -5645,25 +5660,34 @@ currentIntensity model race kms =
             1.0
 
 
-intensityBand : Float -> ( String, String )
-intensityBand i =
+intensityBand : Language -> Float -> ( String, String )
+intensityBand language i =
+    let
+        tr en es =
+            case language of
+                English ->
+                    en
+
+                Spanish ->
+                    es
+    in
     if i < 0.83 then
-        ( "Below conservative", "text-slate-300" )
+        ( tr "Below conservative" "Por debajo de conservador", "text-slate-300" )
 
     else if i < 0.97 then
-        ( "Conservative", "text-sky-400" )
+        ( tr "Conservative" "Conservador", "text-sky-400" )
 
     else if i < 1.03 then
-        ( "Goal", "text-emerald-400" )
+        ( tr "Goal" "Objetivo", "text-emerald-400" )
 
     else if i < 1.12 then
-        ( "Push", "text-amber-400" )
+        ( tr "Push" "Fuerte", "text-amber-400" )
 
     else if i <= 1.22 then
-        ( "All-in", "text-rose-400" )
+        ( tr "All-in" "Al máximo", "text-rose-400" )
 
     else
-        ( "Beyond all-in", "text-rose-500" )
+        ( tr "Beyond all-in" "Más allá del máximo", "text-rose-500" )
 
 
 profileBriefLabel : Profile -> String
@@ -5690,26 +5714,43 @@ race have actuals." Future TASK-022 will refine.
 -}
 confidenceFromProfile : Model -> Race -> ( String, String, Float )
 confidenceFromProfile model race =
+    let
+        tr en es =
+            case model.settings.language of
+                English ->
+                    en
+
+                Spanish ->
+                    es
+    in
     case race.actualSplits of
         Just _ ->
             -- We've seen actuals on this exact race — narrow the band
             -- slightly since the planned vs actual data was used to
             -- calibrate against. Pending real TASK-022 calibration
             -- this is mostly aspirational.
-            ( "Medium-low · 1 actual linked", "text-sky-400", 0.15 )
+            ( tr "Medium-low · 1 actual linked" "Media-baja · 1 actividad vinculada", "text-sky-400", 0.15 )
 
         Nothing ->
-            ( "Low · profile from presets", "text-slate-400", 0.20 )
+            ( tr "Low · profile from presets" "Baja · perfil desde valores predefinidos", "text-slate-400", 0.20 )
 
 
-predictionBreakdown : Predictor.Prediction -> String
-predictionBreakdown p =
+predictionBreakdown : Language -> Predictor.Prediction -> String
+predictionBreakdown language p =
     let
+        tr en es =
+            case language of
+                English ->
+                    en
+
+                Spanish ->
+                    es
+
         pieces =
-            [ ( "climb", p.climbS )
-            , ( "descent", p.descentS )
-            , ( "runnable", p.runnableS )
-            , ( "aid", p.aidS )
+            [ ( tr "climb" "subida", p.climbS )
+            , ( tr "descent" "bajada", p.descentS )
+            , ( tr "runnable" "corrible", p.runnableS )
+            , ( tr "aid" "avit.", p.aidS )
             ]
                 |> List.filter (\( _, s ) -> s > 0)
                 |> List.map (\( name, s ) -> formatHhmm s ++ " " ++ name)
@@ -5725,11 +5766,15 @@ predictionBreakdown p =
 viewActualRunStrip : Model -> Race -> Html Msg
 viewActualRunStrip model race =
     let
+        language =
+            model.settings.language
+
         errorBanner =
             case model.actualRunError of
                 Just msg ->
+                    -- `msg` is a dynamic parse error (English; see TASK-069).
                     p [ class "mt-2 text-sm text-rose-400" ]
-                        [ text ("Couldn't parse actual run: " ++ msg) ]
+                        [ text (Translations.actualParseError language ++ msg) ]
 
                 Nothing ->
                     text ""
@@ -5741,7 +5786,7 @@ viewActualRunStrip model race =
                         [ onClick (OpenStravaPicker race.id)
                         , class "px-4 py-2 text-sm bg-orange-500 text-white rounded-md hover:bg-orange-400 font-medium whitespace-nowrap"
                         ]
-                        [ text "Link from Strava" ]
+                        [ text (Translations.linkFromStrava language) ]
 
                 Nothing ->
                     text ""
@@ -5751,9 +5796,9 @@ viewActualRunStrip model race =
             div []
                 [ div [ class "rounded-2xl bg-slate-900 border border-slate-800 p-4 flex items-center justify-between gap-4 flex-wrap" ]
                     [ div [ class "min-w-0" ]
-                        [ p [ class "font-medium text-slate-100" ] [ text "Link actual run" ]
+                        [ p [ class "font-medium text-slate-100" ] [ text (Translations.linkActualRun language) ]
                         , p [ class "text-sm text-slate-400 mt-0.5" ]
-                            [ text "Upload the .gpx of your completed run to compare per-km splits against the plan." ]
+                            [ text (Translations.linkActualRunHelp language) ]
                         , errorBanner
                         ]
                     , div [ class "flex items-center gap-2" ]
@@ -5762,7 +5807,7 @@ viewActualRunStrip model race =
                             [ onClick (OpenActualGpxPicker race.id)
                             , class "px-4 py-2 text-sm border border-slate-700 rounded-md hover:bg-slate-800 text-slate-100 whitespace-nowrap"
                             ]
-                            [ text "Upload .gpx" ]
+                            [ text (Translations.uploadGpx language) ]
                         ]
                     ]
                 , viewStravaPickerModal model race.id
@@ -5772,14 +5817,14 @@ viewActualRunStrip model race =
             div [ class "rounded-2xl bg-slate-900 border border-emerald-500/30 p-4 flex items-center justify-between gap-4 flex-wrap" ]
                 [ div [ class "flex items-center gap-6 flex-wrap min-w-0" ]
                     [ div []
-                        [ p [ class "text-[10px] uppercase tracking-wider text-emerald-400/80" ] [ text "Actual run linked" ]
+                        [ p [ class "text-[10px] uppercase tracking-wider text-emerald-400/80" ] [ text (Translations.actualRunLinked language) ]
                         , p [ class "text-2xl font-semibold text-slate-100 tabular-nums mt-0.5" ]
                             [ text (formatHhmm actual.totalSeconds) ]
                         ]
                     , div []
-                        [ p [ class "text-[10px] uppercase tracking-wider text-slate-500" ] [ text "Distance run" ]
+                        [ p [ class "text-[10px] uppercase tracking-wider text-slate-500" ] [ text (Translations.distanceRun language) ]
                         , p [ class "text-lg text-slate-200 tabular-nums mt-0.5" ]
-                            [ text (formatFloat 2 (actual.totalDistance / 1000) ++ " km") ]
+                            [ text (Format.number language 2 (actual.totalDistance / 1000) ++ " km") ]
                         ]
                     , let
                         plannedSum =
@@ -5795,16 +5840,16 @@ viewActualRunStrip model race =
 
                             ( label, tone ) =
                                 if diff > 0 then
-                                    ( "+" ++ formatMmss diff ++ " vs target", "text-rose-400" )
+                                    ( "+" ++ formatMmss diff ++ Translations.vsTargetSuffix language, "text-rose-400" )
 
                                 else if diff < 0 then
-                                    ( "−" ++ formatMmss (abs diff) ++ " vs target", "text-emerald-400" )
+                                    ( "−" ++ formatMmss (abs diff) ++ Translations.vsTargetSuffix language, "text-emerald-400" )
 
                                 else
-                                    ( "On target", "text-emerald-400" )
+                                    ( Translations.onTarget language, "text-emerald-400" )
                         in
                         div []
-                            [ p [ class "text-[10px] uppercase tracking-wider text-slate-500" ] [ text "vs Target" ]
+                            [ p [ class "text-[10px] uppercase tracking-wider text-slate-500" ] [ text (Translations.vsTarget language) ]
                             , p [ class ("text-lg tabular-nums mt-0.5 " ++ tone) ] [ text label ]
                             ]
 
@@ -5816,21 +5861,21 @@ viewActualRunStrip model race =
                         [ onClick (OpenActualGpxPicker race.id)
                         , class "px-3 py-1.5 text-sm border border-slate-700 rounded-md hover:bg-slate-800 text-slate-200"
                         ]
-                        [ text "Replace" ]
+                        [ text (Translations.replace language) ]
                     , button
                         [ onClick (ClearActualRun race.id)
                         , class "px-3 py-1.5 text-sm border border-slate-700 rounded-md hover:bg-slate-800 text-slate-400 hover:text-rose-400"
                         ]
-                        [ text "Unlink" ]
+                        [ text (Translations.unlink language) ]
                     , errorBanner
                     ]
                 ]
 
 
-viewPlanCrumb : Race -> Html Msg
-viewPlanCrumb race =
+viewPlanCrumb : Language -> Race -> Html Msg
+viewPlanCrumb language race =
     div [ class "text-sm text-slate-400 flex items-center gap-2 print:hidden" ]
-        [ a [ Route.href Route.Index, class "hover:text-slate-100" ] [ text "Races" ]
+        [ a [ Route.href Route.Index, class "hover:text-slate-100" ] [ text (Translations.breadcrumbRaces language) ]
         , span [ class "text-slate-700" ] [ text "/" ]
         , a [ Route.href (Route.RaceDetail race.id), class "hover:text-slate-100" ] [ text race.name ]
         , span [ class "text-slate-700" ] [ text "/" ]
@@ -5838,32 +5883,26 @@ viewPlanCrumb race =
         ]
 
 
-viewPlanHeader : Race -> Html Msg
-viewPlanHeader race =
+viewPlanHeader : Language -> Race -> Html Msg
+viewPlanHeader language race =
     div [ class "flex items-end justify-between gap-4 flex-wrap" ]
         [ div []
             [ h1 [ class "text-3xl font-bold tracking-tight text-slate-100" ] [ text "Plan" ]
             , p [ class "mt-2 text-sm text-slate-500" ]
                 [ text
-                    (formatFloat 1 (race.distance / 1000)
+                    (Format.number language 1 (race.distance / 1000)
                         ++ " km · "
                         ++ formatInt race.gain
                         ++ " m+ · "
-                        ++ String.fromInt (List.length race.aidStations)
-                        ++ (if List.length race.aidStations == 1 then
-                                " aid station"
-
-                            else
-                                " aid stations"
-                           )
+                        ++ Translations.aidStationCount language (List.length race.aidStations)
                     )
                 ]
             ]
         ]
 
 
-viewPlanTargetPanel : Race -> Int -> Int -> String -> Html Msg
-viewPlanTargetPanel race aidRest currentSum targetText =
+viewPlanTargetPanel : Language -> Race -> Int -> Int -> String -> Html Msg
+viewPlanTargetPanel language race aidRest currentSum targetText =
     let
         target =
             race.plan.targetSeconds
@@ -5878,7 +5917,7 @@ viewPlanTargetPanel race aidRest currentSum targetText =
     in
     div [ class "rounded-2xl bg-slate-900 border border-slate-800 p-5 grid grid-cols-1 sm:grid-cols-4 gap-4 items-center" ]
         [ div []
-            [ p [ class "text-xs text-slate-500 uppercase tracking-wider mb-2" ] [ text "Target time" ]
+            [ p [ class "text-xs text-slate-500 uppercase tracking-wider mb-2" ] [ text (Translations.targetTime language) ]
             , input
                 [ A.type_ "text"
                 , A.value targetText
@@ -5889,9 +5928,9 @@ viewPlanTargetPanel race aidRest currentSum targetText =
                 , class "w-full bg-slate-950 border border-slate-800 rounded-md px-3 py-2 text-2xl font-semibold text-slate-100 tabular-nums focus:outline-none focus:border-rose-500/60"
                 ]
                 []
-            , p [ class "text-xs text-slate-500 mt-1" ] [ text "Tap Tab or click away to commit." ]
+            , p [ class "text-xs text-slate-500 mt-1" ] [ text (Translations.timeCommitHint language) ]
             ]
-        , planStat "Current sum"
+        , planStat (Translations.currentSumLabel language)
             (if currentSum == 0 then
                 "—"
 
@@ -5901,26 +5940,25 @@ viewPlanTargetPanel race aidRest currentSum targetText =
             (case target of
                 Just _ ->
                     if diff == 0 then
-                        Just ( "On target", "text-emerald-400" )
+                        Just ( Translations.onTarget language, "text-emerald-400" )
 
                     else if diff > 0 then
-                        Just ( "+" ++ formatMmss diff ++ " over", "text-rose-400" )
+                        Just ( "+" ++ formatMmss diff ++ Translations.planOver language, "text-rose-400" )
 
                     else
-                        Just ( formatMmss (abs diff) ++ " under", "text-amber-400" )
+                        Just ( formatMmss (abs diff) ++ Translations.planUnder language, "text-amber-400" )
 
                 Nothing ->
                     Nothing
             )
-        , planStat "Aid rest"
+        , planStat (Translations.aidRestLabel language)
             (formatHhmm aidRest)
             (Just
-                ( String.fromInt (List.length race.aidStations)
-                    ++ " stops"
+                ( Translations.stopsCount language (List.length race.aidStations)
                 , "text-slate-500"
                 )
             )
-        , planStat "Avg pace"
+        , planStat (Translations.avgPace language)
             (case ( target, race.distance > 0 ) of
                 ( Just t, True ) ->
                     paceMinPerKm (t - aidRest) race.distance
@@ -5928,7 +5966,7 @@ viewPlanTargetPanel race aidRest currentSum targetText =
                 _ ->
                     "—"
             )
-            (Just ( "/ km · moving", "text-slate-500" ))
+            (Just ( Translations.paceMovingSuffix language, "text-slate-500" ))
         ]
 
 
@@ -5946,12 +5984,12 @@ planStat label value note =
         ]
 
 
-viewPlanTabs : Race -> TableMode -> Html Msg
-viewPlanTabs _ mode =
+viewPlanTabs : Language -> TableMode -> Html Msg
+viewPlanTabs language mode =
     div [ class "flex items-center justify-between gap-3 flex-wrap print:hidden" ]
         [ div [ class "flex items-center gap-1 bg-slate-900 border border-slate-800 rounded-lg p-1" ]
-            [ tabButton "By km" (mode == ByKm) (SetPlanTableMode ByKm)
-            , tabButton "By section" (mode == BySection) (SetPlanTableMode BySection)
+            [ tabButton (Translations.byKm language) (mode == ByKm) (SetPlanTableMode ByKm)
+            , tabButton (Translations.bySection language) (mode == BySection) (SetPlanTableMode BySection)
             ]
         , div [ class "flex items-center gap-2" ]
             [ button
@@ -5964,14 +6002,14 @@ viewPlanTabs _ mode =
                     )
                 , class "px-3 py-1.5 text-sm border border-slate-700 rounded-md hover:bg-slate-800 text-slate-200 flex items-center gap-2"
                 ]
-                [ text "Download CSV" ]
+                [ text (Translations.downloadCsv language) ]
             , button
                 [ onClick PrintPlan
                 , class "px-3 py-1.5 text-sm border border-slate-700 rounded-md hover:bg-slate-800 text-slate-200 flex items-center gap-2"
                 ]
-                [ text "Print" ]
+                [ text (Translations.print language) ]
             , p [ class "text-xs text-slate-500" ]
-                [ text "Tap a row to edit a km in detail." ]
+                [ text (Translations.tapRowHint language) ]
             ]
         ]
 
@@ -5989,8 +6027,8 @@ tabButton labelText active msg =
         [ text labelText ]
 
 
-viewKmTable : Race -> List Km -> Dict Int KmResult -> Html Msg
-viewKmTable race kms results =
+viewKmTable : Language -> Race -> List Km -> Dict Int KmResult -> Html Msg
+viewKmTable language race kms results =
     let
         aidByKm =
             race.aidStations
@@ -5998,7 +6036,7 @@ viewKmTable race kms results =
                 |> List.foldl (\( idx, a ) acc -> Dict.update idx (Just << (\v -> a :: Maybe.withDefault [] v)) acc) Dict.empty
 
         cumulativeRows =
-            kmsWithCumulative race aidByKm results kms
+            kmsWithCumulative language race aidByKm results kms
 
         hasActual =
             race.actualSplits /= Nothing
@@ -6008,8 +6046,8 @@ viewKmTable race kms results =
 
         actualHeaders =
             if hasActual then
-                [ Html.th [ class "px-4 py-3 text-right" ] [ text "Actual" ]
-                , Html.th [ class "px-4 py-3 text-right" ] [ text "Δ vs plan" ]
+                [ Html.th [ class "px-4 py-3 text-right" ] [ text (Translations.colActual language) ]
+                , Html.th [ class "px-4 py-3 text-right" ] [ text (Translations.colDeltaVsPlan language) ]
                 ]
 
             else
@@ -6017,7 +6055,7 @@ viewKmTable race kms results =
 
         hrHeader =
             if hasHr then
-                [ Html.th [ class "px-4 py-3 text-right" ] [ text "Avg HR" ] ]
+                [ Html.th [ class "px-4 py-3 text-right" ] [ text (Translations.colAvgHr language) ] ]
 
             else
                 []
@@ -6026,17 +6064,17 @@ viewKmTable race kms results =
         [ Html.table [ class "w-full text-sm" ]
             [ Html.thead [ class "text-xs uppercase tracking-wider text-slate-500" ]
                 [ Html.tr []
-                    ([ Html.th [ class "px-4 py-3 text-left" ] [ text "Km" ]
-                     , Html.th [ class "px-4 py-3 text-left" ] [ text "Span" ]
-                     , Html.th [ class "px-4 py-3 text-right" ] [ text "Δ ele" ]
-                     , Html.th [ class "px-4 py-3 text-left" ] [ text "Grade" ]
-                     , Html.th [ class "px-4 py-3 text-right" ] [ text "Pace" ]
-                     , Html.th [ class "px-4 py-3 text-right" ] [ text "Time" ]
+                    ([ Html.th [ class "px-4 py-3 text-left" ] [ text (Translations.colKm language) ]
+                     , Html.th [ class "px-4 py-3 text-left" ] [ text (Translations.colSpan language) ]
+                     , Html.th [ class "px-4 py-3 text-right" ] [ text (Translations.colDeltaEle language) ]
+                     , Html.th [ class "px-4 py-3 text-left" ] [ text (Translations.colGrade language) ]
+                     , Html.th [ class "px-4 py-3 text-right" ] [ text (Translations.colPace language) ]
+                     , Html.th [ class "px-4 py-3 text-right" ] [ text (Translations.colTime language) ]
                      ]
                         ++ actualHeaders
                         ++ hrHeader
-                        ++ [ Html.th [ class "px-4 py-3 text-right" ] [ text "Cum" ]
-                           , Html.th [ class "px-4 py-3 text-left" ] [ text "Notes / stops" ]
+                        ++ [ Html.th [ class "px-4 py-3 text-right" ] [ text (Translations.colCum language) ]
+                           , Html.th [ class "px-4 py-3 text-left" ] [ text (Translations.colNotesStops language) ]
                            ]
                     )
                 ]
@@ -6046,12 +6084,13 @@ viewKmTable race kms results =
 
 
 kmsWithCumulative :
-    Race
+    Language
+    -> Race
     -> Dict Int (List AidStation)
     -> Dict Int KmResult
     -> List Km
     -> List (Html Msg)
-kmsWithCumulative race aidByKm results kms =
+kmsWithCumulative language race aidByKm results kms =
     let
         go km ( running, acc ) =
             let
@@ -6071,7 +6110,7 @@ kmsWithCumulative race aidByKm results kms =
                 notes =
                     (kmPlanFor km.index race.plan).notes
             in
-            ( newRunning, viewKmRow race km result stops notes newRunning :: acc )
+            ( newRunning, viewKmRow language race km result stops notes newRunning :: acc )
 
         ( _, rows ) =
             List.foldl go ( 0, [] ) kms
@@ -6079,8 +6118,8 @@ kmsWithCumulative race aidByKm results kms =
     List.reverse rows
 
 
-viewKmRow : Race -> Km -> KmResult -> List AidStation -> String -> Int -> Html Msg
-viewKmRow race km result stops notes cumulative =
+viewKmRow : Language -> Race -> Km -> KmResult -> List AidStation -> String -> Int -> Html Msg
+viewKmRow language race km result stops notes cumulative =
     let
         deltaEle =
             km.eleEnd - km.eleStart
@@ -6122,9 +6161,9 @@ viewKmRow race km result stops notes cumulative =
         spanCell =
             Html.td [ class "px-4 py-3 align-top text-slate-400 tabular-nums whitespace-nowrap" ]
                 [ text
-                    (formatFloat 2 (km.distStart / 1000)
+                    (Format.number language 2 (km.distStart / 1000)
                         ++ " → "
-                        ++ formatFloat 2 (km.distEnd / 1000)
+                        ++ Format.number language 2 (km.distEnd / 1000)
                         ++ " km"
                     )
                 ]
@@ -6156,7 +6195,7 @@ viewKmRow race km result stops notes cumulative =
             Html.td [ class "px-4 py-3 align-top" ]
                 [ let
                     ( gLabel, gTone ) =
-                        gradeClass km.slope
+                        gradeClass language km.slope
                   in
                   span
                     [ class
@@ -6251,7 +6290,7 @@ viewKmRow race km result stops notes cumulative =
                             (\a ->
                                 div []
                                     [ div [ class "text-amber-300" ]
-                                        [ text ("★ " ++ a.name ++ " · " ++ formatRest a.restSeconds) ]
+                                        [ text ("★ " ++ a.name ++ " · " ++ formatRest language a.restSeconds) ]
                                     , if String.isEmpty a.notes then
                                         text ""
 
@@ -6281,8 +6320,8 @@ viewKmRow race km result stops notes cumulative =
         )
 
 
-viewSectionTable : Race -> List Km -> Dict Int KmResult -> Html Msg
-viewSectionTable race kms results =
+viewSectionTable : Language -> Race -> List Km -> Dict Int KmResult -> Html Msg
+viewSectionTable language race kms results =
     let
         sections =
             Planning.sectionsForRace
@@ -6292,15 +6331,15 @@ viewSectionTable race kms results =
                 }
 
         rows =
-            sectionsWithCumulative race results sections
+            sectionsWithCumulative language race results sections
 
         hasActual =
             race.actualSplits /= Nothing
 
         actualHeaders =
             if hasActual then
-                [ Html.th [ class "px-4 py-3 text-right" ] [ text "Actual" ]
-                , Html.th [ class "px-4 py-3 text-right" ] [ text "Δ vs plan" ]
+                [ Html.th [ class "px-4 py-3 text-right" ] [ text (Translations.colActual language) ]
+                , Html.th [ class "px-4 py-3 text-right" ] [ text (Translations.colDeltaVsPlan language) ]
                 ]
 
             else
@@ -6313,30 +6352,30 @@ viewSectionTable race kms results =
         [ Html.table [ class "w-full text-sm" ]
             [ Html.thead [ class "text-xs uppercase tracking-wider text-slate-500" ]
                 [ Html.tr []
-                    ([ Html.th [ class "px-4 py-3 text-left" ] [ text "Section" ]
-                     , Html.th [ class "px-4 py-3 text-right" ] [ text "Distance" ]
-                     , Html.th [ class "px-4 py-3 text-right" ] [ text "Gain" ]
-                     , Html.th [ class "px-4 py-3 text-right" ] [ text "Loss" ]
-                     , Html.th [ class "px-4 py-3 text-right" ] [ text "Pace" ]
-                     , Html.th [ class "px-4 py-3 text-right" ] [ text "Section time" ]
+                    ([ Html.th [ class "px-4 py-3 text-left" ] [ text (Translations.colSection language) ]
+                     , Html.th [ class "px-4 py-3 text-right" ] [ text (Translations.statDistance language) ]
+                     , Html.th [ class "px-4 py-3 text-right" ] [ text (Translations.statGain language) ]
+                     , Html.th [ class "px-4 py-3 text-right" ] [ text (Translations.statLoss language) ]
+                     , Html.th [ class "px-4 py-3 text-right" ] [ text (Translations.colPace language) ]
+                     , Html.th [ class "px-4 py-3 text-right" ] [ text (Translations.colSectionTime language) ]
                      ]
                         ++ actualHeaders
-                        ++ [ Html.th [ class "px-4 py-3 text-right" ] [ text "Cum" ] ]
+                        ++ [ Html.th [ class "px-4 py-3 text-right" ] [ text (Translations.colCum language) ] ]
                     )
                 ]
             , Html.tbody [] rows
             ]
         , if hasAidRest then
             p [ class "px-4 py-3 text-xs text-slate-500 border-t border-slate-800" ]
-                [ text "Section time and Cum are clock time — moving plus the aid rest taken in that section. Pace is moving only." ]
+                [ text (Translations.sectionTimeNote language) ]
 
           else
             text ""
         ]
 
 
-sectionsWithCumulative : Race -> Dict Int KmResult -> List Planning.Section -> List (Html Msg)
-sectionsWithCumulative race results sections =
+sectionsWithCumulative : Language -> Race -> Dict Int KmResult -> List Planning.Section -> List (Html Msg)
+sectionsWithCumulative language race results sections =
     let
         hasActual =
             race.actualSplits /= Nothing
@@ -6392,7 +6431,7 @@ sectionsWithCumulative race results sections =
                         , A.attribute "tabindex" "0"
                         ]
                         ([ Html.td [ class "px-4 py-3 text-white font-medium" ] [ text section.label ]
-                         , Html.td [ class "px-4 py-3 text-right text-slate-300 tabular-nums" ] [ text (formatFloat 2 (section.distance / 1000) ++ " km") ]
+                         , Html.td [ class "px-4 py-3 text-right text-slate-300 tabular-nums" ] [ text (Format.number language 2 (section.distance / 1000) ++ " km") ]
                          , Html.td [ class "px-4 py-3 text-right text-rose-300 tabular-nums" ] [ text (formatInt section.gain ++ " m+") ]
                          , Html.td [ class "px-4 py-3 text-right text-emerald-300 tabular-nums" ] [ text (formatInt section.loss ++ " m−") ]
                          , Html.td [ class "px-4 py-3 text-right text-slate-300 tabular-nums" ] [ text pace ]
@@ -6415,7 +6454,7 @@ sectionsWithCumulative race results sections =
                                         [ text ("★ " ++ aid.name)
                                         , if aid.restSeconds > 0 then
                                             span [ class "text-amber-300/60 font-normal" ]
-                                                [ text ("  ·  rest " ++ formatHmsLong aid.restSeconds) ]
+                                                [ text ("  ·  " ++ Translations.restWord language ++ " " ++ formatHmsLong aid.restSeconds) ]
 
                                           else
                                             text ""
@@ -6499,27 +6538,30 @@ viewPlanSection model race secIndex =
 
             else
                 Just (secIndex + 1)
+
+        language =
+            model.settings.language
     in
     div [ class "max-w-screen-2xl mx-auto mt-8 px-6 space-y-6" ]
-        [ viewPlanCrumb race
+        [ viewPlanCrumb language race
         , div [ class "flex items-end justify-between gap-4 flex-wrap" ]
             [ h1 [ class "text-3xl font-bold tracking-tight text-white" ]
-                [ text ("Section " ++ String.fromInt (secIndex + 1) ++ " of " ++ String.fromInt (List.length sections)) ]
+                [ text (Translations.sectionBreadcrumb language (secIndex + 1) (List.length sections)) ]
             , a [ Route.href (Route.PlanTable race.id), class "text-sm text-slate-400 hover:text-slate-100" ]
-                [ text "Back to table" ]
+                [ text (Translations.backToTable language) ]
             ]
         , case section of
             Nothing ->
                 div [ class "rounded-2xl bg-slate-900 border border-slate-800 p-10 text-center text-slate-500" ]
-                    [ text "This section doesn't exist in this race." ]
+                    [ text (Translations.sectionNotExist language) ]
 
             Just s ->
-                viewSectionCardAndDetails model race kms results s prevIndex nextIndex
+                viewSectionCardAndDetails language race kms results s prevIndex nextIndex
         ]
 
 
 viewSectionCardAndDetails :
-    Model
+    Language
     -> Race
     -> List Km
     -> Dict Int KmResult
@@ -6527,7 +6569,7 @@ viewSectionCardAndDetails :
     -> Maybe Int
     -> Maybe Int
     -> Html Msg
-viewSectionCardAndDetails _ race kms results section prevIndex nextIndex =
+viewSectionCardAndDetails language race kms results section prevIndex nextIndex =
     let
         containedKms =
             kms |> List.filter (\km -> List.member km.index section.kmIndices)
@@ -6556,18 +6598,18 @@ viewSectionCardAndDetails _ race kms results section prevIndex nextIndex =
     in
     div [ class "grid grid-cols-1 lg:grid-cols-2 gap-6 items-start" ]
         [ div [ class "flex flex-col items-center gap-4 lg:sticky lg:top-24" ]
-            [ viewSectionCard section containedKms
+            [ viewSectionCard language section containedKms
             , div [ class "flex gap-3 justify-between" ]
-                [ navLink "← Prev section" prevIndex
-                , navLink "Next section →" nextIndex
+                [ navLink (Translations.prevSection language) prevIndex
+                , navLink (Translations.nextSection language) nextIndex
                 ]
             ]
-        , viewSectionDetails race section containedKms results sectionSeconds sectionPace
+        , viewSectionDetails language race section containedKms results sectionSeconds sectionPace
         ]
 
 
-viewSectionCard : Planning.Section -> List Km -> Html msg
-viewSectionCard section containedKms =
+viewSectionCard : Language -> Planning.Section -> List Km -> Html msg
+viewSectionCard language section containedKms =
     let
         cardWidth =
             440.0
@@ -6665,11 +6707,9 @@ viewSectionCard section containedKms =
         [ div [ class "px-5 pt-4 pb-3 border-b border-slate-800" ]
             [ p [ class "text-xs uppercase tracking-wider text-slate-500" ]
                 [ text
-                    ("Section · "
-                        ++ formatFloat 1 (section.distance / 1000)
-                        ++ " km wide · scale "
-                        ++ formatFloat 1 mPerPx
-                        ++ " m/px"
+                    (Translations.sectionCardHeader language
+                        (Format.number language 1 (section.distance / 1000))
+                        (Format.number language 1 mPerPx)
                     )
                 ]
             , p [ class "mt-1 text-2xl font-semibold text-white" ] [ text section.label ]
@@ -6788,14 +6828,15 @@ viewSectionCardEndAid yTop yBottom cardWidth x aid =
 
 
 viewSectionDetails :
-    Race
+    Language
+    -> Race
     -> Planning.Section
     -> List Km
     -> Dict Int KmResult
     -> Int
     -> String
     -> Html Msg
-viewSectionDetails race section containedKms results sectionSeconds sectionPace =
+viewSectionDetails language race section containedKms results sectionSeconds sectionPace =
     let
         sectionRest =
             Planning.sectionAidRest race.aidStations section
@@ -6807,10 +6848,10 @@ viewSectionDetails race section containedKms results sectionSeconds sectionPace 
             case sectionActualSeconds race section.kmIndices of
                 Just actualS ->
                     div [ class "grid grid-cols-2 gap-3 tabular-nums" ]
-                        [ smallStat "Actual" (formatHmsLong actualS) ""
+                        [ smallStat (Translations.colActual language) (formatHmsLong actualS) ""
                         , div [ class "rounded-lg bg-slate-950/60 px-3 py-2" ]
                             [ p [ class "text-[10px] uppercase tracking-wider text-slate-500" ]
-                                [ text "Δ vs plan" ]
+                                [ text (Translations.colDeltaVsPlan language) ]
                             , p [ class "flex items-baseline gap-1" ]
                                 [ span [ class "text-base font-semibold" ]
                                     [ viewSignedDeltaCell (actualS - sectionClock) ]
@@ -6822,25 +6863,25 @@ viewSectionDetails race section containedKms results sectionSeconds sectionPace 
                     case race.actualSplits of
                         Just _ ->
                             p [ class "text-xs text-slate-500 italic" ]
-                                [ text "Actual run is linked, but some km in this section is missing from its trace." ]
+                                [ text (Translations.sectionActualMissing language) ]
 
                         Nothing ->
                             text ""
     in
     div [ class "space-y-4" ]
         [ div [ class "rounded-2xl bg-slate-900 border border-slate-800 p-5 space-y-4" ]
-            [ h3 [ class "text-base font-semibold text-white" ] [ text "Section plan" ]
+            [ h3 [ class "text-base font-semibold text-white" ] [ text (Translations.sectionPlan language) ]
             , div [ class "grid grid-cols-2 sm:grid-cols-4 gap-3 tabular-nums" ]
-                [ smallStat "Distance" (formatFloat 1 (section.distance / 1000)) "km"
-                , smallStat "Time" (formatHmsLong sectionClock) ""
-                , smallStat "Pace" sectionPace "/km"
-                , smallStat "Kms"
+                [ smallStat (Translations.statDistance language) (Format.number language 1 (section.distance / 1000)) "km"
+                , smallStat (Translations.colTime language) (formatHmsLong sectionClock) ""
+                , smallStat (Translations.colPace language) sectionPace "/km"
+                , smallStat (Translations.kmsLabel language)
                     (String.fromInt (List.length containedKms))
                     ""
                 ]
             , if sectionRest > 0 then
                 p [ class "text-xs text-amber-300/80" ]
-                    [ text ("Time is clock time, including " ++ formatRest sectionRest ++ " at aid stations in this section. Pace is moving only.") ]
+                    [ text (Translations.sectionClockNote language (formatRest language sectionRest)) ]
 
               else
                 text ""
@@ -6849,11 +6890,11 @@ viewSectionDetails race section containedKms results sectionSeconds sectionPace 
                 Just aid ->
                     div [ class "rounded-xl bg-amber-400/5 border border-amber-400/30 p-4 space-y-2" ]
                         [ p [ class "text-xs uppercase tracking-wider text-amber-300" ]
-                            [ text "Ends at" ]
+                            [ text (Translations.endsAt language) ]
                         , div [ class "flex items-baseline justify-between gap-3 flex-wrap" ]
                             [ p [ class "text-lg font-semibold text-white" ] [ text aid.name ]
                             , p [ class "text-sm text-amber-200 tabular-nums" ]
-                                [ text (formatFloat 1 (aid.distance / 1000) ++ " km · " ++ formatRest aid.restSeconds) ]
+                                [ text (Format.number language 1 (aid.distance / 1000) ++ " km · " ++ formatRest language aid.restSeconds) ]
                             ]
                         , if List.isEmpty aid.services then
                             text ""
@@ -6862,7 +6903,7 @@ viewSectionDetails race section containedKms results sectionSeconds sectionPace 
                             p [ class "flex gap-2 text-lg" ]
                                 (List.map
                                     (\s ->
-                                        span [ A.title (serviceLabel s) ]
+                                        span [ A.title (Translations.serviceLabel language s) ]
                                             [ text (serviceIcon s) ]
                                     )
                                     aid.services
@@ -6876,23 +6917,23 @@ viewSectionDetails race section containedKms results sectionSeconds sectionPace 
                             [ Route.href (Route.RaceDetail race.id)
                             , class "inline-block text-xs text-amber-300 hover:text-amber-200 underline"
                             ]
-                            [ text "Edit aid station →" ]
+                            [ text (Translations.editAidStationLink language) ]
                         ]
 
                 Nothing ->
                     div [ class "rounded-xl bg-slate-950 border border-slate-800 p-4 text-sm text-slate-400" ]
-                        [ text "🏁 This section finishes the race." ]
+                        [ text (Translations.sectionFinishes language) ]
             ]
         , div [ class "rounded-2xl bg-slate-900 border border-slate-800 p-5 space-y-3" ]
-            [ h3 [ class "text-base font-semibold text-white" ] [ text "Kilometers in this section" ]
+            [ h3 [ class "text-base font-semibold text-white" ] [ text (Translations.kmsInSection language) ]
             , div [ class "divide-y divide-slate-800" ]
-                (List.map (viewSectionKmRow race results) containedKms)
+                (List.map (viewSectionKmRow language race results) containedKms)
             ]
         ]
 
 
-viewSectionKmRow : Race -> Dict Int KmResult -> Km -> Html Msg
-viewSectionKmRow race results km =
+viewSectionKmRow : Language -> Race -> Dict Int KmResult -> Km -> Html Msg
+viewSectionKmRow language race results km =
     let
         result =
             Dict.get km.index results
@@ -6919,9 +6960,9 @@ viewSectionKmRow race results km =
         , div [ class "min-w-0 flex-1" ]
             [ p [ class "text-sm text-white font-medium tabular-nums" ]
                 [ text
-                    (formatFloat 2 (km.distStart / 1000)
+                    (Format.number language 2 (km.distStart / 1000)
                         ++ " → "
-                        ++ formatFloat 2 (km.distEnd / 1000)
+                        ++ Format.number language 2 (km.distEnd / 1000)
                         ++ " km"
                     )
                 ]
@@ -7002,19 +7043,22 @@ viewPlanKm model race kmIndex =
 
             else
                 Just (kmIndex + 1)
+
+        language =
+            model.settings.language
     in
     div [ class "max-w-screen-2xl mx-auto mt-8 px-6 space-y-6" ]
-        [ viewPlanCrumb race
+        [ viewPlanCrumb language race
         , div [ class "flex items-end justify-between gap-4 flex-wrap" ]
             [ h1 [ class "text-3xl font-bold tracking-tight text-slate-100" ]
-                [ text ("Km " ++ String.fromInt (kmIndex + 1) ++ " of " ++ String.fromInt (List.length kms)) ]
+                [ text (Translations.kmBreadcrumb language (kmIndex + 1) (List.length kms)) ]
             , a [ Route.href (Route.PlanTable race.id), class "text-sm text-slate-400 hover:text-slate-100" ]
-                [ text "Back to table" ]
+                [ text (Translations.backToTable language) ]
             ]
         , case thisKm of
             Nothing ->
                 div [ class "rounded-2xl bg-slate-900 border border-slate-800 p-10 text-center text-slate-500" ]
-                    [ text "This km doesn't exist in this race." ]
+                    [ text (Translations.kmNotExist language) ]
 
             Just km ->
                 viewKmCardAndForm model race km kms results aidRest prevIndex nextIndex
@@ -7024,6 +7068,9 @@ viewPlanKm model race kmIndex =
 viewKmCardAndForm : Model -> Race -> Km -> List Km -> Dict Int KmResult -> Int -> Maybe Int -> Maybe Int -> Html Msg
 viewKmCardAndForm model race km allKms results _ prevIndex nextIndex =
     let
+        language =
+            model.settings.language
+
         result =
             Dict.get km.index results |> Maybe.withDefault { seconds = 0, source = AutoComputed }
 
@@ -7060,18 +7107,18 @@ viewKmCardAndForm model race km allKms results _ prevIndex nextIndex =
     in
     div [ class "grid grid-cols-1 lg:grid-cols-2 gap-6 items-start" ]
         [ div [ class "flex flex-col items-center gap-4 lg:sticky lg:top-24" ]
-            [ viewKmCard km stopsInKm raceMaxRange
+            [ viewKmCard language km stopsInKm raceMaxRange
             , div [ class "flex gap-3 w-[360px] justify-between" ]
-                [ navLink "← Prev km" prevIndex
-                , navLink "Next km →" nextIndex
+                [ navLink (Translations.prevKm language) prevIndex
+                , navLink (Translations.nextKm language) nextIndex
                 ]
             ]
         , viewKmForm model race km result kp stopsInKm
         ]
 
 
-viewKmCard : Km -> List AidStation -> Float -> Html Msg
-viewKmCard km stopsInKm raceMaxRange =
+viewKmCard : Language -> Km -> List AidStation -> Float -> Html Msg
+viewKmCard language km stopsInKm raceMaxRange =
     let
         cardWidth =
             360.0
@@ -7140,14 +7187,7 @@ viewKmCard km stopsInKm raceMaxRange =
         ]
         [ div [ class "px-5 pt-4 pb-3 border-b border-slate-800" ]
             [ p [ class "text-xs uppercase tracking-wider text-slate-500" ]
-                [ text
-                    ("Km "
-                        ++ String.fromInt (km.index + 1)
-                        ++ " · 1:1 scale (1 px = "
-                        ++ formatFloat 1 mPerPx
-                        ++ " m)"
-                    )
-                ]
+                [ text (Translations.kmCardHeader language (km.index + 1) (Format.number language 1 mPerPx)) ]
             , div [ class "mt-1 flex items-baseline justify-between" ]
                 [ p [ class "text-2xl font-semibold text-white tabular-nums" ]
                     [ text
@@ -7356,15 +7396,18 @@ viewKmForm :
     -> Html Msg
 viewKmForm model race km result kp stopsInKm =
     let
+        language =
+            model.settings.language
+
         sourceBadge =
             case result.source of
                 UserManual ->
                     span [ class "px-2 py-0.5 text-[10px] uppercase tracking-wider bg-amber-400/20 text-amber-300 rounded" ]
-                        [ text "Manual" ]
+                        [ text (Translations.modeManual language) ]
 
                 AutoComputed ->
                     span [ class "px-2 py-0.5 text-[10px] uppercase tracking-wider bg-slate-800 text-slate-400 rounded" ]
-                        [ text "Auto" ]
+                        [ text (Translations.modeAuto language) ]
 
         stopRestInKm =
             List.foldl (\a acc -> acc + a.restSeconds) 0 stopsInKm
@@ -7386,22 +7429,22 @@ viewKmForm model race km result kp stopsInKm =
     in
     div [ class "space-y-5 rounded-2xl bg-slate-900 border border-slate-800 p-5" ]
         [ div [ class "flex items-baseline justify-between gap-2" ]
-            [ h3 [ class "text-base font-semibold text-slate-100" ] [ text "Plan this km" ]
+            [ h3 [ class "text-base font-semibold text-slate-100" ] [ text (Translations.planThisKm language) ]
             , sourceBadge
             ]
         , div [ class "grid grid-cols-3 gap-3 tabular-nums" ]
-            [ smallStat "Distance" (formatFloat 2 (km.distance / 1000)) "km"
-            , smallStat "Δ ele" (formatInt (km.eleEnd - km.eleStart)) "m"
-            , smallStat "Slope" (formatFloat 1 (km.slope * 100)) "%"
+            [ smallStat (Translations.statDistance language) (Format.number language 2 (km.distance / 1000)) "km"
+            , smallStat (Translations.colDeltaEle language) (formatInt (km.eleEnd - km.eleStart)) "m"
+            , smallStat (Translations.slopeLabel language) (Format.number language 1 (km.slope * 100)) "%"
             ]
         , div [ class "grid grid-cols-2 gap-3" ]
-            [ field "Target time"
+            [ field (Translations.targetTime language)
                 [ input
                     [ A.type_ "text"
                     , A.value model.kmTimeText
                     , A.placeholder
                         (if result.seconds > 0 then
-                            formatMmss kmClockTime ++ " (auto)"
+                            formatMmss kmClockTime ++ Translations.autoSuffix language
 
                          else
                             "m:ss"
@@ -7413,14 +7456,14 @@ viewKmForm model race km result kp stopsInKm =
                     []
                 ]
             , div [ class "space-y-1" ]
-                [ span [ class "text-xs text-slate-500 uppercase tracking-wider" ] [ text "Pace" ]
+                [ span [ class "text-xs text-slate-500 uppercase tracking-wider" ] [ text (Translations.colPace language) ]
                 , div [ class "px-3 py-2 bg-slate-950 border border-slate-800 rounded-md text-lg font-medium text-slate-100 tabular-nums" ]
                     [ text (pace ++ "/km") ]
                 ]
             ]
         , if stopRestInKm > 0 then
             p [ class "text-xs text-amber-300/80 -mt-3" ]
-                [ text ("Target time is clock time, including " ++ formatRest stopRestInKm ++ " at the aid station. Pace is moving only.") ]
+                [ text (Translations.kmClockNote language (formatRest language stopRestInKm)) ]
 
           else
             text ""
@@ -7433,7 +7476,7 @@ viewKmForm model race km result kp stopsInKm =
                     hrCell =
                         if hasHrData then
                             [ div [ class "space-y-1" ]
-                                [ span [ class "text-xs text-rose-400/80 uppercase tracking-wider" ] [ text "Avg HR" ]
+                                [ span [ class "text-xs text-rose-400/80 uppercase tracking-wider" ] [ text (Translations.colAvgHr language) ]
                                 , div [ class "px-3 py-2 bg-slate-950 border border-rose-500/30 rounded-md text-lg font-medium text-slate-100 tabular-nums" ]
                                     (case kmAvgHr of
                                         Just bpm ->
@@ -7459,12 +7502,12 @@ viewKmForm model race km result kp stopsInKm =
                 in
                 div [ class gridClass ]
                     ([ div [ class "space-y-1" ]
-                        [ span [ class "text-xs text-emerald-400/80 uppercase tracking-wider" ] [ text "Actual" ]
+                        [ span [ class "text-xs text-emerald-400/80 uppercase tracking-wider" ] [ text (Translations.colActual language) ]
                         , div [ class "px-3 py-2 bg-slate-950 border border-emerald-500/30 rounded-md text-lg font-medium text-slate-100 tabular-nums" ]
                             [ text (formatMmss actualS) ]
                         ]
                      , div [ class "space-y-1" ]
-                        [ span [ class "text-xs text-slate-500 uppercase tracking-wider" ] [ text "Δ vs plan" ]
+                        [ span [ class "text-xs text-slate-500 uppercase tracking-wider" ] [ text (Translations.colDeltaVsPlan language) ]
                         , div [ class "px-3 py-2 bg-slate-950 border border-slate-800 rounded-md text-lg font-medium" ]
                             [ viewSignedDeltaCell (actualS - kmClockTime) ]
                         ]
@@ -7474,7 +7517,7 @@ viewKmForm model race km result kp stopsInKm =
 
             ( Just _, Nothing ) ->
                 p [ class "text-xs text-slate-500 italic" ]
-                    [ text "Actual run linked, but this km isn't in its trace." ]
+                    [ text (Translations.kmActualMissing language) ]
 
             ( Nothing, _ ) ->
                 text ""
@@ -7484,15 +7527,15 @@ viewKmForm model race km result kp stopsInKm =
                     [ onClick (ResetKmToAuto km.index)
                     , class "text-xs text-slate-400 hover:text-slate-100 underline"
                     ]
-                    [ text "Reset to auto (GAP)" ]
+                    [ text (Translations.resetToAuto language) ]
 
             Auto ->
                 p [ class "text-xs text-slate-500" ]
-                    [ text "Auto-distributed from your target total time using the slope of this km." ]
-        , field "Notes"
+                    [ text (Translations.resetToAutoHelp language) ]
+        , field (Translations.fieldNotes language)
             [ textarea
                 [ A.value model.kmNotesText
-                , A.placeholder "Anything to remember about this km — surface, exposure, mental cues…"
+                , A.placeholder (Translations.kmNotesPlaceholder language)
                 , A.rows 3
                 , onInput SetKmNotesText
                 , onBlur (CommitKmNotesForKm km.index)
@@ -7505,13 +7548,13 @@ viewKmForm model race km result kp stopsInKm =
 
           else
             div [ class "space-y-2" ]
-                [ p [ class "text-xs text-slate-500 uppercase tracking-wider" ] [ text "Aid stations in this km" ]
+                [ p [ class "text-xs text-slate-500 uppercase tracking-wider" ] [ text (Translations.aidStationsInKm language) ]
                 , div [ class "space-y-1" ]
                     (List.map
                         (\a ->
                             div [ class "text-sm" ]
                                 [ div [ class "text-amber-300" ]
-                                    [ text ("★ " ++ a.name ++ " · " ++ formatFloat 2 (a.distance / 1000) ++ " km · " ++ formatRest a.restSeconds) ]
+                                    [ text ("★ " ++ a.name ++ " · " ++ Format.number language 2 (a.distance / 1000) ++ " km · " ++ formatRest language a.restSeconds) ]
                                 , if String.isEmpty a.notes then
                                     text ""
 
@@ -8288,15 +8331,19 @@ viewSignedDeltaCell diff =
         [ text (prefix ++ formatMmss mag) ]
 
 
-{-| NOTE: still English. Localizing this embeds the word "rest" and cascades
-`Language` through the plan-table machinery (`kmsWithCumulative` → `viewKmRow`),
-which is TASK-065's surface — so `formatRest` localizes there, where 5 of its 7
-callers live. The aid rows (TASK-064) render the rest value in English until then.
--}
-formatRest : Int -> String
-formatRest seconds =
+formatRest : Language -> Int -> String
+formatRest language seconds =
+    let
+        tr en es =
+            case language of
+                English ->
+                    en
+
+                Spanish ->
+                    es
+    in
     if seconds <= 0 then
-        "no rest"
+        tr "no rest" "sin descanso"
 
     else if seconds < 60 then
         String.fromInt seconds ++ "s"
@@ -8310,10 +8357,10 @@ formatRest seconds =
                 modBy 60 seconds
         in
         if remainder == 0 then
-            String.fromInt minutes ++ " min rest"
+            String.fromInt minutes ++ tr " min rest" " min descanso"
 
         else
-            String.fromInt minutes ++ ":" ++ String.padLeft 2 '0' (String.fromInt remainder) ++ " rest"
+            String.fromInt minutes ++ ":" ++ String.padLeft 2 '0' (String.fromInt remainder) ++ tr " rest" " descanso"
 
 
 

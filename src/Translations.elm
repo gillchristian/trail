@@ -1357,16 +1357,16 @@ modeHelpFromStart language =
             "Distancia absoluta desde la línea de salida."
 
 
-{-| `prevKm` is the already-formatted "X.X" km string.
+{-| `prevKmStr` is the already-formatted "X.X" km string.
 -}
 modeHelpFromPrevious : Language -> String -> String
-modeHelpFromPrevious language prevKm =
+modeHelpFromPrevious language prevKmStr =
     case language of
         English ->
-            "Distance added on top of " ++ prevKm ++ " km (the previous stop, or start if there is none)."
+            "Distance added on top of " ++ prevKmStr ++ " km (the previous stop, or start if there is none)."
 
         Spanish ->
-            "Distancia que se suma a " ++ prevKm ++ " km (la parada anterior, o la salida si no hay)."
+            "Distancia que se suma a " ++ prevKmStr ++ " km (la parada anterior, o la salida si no hay)."
 
 
 servicesLabel : Language -> String
@@ -1407,3 +1407,816 @@ addAidStation language =
 
         Spanish ->
             "Agregar avituallamiento"
+
+
+
+-- PLAN VIEWS (TASK-065)
+-- Actual-run strip
+
+
+actualParseError : Language -> String
+actualParseError language =
+    case language of
+        English ->
+            "Couldn't parse actual run: "
+
+        Spanish ->
+            "No se pudo procesar la actividad: "
+
+
+linkFromStrava : Language -> String
+linkFromStrava language =
+    case language of
+        English ->
+            "Link from Strava"
+
+        Spanish ->
+            "Vincular desde Strava"
+
+
+linkActualRun : Language -> String
+linkActualRun language =
+    case language of
+        English ->
+            "Link actual run"
+
+        Spanish ->
+            "Vincular actividad real"
+
+
+linkActualRunHelp : Language -> String
+linkActualRunHelp language =
+    case language of
+        English ->
+            "Upload the .gpx of your completed run to compare per-km splits against the plan."
+
+        Spanish ->
+            "Sube el .gpx de tu actividad terminada para comparar los parciales por km con el plan."
+
+
+uploadGpx : Language -> String
+uploadGpx language =
+    case language of
+        English ->
+            "Upload .gpx"
+
+        Spanish ->
+            "Subir .gpx"
+
+
+actualRunLinked : Language -> String
+actualRunLinked language =
+    case language of
+        English ->
+            "Actual run linked"
+
+        Spanish ->
+            "Actividad vinculada"
+
+
+distanceRun : Language -> String
+distanceRun language =
+    case language of
+        English ->
+            "Distance run"
+
+        Spanish ->
+            "Distancia recorrida"
+
+
+onTarget : Language -> String
+onTarget language =
+    case language of
+        English ->
+            "On target"
+
+        Spanish ->
+            "En objetivo"
+
+
+vsTarget : Language -> String
+vsTarget language =
+    case language of
+        English ->
+            "vs Target"
+
+        Spanish ->
+            "vs objetivo"
+
+
+{-| Suffix after a +/- time diff, e.g. "+1:30 vs target".
+-}
+vsTargetSuffix : Language -> String
+vsTargetSuffix language =
+    case language of
+        English ->
+            " vs target"
+
+        Spanish ->
+            " vs objetivo"
+
+
+unlink : Language -> String
+unlink language =
+    case language of
+        English ->
+            "Unlink"
+
+        Spanish ->
+            "Desvincular"
+
+
+
+-- Target panel
+
+
+targetTime : Language -> String
+targetTime language =
+    case language of
+        English ->
+            "Target time"
+
+        Spanish ->
+            "Tiempo objetivo"
+
+
+timeCommitHint : Language -> String
+timeCommitHint language =
+    case language of
+        English ->
+            "Tap Tab or click away to commit."
+
+        Spanish ->
+            "Pulsa Tab o haz clic fuera para confirmar."
+
+
+planOver : Language -> String
+planOver language =
+    case language of
+        English ->
+            " over"
+
+        Spanish ->
+            " de más"
+
+
+planUnder : Language -> String
+planUnder language =
+    case language of
+        English ->
+            " under"
+
+        Spanish ->
+            " de menos"
+
+
+currentSumLabel : Language -> String
+currentSumLabel language =
+    case language of
+        English ->
+            "Current sum"
+
+        Spanish ->
+            "Suma actual"
+
+
+{-| The bare word "rest" (e.g. "· rest 5:00") — distinct from `formatRest`,
+which formats a duration.
+-}
+restWord : Language -> String
+restWord language =
+    case language of
+        English ->
+            "rest"
+
+        Spanish ->
+            "descanso"
+
+
+aidRestLabel : Language -> String
+aidRestLabel language =
+    case language of
+        English ->
+            "Aid rest"
+
+        Spanish ->
+            "Descanso"
+
+
+{-| "N stops" (always count form — for the aid-rest subtitle).
+-}
+stopsCount : Language -> Int -> String
+stopsCount language count =
+    String.fromInt count
+        ++ " "
+        ++ (case language of
+                English ->
+                    plural count { one = "stop", other = "stops" }
+
+                Spanish ->
+                    plural count { one = "parada", other = "paradas" }
+           )
+
+
+avgPace : Language -> String
+avgPace language =
+    case language of
+        English ->
+            "Avg pace"
+
+        Spanish ->
+            "Ritmo medio"
+
+
+paceMovingSuffix : Language -> String
+paceMovingSuffix language =
+    case language of
+        English ->
+            "/ km · moving"
+
+        Spanish ->
+            "/ km · en movimiento"
+
+
+
+-- Predictor strip
+
+
+effortLabel : Language -> String
+effortLabel language =
+    case language of
+        English ->
+            "Effort"
+
+        Spanish ->
+            "Esfuerzo"
+
+
+predictedFinish : Language -> String
+predictedFinish language =
+    case language of
+        English ->
+            "Predicted finish"
+
+        Spanish ->
+            "Llegada estimada"
+
+
+effortConservative : Language -> String
+effortConservative language =
+    case language of
+        English ->
+            "Conservative"
+
+        Spanish ->
+            "Conservador"
+
+
+effortGoal : Language -> String
+effortGoal language =
+    case language of
+        English ->
+            "Goal"
+
+        Spanish ->
+            "Objetivo"
+
+
+effortPush : Language -> String
+effortPush language =
+    case language of
+        English ->
+            "Push"
+
+        Spanish ->
+            "Fuerte"
+
+
+effortAllIn : Language -> String
+effortAllIn language =
+    case language of
+        English ->
+            "All-in"
+
+        Spanish ->
+            "Al máximo"
+
+
+sliderHelp : Language -> String
+sliderHelp language =
+    case language of
+        English ->
+            "Drag the slider to dial effort up or down — the target time updates to match."
+
+        Spanish ->
+            "Arrastra el control para subir o bajar el esfuerzo — el tiempo objetivo se ajusta."
+
+
+sliderHelpNoTarget : Language -> String
+sliderHelpNoTarget language =
+    case language of
+        English ->
+            "No target set yet. Drag the slider to lock one in, or type a target above."
+
+        Spanish ->
+            "Aún no hay objetivo. Arrastra el control para fijar uno, o escribe un objetivo arriba."
+
+
+
+-- Tabs + table headers
+
+
+byKm : Language -> String
+byKm language =
+    case language of
+        English ->
+            "By km"
+
+        Spanish ->
+            "Por km"
+
+
+bySection : Language -> String
+bySection language =
+    case language of
+        English ->
+            "By section"
+
+        Spanish ->
+            "Por tramo"
+
+
+downloadCsv : Language -> String
+downloadCsv language =
+    case language of
+        English ->
+            "Download CSV"
+
+        Spanish ->
+            "Descargar CSV"
+
+
+print : Language -> String
+print language =
+    case language of
+        English ->
+            "Print"
+
+        Spanish ->
+            "Imprimir"
+
+
+tapRowHint : Language -> String
+tapRowHint language =
+    case language of
+        English ->
+            "Tap a row to edit a km in detail."
+
+        Spanish ->
+            "Toca una fila para editar un km en detalle."
+
+
+colKm : Language -> String
+colKm _ =
+    "Km"
+
+
+colSpan : Language -> String
+colSpan language =
+    case language of
+        English ->
+            "Span"
+
+        Spanish ->
+            "Rango"
+
+
+{-| Δ-elevation column header. Kept compact (symbol + "ele") in both languages.
+-}
+colDeltaEle : Language -> String
+colDeltaEle _ =
+    "Δ ele"
+
+
+colGrade : Language -> String
+colGrade language =
+    case language of
+        English ->
+            "Grade"
+
+        Spanish ->
+            "Pendiente"
+
+
+colPace : Language -> String
+colPace language =
+    case language of
+        English ->
+            "Pace"
+
+        Spanish ->
+            "Ritmo"
+
+
+colTime : Language -> String
+colTime language =
+    case language of
+        English ->
+            "Time"
+
+        Spanish ->
+            "Tiempo"
+
+
+colActual : Language -> String
+colActual language =
+    case language of
+        English ->
+            "Actual"
+
+        Spanish ->
+            "Real"
+
+
+{-| Δ-vs-plan column header. "plan" is a cognate; kept compact in both.
+-}
+colDeltaVsPlan : Language -> String
+colDeltaVsPlan _ =
+    "Δ vs plan"
+
+
+colAvgHr : Language -> String
+colAvgHr language =
+    case language of
+        English ->
+            "Avg HR"
+
+        Spanish ->
+            "FC media"
+
+
+colCum : Language -> String
+colCum language =
+    case language of
+        English ->
+            "Cum"
+
+        Spanish ->
+            "Acum."
+
+
+colNotesStops : Language -> String
+colNotesStops language =
+    case language of
+        English ->
+            "Notes / stops"
+
+        Spanish ->
+            "Notas / paradas"
+
+
+colSection : Language -> String
+colSection language =
+    case language of
+        English ->
+            "Section"
+
+        Spanish ->
+            "Tramo"
+
+
+colSectionTime : Language -> String
+colSectionTime language =
+    case language of
+        English ->
+            "Section time"
+
+        Spanish ->
+            "Tiempo de tramo"
+
+
+sectionTimeNote : Language -> String
+sectionTimeNote language =
+    case language of
+        English ->
+            "Section time and Cum are clock time — moving plus the aid rest taken in that section. Pace is moving only."
+
+        Spanish ->
+            "El tiempo de tramo y Acum. son tiempo de reloj — en movimiento más el descanso en avituallamientos del tramo. El ritmo es solo en movimiento."
+
+
+
+-- Per-section detail
+
+
+prevSection : Language -> String
+prevSection language =
+    case language of
+        English ->
+            "← Prev section"
+
+        Spanish ->
+            "← Tramo anterior"
+
+
+nextSection : Language -> String
+nextSection language =
+    case language of
+        English ->
+            "Next section →"
+
+        Spanish ->
+            "Tramo siguiente →"
+
+
+sectionBreadcrumb : Language -> Int -> Int -> String
+sectionBreadcrumb language index total =
+    (case language of
+        English ->
+            "Section "
+
+        Spanish ->
+            "Tramo "
+    )
+        ++ String.fromInt index
+        ++ (case language of
+                English ->
+                    " of "
+
+                Spanish ->
+                    " de "
+           )
+        ++ String.fromInt total
+
+
+backToTable : Language -> String
+backToTable language =
+    case language of
+        English ->
+            "Back to table"
+
+        Spanish ->
+            "Volver a la tabla"
+
+
+sectionNotExist : Language -> String
+sectionNotExist language =
+    case language of
+        English ->
+            "This section doesn't exist in this race."
+
+        Spanish ->
+            "Este tramo no existe en esta carrera."
+
+
+sectionActualMissing : Language -> String
+sectionActualMissing language =
+    case language of
+        English ->
+            "Actual run is linked, but some km in this section is missing from its trace."
+
+        Spanish ->
+            "Hay una actividad vinculada, pero falta algún km de este tramo en su traza."
+
+
+sectionPlan : Language -> String
+sectionPlan language =
+    case language of
+        English ->
+            "Section plan"
+
+        Spanish ->
+            "Plan del tramo"
+
+
+kmsLabel : Language -> String
+kmsLabel _ =
+    "Kms"
+
+
+{-| `rest` is the already-formatted rest string.
+-}
+sectionClockNote : Language -> String -> String
+sectionClockNote language rest =
+    case language of
+        English ->
+            "Time is clock time, including " ++ rest ++ " at aid stations in this section. Pace is moving only."
+
+        Spanish ->
+            "El tiempo es tiempo de reloj, incluye " ++ rest ++ " en avituallamientos de este tramo. El ritmo es solo en movimiento."
+
+
+endsAt : Language -> String
+endsAt language =
+    case language of
+        English ->
+            "Ends at"
+
+        Spanish ->
+            "Termina en"
+
+
+editAidStationLink : Language -> String
+editAidStationLink language =
+    case language of
+        English ->
+            "Edit aid station →"
+
+        Spanish ->
+            "Editar avituallamiento →"
+
+
+sectionFinishes : Language -> String
+sectionFinishes language =
+    case language of
+        English ->
+            "🏁 This section finishes the race."
+
+        Spanish ->
+            "🏁 Este tramo termina la carrera."
+
+
+kmsInSection : Language -> String
+kmsInSection language =
+    case language of
+        English ->
+            "Kilometers in this section"
+
+        Spanish ->
+            "Kilómetros de este tramo"
+
+
+{-| Section-card header: "Section · <widthKm> km wide · scale <mPerPx> m/px".
+The two numbers are already-formatted strings.
+-}
+sectionCardHeader : Language -> String -> String -> String
+sectionCardHeader language widthKm mPerPx =
+    case language of
+        English ->
+            "Section · " ++ widthKm ++ " km wide · scale " ++ mPerPx ++ " m/px"
+
+        Spanish ->
+            "Tramo · " ++ widthKm ++ " km de ancho · escala " ++ mPerPx ++ " m/px"
+
+
+
+-- Per-km detail
+
+
+prevKm : Language -> String
+prevKm language =
+    case language of
+        English ->
+            "← Prev km"
+
+        Spanish ->
+            "← Km anterior"
+
+
+nextKm : Language -> String
+nextKm language =
+    case language of
+        English ->
+            "Next km →"
+
+        Spanish ->
+            "Km siguiente →"
+
+
+kmBreadcrumb : Language -> Int -> Int -> String
+kmBreadcrumb language index total =
+    "Km "
+        ++ String.fromInt index
+        ++ (case language of
+                English ->
+                    " of "
+
+                Spanish ->
+                    " de "
+           )
+        ++ String.fromInt total
+
+
+kmNotExist : Language -> String
+kmNotExist language =
+    case language of
+        English ->
+            "This km doesn't exist in this race."
+
+        Spanish ->
+            "Este km no existe en esta carrera."
+
+
+{-| Km-card header: "Km <n> · 1:1 scale (1 px = <mPerPx> m)". `index` is the
+1-based km number; `mPerPx` is already formatted.
+-}
+kmCardHeader : Language -> Int -> String -> String
+kmCardHeader language index mPerPx =
+    "Km "
+        ++ String.fromInt index
+        ++ (case language of
+                English ->
+                    " · 1:1 scale (1 px = "
+
+                Spanish ->
+                    " · escala 1:1 (1 px = "
+           )
+        ++ mPerPx
+        ++ " m)"
+
+
+modeManual : Language -> String
+modeManual _ =
+    "Manual"
+
+
+modeAuto : Language -> String
+modeAuto _ =
+    "Auto"
+
+
+planThisKm : Language -> String
+planThisKm language =
+    case language of
+        English ->
+            "Plan this km"
+
+        Spanish ->
+            "Planifica este km"
+
+
+slopeLabel : Language -> String
+slopeLabel language =
+    case language of
+        English ->
+            "Slope"
+
+        Spanish ->
+            "Pendiente"
+
+
+autoSuffix : Language -> String
+autoSuffix _ =
+    " (auto)"
+
+
+{-| `rest` is the already-formatted rest string.
+-}
+kmClockNote : Language -> String -> String
+kmClockNote language rest =
+    case language of
+        English ->
+            "Target time is clock time, including " ++ rest ++ " at the aid station. Pace is moving only."
+
+        Spanish ->
+            "El tiempo objetivo es tiempo de reloj, incluye " ++ rest ++ " en el avituallamiento. El ritmo es solo en movimiento."
+
+
+kmActualMissing : Language -> String
+kmActualMissing language =
+    case language of
+        English ->
+            "Actual run linked, but this km isn't in its trace."
+
+        Spanish ->
+            "Actividad vinculada, pero este km no está en su traza."
+
+
+resetToAuto : Language -> String
+resetToAuto language =
+    case language of
+        English ->
+            "Reset to auto (GAP)"
+
+        Spanish ->
+            "Restablecer a auto (GAP)"
+
+
+resetToAutoHelp : Language -> String
+resetToAutoHelp language =
+    case language of
+        English ->
+            "Auto-distributed from your target total time using the slope of this km."
+
+        Spanish ->
+            "Distribuido automáticamente desde tu tiempo objetivo total según la pendiente de este km."
+
+
+kmNotesPlaceholder : Language -> String
+kmNotesPlaceholder language =
+    case language of
+        English ->
+            "Anything to remember about this km — surface, exposure, mental cues…"
+
+        Spanish ->
+            "Algo que recordar de este km — terreno, exposición, recordatorios mentales…"
+
+
+aidStationsInKm : Language -> String
+aidStationsInKm language =
+    case language of
+        English ->
+            "Aid stations in this km"
+
+        Spanish ->
+            "Avituallamientos en este km"
