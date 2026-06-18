@@ -2924,3 +2924,82 @@ aidStyle language a =
 
                 AidRelaxed ->
                     "Relajado (15 min)"
+
+
+
+-- ACTIVITY FEED / CHANGELOG (TASK-067)
+
+
+activityLabel : Language -> String
+activityLabel language =
+    case language of
+        English ->
+            "Activity"
+
+        Spanish ->
+            "Actividad"
+
+
+activitySubtitle : Language -> String
+activitySubtitle language =
+    case language of
+        English ->
+            "Every change to this plan, newest first"
+
+        Spanish ->
+            "Cada cambio de este plan, lo más reciente primero"
+
+
+noChangesYet : Language -> String
+noChangesYet language =
+    case language of
+        English ->
+            "No changes recorded yet."
+
+        Spanish ->
+            "Aún no hay cambios registrados."
+
+
+{-| Person label for "your own" entries (also used by the merge review).
+-}
+you : Language -> String
+you language =
+    case language of
+        English ->
+            "You"
+
+        Spanish ->
+            "Tú"
+
+
+someone : Language -> String
+someone language =
+    case language of
+        English ->
+            "Someone"
+
+        Spanish ->
+            "Alguien"
+
+
+relativeJustNow : Language -> String
+relativeJustNow language =
+    case language of
+        English ->
+            "just now"
+
+        Spanish ->
+            "ahora mismo"
+
+
+{-| Wrap a coarse magnitude ("5m"/"3h"/"2d") as a relative time. English suffixes
+"ago"; Spanish prefixes "hace".
+-}
+relativeAgo : Language -> String -> String
+relativeAgo language magnitude =
+    case language of
+        English ->
+            magnitude ++ " ago"
+
+        Spanish ->
+            "hace " ++ magnitude
