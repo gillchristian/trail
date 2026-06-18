@@ -2684,7 +2684,15 @@ applyMerge local incoming filePeople finalLayer model =
     , Cmd.batch
         [ Storage.saveIdentity (Identity.encodeStored { me = model.me, directory = dir })
         , Storage.saveRaceMeta (encodeRaceMeta applied)
-        , Nav.pushUrl model.key (Route.toString (Route.RaceDetail local.id))
+
+        -- Defer the navigation a tick. Applying a merge tears down the
+        -- full-screen review modal AND reorders the race list in the same
+        -- update; navigating synchronously on top of that races the virtual-DOM
+        -- patch ahead of the teardown and corrupts it (a `childNodes of
+        -- undefined` crash that survives until reload). Letting the teardown
+        -- render commit first makes the nav a clean Index→detail transition.
+        -- Mirrors the `GotContent` → `StartParse` sleep.
+        , Task.perform (\_ -> NavigateTo (Route.RaceDetail local.id)) (Process.sleep 50)
         ]
     )
 
