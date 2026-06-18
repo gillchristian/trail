@@ -4383,7 +4383,7 @@ viewRaceDetail model race =
         [ div [ class "flex items-center justify-between gap-3" ]
             [ a [ Route.href Route.Index, class "inline-flex items-center gap-2 text-sm text-slate-400 hover:text-slate-100" ]
                 [ text (Translations.backToRaces ctx.language) ]
-            , viewHistoryButton race
+            , viewHistoryButton ctx.language race
             ]
         , viewRaceHero race
         , div [ class "flex items-end justify-between gap-4 flex-wrap" ]
@@ -7613,8 +7613,8 @@ smallStat labelText value unit =
 {-| Right-aligned "Activity" button on the race-page header row, mirroring the
 "← Back to races" link styling, with a count once there are entries.
 -}
-viewHistoryButton : Race -> Html Msg
-viewHistoryButton race =
+viewHistoryButton : Language -> Race -> Html Msg
+viewHistoryButton language race =
     let
         count =
             List.length race.history
@@ -7624,7 +7624,7 @@ viewHistoryButton race =
         , class "inline-flex items-center gap-2 text-sm text-slate-400 hover:text-slate-100"
         ]
         [ span [ class "text-base leading-none" ] [ text "📍" ]
-        , text "Activity"
+        , text (Translations.activityLabel language)
         , if count > 0 then
             span
                 [ class "inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-full bg-rose-500/20 text-rose-300 text-xs font-semibold" ]
@@ -7657,8 +7657,8 @@ viewHistoryDrawer model =
                     , div [ class "relative w-full max-w-md bg-slate-900 border-l border-slate-800 shadow-2xl flex flex-col trail-drawer-in" ]
                         [ div [ class "flex items-start justify-between px-6 py-4 border-b border-slate-800" ]
                             [ div []
-                                [ h2 [ class "text-lg font-semibold text-slate-100" ] [ text "Activity" ]
-                                , p [ class "text-xs text-slate-500 mt-0.5" ] [ text "Every change to this plan, newest first" ]
+                                [ h2 [ class "text-lg font-semibold text-slate-100" ] [ text (Translations.activityLabel model.settings.language) ]
+                                , p [ class "text-xs text-slate-500 mt-0.5" ] [ text (Translations.activitySubtitle model.settings.language) ]
                                 ]
                             , button
                                 [ onClick CloseHistory
@@ -7667,17 +7667,17 @@ viewHistoryDrawer model =
                                 [ text "×" ]
                             ]
                         , div [ class "flex-1 overflow-y-auto px-6 py-5" ]
-                            [ viewHistoryFeed model.now model.deviceId model.me model.directory race.history ]
+                            [ viewHistoryFeed model.settings.language model.now model.deviceId model.me model.directory race.history ]
                         ]
                     ]
 
 
-viewHistoryFeed : Int -> String -> Maybe Identity.Me -> Identity.Directory -> List ChangeEntry -> Html Msg
-viewHistoryFeed now deviceId me directory history =
+viewHistoryFeed : Language -> Int -> String -> Maybe Identity.Me -> Identity.Directory -> List ChangeEntry -> Html Msg
+viewHistoryFeed language now deviceId me directory history =
     if List.isEmpty history then
         div [ class "text-center py-12" ]
             [ p [ class "text-4xl mb-3 opacity-60" ] [ text "🗺" ]
-            , p [ class "text-sm text-slate-500" ] [ text "No changes recorded yet." ]
+            , p [ class "text-sm text-slate-500" ] [ text (Translations.noChangesYet language) ]
             ]
 
     else
@@ -7688,11 +7688,11 @@ viewHistoryFeed now deviceId me directory history =
             total =
                 List.length entries
         in
-        div [] (List.indexedMap (viewHistoryEntry now deviceId me directory total) entries)
+        div [] (List.indexedMap (viewHistoryEntry language now deviceId me directory total) entries)
 
 
-viewHistoryEntry : Int -> String -> Maybe Identity.Me -> Identity.Directory -> Int -> Int -> ChangeEntry -> Html Msg
-viewHistoryEntry now deviceId me directory total i entry =
+viewHistoryEntry : Language -> Int -> String -> Maybe Identity.Me -> Identity.Directory -> Int -> Int -> ChangeEntry -> Html Msg
+viewHistoryEntry language now deviceId me directory total i entry =
     let
         isLast =
             i == total - 1
@@ -7711,19 +7711,19 @@ viewHistoryEntry now deviceId me directory total i entry =
             [ span [ class "text-sm leading-none" ] [ text badgeIcon ] ]
         , div [ class "min-w-0 flex-1" ]
             [ div [ class "flex items-baseline justify-between gap-2" ]
-                [ span [ class "text-sm font-medium text-slate-200" ] [ text (authorLabel deviceId me directory entry) ]
-                , span [ class "text-xs text-slate-500 whitespace-nowrap" ] [ text (relativeTime now entry.timestampMs) ]
+                [ span [ class "text-sm font-medium text-slate-200" ] [ text (authorLabel language deviceId me directory entry) ]
+                , span [ class "text-xs text-slate-500 whitespace-nowrap" ] [ text (relativeTime language now entry.timestampMs) ]
                 ]
-            , div [ class "mt-1.5 space-y-1" ] (List.map viewChangeRow entry.changes)
+            , div [ class "mt-1.5 space-y-1" ] (List.map (viewChangeRow language) entry.changes)
             ]
         ]
 
 
-viewChangeRow : ChangeDescriptor -> Html Msg
-viewChangeRow d =
+viewChangeRow : Language -> ChangeDescriptor -> Html Msg
+viewChangeRow language d =
     let
         info =
-            describeChange d
+            describeChange language d
     in
     div [ class "flex items-start gap-2 text-sm text-slate-400" ]
         [ span [ class ("shrink-0 leading-5 " ++ info.tone) ] [ text info.icon ]
@@ -7759,66 +7759,78 @@ isCourseUploaded d =
 {-| Per-type icon, phrasing and tint for one change — the feed's per-type visual
 treatment (spec §5).
 -}
-describeChange : ChangeDescriptor -> { icon : String, phrase : String, tone : String }
-describeChange d =
+describeChange : Language -> ChangeDescriptor -> { icon : String, phrase : String, tone : String }
+describeChange language d =
     let
+        tr en es =
+            case language of
+                English ->
+                    en
+
+                Spanish ->
+                    es
+
+        -- "km N" (km is language-neutral).
         km1 km =
             "km " ++ String.fromInt (km + 1)
     in
     case d of
         AidAdded r ->
-            { icon = "⛑", phrase = "Added aid “" ++ r.name ++ "”", tone = "text-emerald-300" }
+            { icon = "⛑", phrase = tr ("Added aid “" ++ r.name ++ "”") ("Avituallamiento agregado: “" ++ r.name ++ "”"), tone = "text-emerald-300" }
 
         AidRemoved r ->
-            { icon = "✕", phrase = "Removed aid “" ++ r.name ++ "”", tone = "text-rose-300" }
+            { icon = "✕", phrase = tr ("Removed aid “" ++ r.name ++ "”") ("Avituallamiento quitado: “" ++ r.name ++ "”"), tone = "text-rose-300" }
 
         AidMoved r ->
-            { icon = "📍", phrase = "Moved “" ++ r.name ++ "” to " ++ km1 r.toKm, tone = "text-amber-300" }
+            { icon = "📍", phrase = tr ("Moved “" ++ r.name ++ "” to " ++ km1 r.toKm) ("“" ++ r.name ++ "” movido a " ++ km1 r.toKm), tone = "text-amber-300" }
 
         AidRenamed r ->
-            { icon = "🏷", phrase = "Renamed aid to “" ++ r.to ++ "”", tone = "text-slate-300" }
+            { icon = "🏷", phrase = tr ("Renamed aid to “" ++ r.to ++ "”") ("Avituallamiento renombrado a “" ++ r.to ++ "”"), tone = "text-slate-300" }
 
         AidRetimed r ->
-            { icon = "⏱", phrase = "“" ++ r.name ++ "” rest → " ++ formatRestShort r.toRest, tone = "text-sky-300" }
+            { icon = "⏱", phrase = "“" ++ r.name ++ "” " ++ tr "rest → " "descanso → " ++ formatRestShort r.toRest, tone = "text-sky-300" }
 
         KmNoteAdded r ->
-            { icon = "📝", phrase = "Note added on " ++ km1 r.km, tone = "text-emerald-300" }
+            { icon = "📝", phrase = tr ("Note added on " ++ km1 r.km) ("Nota agregada en " ++ km1 r.km), tone = "text-emerald-300" }
 
         KmNoteEdited r ->
-            { icon = "📝", phrase = "Note edited on " ++ km1 r.km, tone = "text-slate-300" }
+            { icon = "📝", phrase = tr ("Note edited on " ++ km1 r.km) ("Nota editada en " ++ km1 r.km), tone = "text-slate-300" }
 
         KmNoteCleared r ->
-            { icon = "📝", phrase = "Note cleared on " ++ km1 r.km, tone = "text-rose-300" }
+            { icon = "📝", phrase = tr ("Note cleared on " ++ km1 r.km) ("Nota borrada en " ++ km1 r.km), tone = "text-rose-300" }
 
         KmPaceSet r ->
-            { icon = "⏱", phrase = "Pace set on " ++ km1 r.km, tone = "text-sky-300" }
+            { icon = "⏱", phrase = tr ("Pace set on " ++ km1 r.km) ("Ritmo fijado en " ++ km1 r.km), tone = "text-sky-300" }
 
         KmPaceChanged r ->
-            { icon = "⏱", phrase = "Pace changed on " ++ km1 r.km, tone = "text-amber-300" }
+            { icon = "⏱", phrase = tr ("Pace changed on " ++ km1 r.km) ("Ritmo cambiado en " ++ km1 r.km), tone = "text-amber-300" }
 
         KmPaceCleared r ->
-            { icon = "⏱", phrase = "Pace cleared on " ++ km1 r.km, tone = "text-rose-300" }
+            { icon = "⏱", phrase = tr ("Pace cleared on " ++ km1 r.km) ("Ritmo borrado en " ++ km1 r.km), tone = "text-rose-300" }
 
         RaceRenamed r ->
-            { icon = "🏷", phrase = "Renamed race to “" ++ r.to ++ "”", tone = "text-slate-300" }
+            { icon = "🏷", phrase = tr ("Renamed race to “" ++ r.to ++ "”") ("Carrera renombrada a “" ++ r.to ++ "”"), tone = "text-slate-300" }
 
         RaceDateChanged r ->
-            { icon = "📅", phrase = "Race date " ++ (r.to |> Maybe.map (\t -> "→ " ++ t) |> Maybe.withDefault "cleared"), tone = "text-slate-300" }
+            { icon = "📅", phrase = tr "Race date " "Fecha de carrera " ++ (r.to |> Maybe.map (\t -> "→ " ++ t) |> Maybe.withDefault (tr "cleared" "borrada")), tone = "text-slate-300" }
 
         CourseUploaded ->
-            { icon = "🗺", phrase = "Course uploaded", tone = "text-emerald-300" }
+            { icon = "🗺", phrase = tr "Course uploaded" "Recorrido subido", tone = "text-emerald-300" }
 
         Merged r ->
-            { icon = "🔀", phrase = "Merged " ++ String.fromInt r.count ++ pluralCount r.count ++ " from " ++ r.fromAuthor, tone = "text-sky-300" }
+            { icon = "🔀"
+            , phrase =
+                String.fromInt r.count
+                    ++ (case language of
+                            English ->
+                                Translations.plural r.count { one = " change merged from ", other = " changes merged from " }
 
-
-pluralCount : Int -> String
-pluralCount n =
-    if n == 1 then
-        " change"
-
-    else
-        " changes"
+                            Spanish ->
+                                Translations.plural r.count { one = " cambio combinado de ", other = " cambios combinados de " }
+                       )
+                    ++ r.fromAuthor
+            , tone = "text-sky-300"
+            }
 
 
 formatRestShort : Int -> String
@@ -7839,13 +7851,13 @@ id, otherwise the person's name. Falls back to the device comparison for
 pre-WI-5 entries (no `authorId`), which are almost always this device's own.
 This is what retires the old hardcoded seat-relative "Coach" label.
 -}
-authorLabel : String -> Maybe Identity.Me -> Identity.Directory -> ChangeEntry -> String
-authorLabel deviceId me directory entry =
+authorLabel : Language -> String -> Maybe Identity.Me -> Identity.Directory -> ChangeEntry -> String
+authorLabel language deviceId me directory entry =
     if entry.authorId /= "" then
         case me of
             Just m ->
                 if entry.authorId == m.userId then
-                    "You"
+                    Translations.you language
 
                 else
                     Identity.resolveName directory entry.authorId
@@ -7854,36 +7866,33 @@ authorLabel deviceId me directory entry =
                 Identity.resolveName directory entry.authorId
 
     else if entry.author == deviceId then
-        "You"
+        Translations.you language
 
     else
         -- A pre-WI-5 entry from another device: `author` is a deviceId, which the
         -- userId-keyed directory can't resolve, and there's no person id to go on.
-        "Someone"
+        Translations.someone language
 
 
 {-| A coarse "Nd/Nh/Nm ago" from two epoch-ms timestamps.
 -}
-relativeTime : Int -> Int -> String
-relativeTime now ms =
+relativeTime : Language -> Int -> Int -> String
+relativeTime language now ms =
     let
         secs =
             (now - ms) // 1000
     in
-    if secs < 0 then
-        "just now"
-
-    else if secs < 60 then
-        "just now"
+    if secs < 60 then
+        Translations.relativeJustNow language
 
     else if secs < 3600 then
-        String.fromInt (secs // 60) ++ "m ago"
+        Translations.relativeAgo language (String.fromInt (secs // 60) ++ "m")
 
     else if secs < 86400 then
-        String.fromInt (secs // 3600) ++ "h ago"
+        Translations.relativeAgo language (String.fromInt (secs // 3600) ++ "h")
 
     else
-        String.fromInt (secs // 86400) ++ "d ago"
+        Translations.relativeAgo language (String.fromInt (secs // 86400) ++ "d")
 
 
 viewDeleteModal : Model -> Html Msg
