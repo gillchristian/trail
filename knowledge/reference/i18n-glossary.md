@@ -90,6 +90,8 @@ Water→Agua · Food→Comida · Warm food→Comida caliente · Medical→Asiste
 | Actual (column/stat) | Real |
 | Grade (column) | Pendiente |
 | Δ ele / Δ vs plan (columns) | kept verbatim (compact symbols) |
+| Plan by `<name>` | Plan de `<name>` |
+| Start / Finish (in section labels) | Salida / Meta — **but `section.label` is CSV-canonical; localizing it is TASK-071** |
 
 ## Split terms — chosen value (flag if you'd prefer the alternative)
 

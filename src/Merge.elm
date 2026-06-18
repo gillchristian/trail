@@ -48,6 +48,7 @@ owner-only (Q3) — they're not in `PlanningLayer` at all.
 -}
 
 import Dict exposing (Dict)
+import Language exposing (Language(..))
 import Types exposing (AidStation, KmPlan, Plan, PlanningLayer, Race, emptyKmPlan, sortAidStations)
 
 
@@ -255,7 +256,7 @@ field3 key show base mine theirs =
 
     else
         ( mine
-        , Just { key = key, label = conflictKeyLabel key, mine = show mine, theirs = show theirs }
+        , Just { key = key, label = conflictKeyLabel English key, mine = show mine, theirs = show theirs }
         )
 
 
@@ -452,7 +453,7 @@ mergeAidFields b m t =
 presenceConflict : String -> AidStation -> Bool -> Conflict
 presenceConflict id aid mineHasIt =
     { key = KAidPresence id
-    , label = conflictKeyLabel (KAidPresence id)
+    , label = conflictKeyLabel English (KAidPresence id)
     , mine =
         if mineHasIt then
             "keep \"" ++ aid.name ++ "\""
@@ -641,60 +642,83 @@ setAidPresence id theirs aids =
 -- ============================================================
 
 
-conflictKeyLabel : ConflictKey -> String
-conflictKeyLabel key =
+{-| Display label for a conflict key (merge-review card context). Localized via
+an inline `tr` (enum-derived, like the view's threshold labels). The engine stores
+`Conflict.label` in English (canonical, also what `smoke:merge` reads); the merge
+view re-derives a localized label from `conflict.key`.
+-}
+conflictKeyLabel : Language -> ConflictKey -> String
+conflictKeyLabel language key =
+    let
+        tr en es =
+            case language of
+                English ->
+                    en
+
+                Spanish ->
+                    es
+    in
     case key of
         KName ->
-            "Race name"
+            tr "Race name" "Nombre de la carrera"
 
         KDate ->
-            "Race date"
+            tr "Race date" "Fecha de la carrera"
 
         KLocation ->
-            "Location"
+            tr "Location" "Ubicación"
 
         KUrl ->
             "URL"
 
         KNotes ->
-            "Race notes"
+            tr "Race notes" "Notas de la carrera"
 
         KTarget ->
-            "Target time"
+            tr "Target time" "Tiempo objetivo"
 
         KKmTime i ->
-            "Km " ++ String.fromInt (i + 1) ++ " pace"
+            tr ("Km " ++ String.fromInt (i + 1) ++ " pace") ("Ritmo del km " ++ String.fromInt (i + 1))
 
         KKmNote i ->
-            "Km " ++ String.fromInt (i + 1) ++ " note"
+            tr ("Km " ++ String.fromInt (i + 1) ++ " note") ("Nota del km " ++ String.fromInt (i + 1))
 
         KAid id kind ->
-            "Aid " ++ id ++ " · " ++ aidFieldLabel kind
+            tr "Aid " "Avit. " ++ id ++ " · " ++ aidFieldLabel language kind
 
         KAidPresence id ->
-            "Aid " ++ id ++ " (added/removed)"
+            tr ("Aid " ++ id ++ " (added/removed)") ("Avit. " ++ id ++ " (agregado/quitado)")
 
 
-aidFieldLabel : AidFieldKind -> String
-aidFieldLabel kind =
+aidFieldLabel : Language -> AidFieldKind -> String
+aidFieldLabel language kind =
+    let
+        tr en es =
+            case language of
+                English ->
+                    en
+
+                Spanish ->
+                    es
+    in
     case kind of
         AidName ->
-            "name"
+            tr "name" "nombre"
 
         AidDistance ->
-            "distance"
+            tr "distance" "distancia"
 
         AidRest ->
-            "rest"
+            tr "rest" "descanso"
 
         AidServices ->
-            "services"
+            tr "services" "servicios"
 
         AidNotes ->
-            "notes"
+            tr "notes" "notas"
 
         AidCutoff ->
-            "cutoff"
+            tr "cutoff" "corte"
 
 
 showTarget : Maybe Int -> String

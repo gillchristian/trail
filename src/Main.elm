@@ -4352,7 +4352,7 @@ viewOwnerLine model race =
 
     else
         p [ class "mt-1 text-xs text-slate-500" ]
-            [ text "Plan by "
+            [ text (Translations.planBy model.settings.language)
             , span [ class "text-slate-400" ] [ text (Identity.resolveName model.directory race.owner) ]
             ]
 
@@ -8140,9 +8140,9 @@ viewConflictCard language name review i conflict =
             Dict.get i review.choices
     in
     div [ class "rounded-xl border border-slate-800 bg-slate-950/50 p-3 space-y-2" ]
-        -- conflict.label ("Target pace · km 14") is built in Merge.elm; localizing
-        -- it needs Language in the merge layer — deferred to TASK-069.
-        [ p [ class "text-xs font-medium text-slate-400" ] [ text conflict.label ]
+        -- Re-derive a localized label from the typed key (TASK-069); the engine's
+        -- canonical English `conflict.label` is unused for display.
+        [ p [ class "text-xs font-medium text-slate-400" ] [ text (Merge.conflictKeyLabel language conflict.key) ]
         , if isProseConflict conflict.key then
             viewNoteMerge language name i conflict choice
 
