@@ -2802,3 +2802,25 @@ parse; only the display localizes** (cf. `serviceLabel`/`serviceToString`,
 they can import `Translations`/`Format`/`Language` with no cycle.
 **Next:** TASK-067 — activity feed / changelog (`describeChange` typed descriptors +
 relative-time "hace …"; `smoke:changelog`).
+
+---
+## 2026-06-18 18:23 — TASK-067: translate activity feed / changelog
+
+**Task:** TASK-067 (i18n epic, surface)
+**What I did:** Localized the change-history feed — drawer header/subtitle/empty,
+`describeChange` (all typed variants, inline `tr`), `authorLabel` (Tú/Alguien),
+`relativeTime` (hace …). Threaded `Language` through the feed view chain.
+**What I verified:** type-check Success; build OK; smoke:i18n + smoke:changelog PASS;
+no leftover literals.
+**What changed in the repo:** `src/Translations.elm` (+feed strings), `src/Main.elm`.
+PR #146 (`9e2482f`).
+**What I learned:** The `Changelog` *engine* (diff/codec/union, the typed
+`ChangeDescriptor`s) is data, not display — it stayed untouched; only `describeChange`
+(the Main view renderer that turns a descriptor into an icon+phrase) localizes. So
+`smoke:changelog` kept passing without changes. Style choice worth the user's eye:
+Spanish change phrases use **participle log-style** ("Avituallamiento agregado: …",
+"Nota editada en km 5") instead of a conjugated verb, so a line reads naturally under
+either a "Tú" or a person-name author label. Reused `Translations.you` here; the
+merge review (068) reuses it too.
+**Next:** TASK-068 — modals + toasts (delete-confirm, identity flows, the merge-review
+surface — highest interpolation/plural density; person-named via WI-5, never "coach").
