@@ -14,18 +14,18 @@
 **Notes:** scope cuts, links, anything decided while planning.
 ```
 
-### TASK-061 — WI-4: `Translations` module + global chrome
+### TASK-062 — Translate: home / upload / race cards
 
-**Source:** BACKLOG (i18n epic). **Deps:** TASK-058–060 (all done — PR #128/#130/#132).
-**Branch:** `feat/task-061-translations-chrome`
+**Source:** BACKLOG (i18n epic). **Deps:** TASK-061 (done, PR #134).
+**Branch:** `feat/task-062-home-translations`
 **Acceptance criteria:**
-- [ ] New `Translations.elm`: function-per-key, each `case`-matching `Language`, **total** (no `_ ->` fallthrough that hides a missing translation); typed-argument interpolation (no string-template lookup); a one/other `plural : Int -> { one : String, other : String } -> String` helper.
-- [ ] Translate the **global chrome**: header/nav route labels ("Your races", "Race detail", "Map view", "Plan · …", "Profile · settings", "Lost?"), the footer privacy line, and the `Browser.Document` title — threaded via `Context`/`Language` (header takes the language; no `model.settings` in leaf views).
-- [ ] Adding a third `Language` constructor would make every `Translations` `case` non-exhaustive (the WI-4 guarantee) — confirmed by review; the full add-a-constructor sweep is TASK-069's DoD.
-- [ ] Spanish terms match `reference/i18n-glossary.md` (append any new term introduced).
-- [ ] CI green: type-check, `npm run build`, `npm run smoke`, `npm run smoke:i18n`. **Manual browser check:** toggle → header/nav/footer/title read Spanish, and back.
+- [ ] Index hero (page title + subtitle + race-count, with `plural`), upload banner (drop copy, parsing/saving/error states, button labels), and the empty state are localized via `Translations` (threaded `Language`/`Context`).
+- [ ] The race-card labels localize: `densityLabel` (Flat/Rolling/Hilly/Mountainous/Very mountainous/Extreme), `distanceCategory` (Short/Medium/Long/Ultra), and the aid-count line ("N aid stations planned" / "No aid stations yet") via `plural`. These label fns gain a `Language` arg.
+- [ ] All new Spanish terms match / are appended to `reference/i18n-glossary.md`.
+- [ ] No `_ ->` fallthrough in any new `Translations` fn (totality preserved).
+- [ ] CI green: type-check, `npm run build`, `npm run smoke`, `npm run smoke:i18n`. **Manual browser check:** home page reads Spanish under the toggle (hero, cards, upload states, empty state).
 
-**Notes:** Establishes the pattern every later surface task reuses. Keep the module's first slice to the chrome strings + `plural`; **don't pre-define shared buttons** (Save/Cancel/…) until a surface task needs them (three-uses rule) — they'll be added where first used (063/064/068) and consolidated. `viewHeader : Route -> …` gains a `Language`/`Context` param; thread `ctx` from `view`. Footer privacy line moves from the hardcoded English string (TASK-059 left it) into `Translations`. Spec WI-4; ADR-0014. On close, pull TASK-062 (home / upload / race cards).
+**Notes:** `viewIndex`/`viewIndexHero`/upload-banner views take `Language`; `viewRaceCard`/`viewRaceGrid` already thread `Context` (TASK-060) — reuse it (`ctx.language`). `densityLabel`/`distanceCategory` currently return `(String, tone)` — add a `Language` param. Watch the **single-letter category badge** (`catLetter`, e.g. "S/M/L/U") — decide whether it localizes (likely keep the letter language-neutral or map to S/M/L/U regardless). Spec WI-4 surface task. On close, pull TASK-063 (race detail / edit dialog / map view).
 
 ---
 
