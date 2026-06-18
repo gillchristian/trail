@@ -14,17 +14,18 @@
 **Notes:** scope cuts, links, anything decided while planning.
 ```
 
-### TASK-067 — Translate: activity feed / changelog
+### TASK-068 — Translate: modals + toasts
 
-**Source:** BACKLOG (i18n epic). **Deps:** TASK-061 (done, PR #134).
-**Branch:** `feat/task-067-changelog-translations`
+**Source:** BACKLOG (i18n epic). **Deps:** TASK-061 (done, PR #134). Person labels reuse `Translations.you` (TASK-067).
+**Branch:** `feat/task-068-modal-translations`
 **Acceptance criteria:**
-- [ ] The feed surface (`viewHistoryFeed`/`viewHistoryDrawer`/button): header ("Activity" + "Every change to this plan, newest first"), empty state, the drawer open/close affordance.
-- [ ] `describeChange` typed `ChangeDescriptor`s: every variant (Aid Added/Removed/Moved/Renamed/Retimed, KmNote add/edit/clear, KmPace set/change/clear, RaceRenamed/DateChanged, CourseUploaded, Merged) — interpolated names/indices, and the `Merged N change(s)` plural. Quoted user content (aid/race names) stays verbatim.
-- [ ] Relative time (`relativeTime`/`formatTimeAgo`): "Ns/m/h/d ago" → "hace …", and `formatRestShort` if shown in the feed.
-- [ ] New Spanish terms in glossary; no `_ ->`; CI green incl. `smoke:changelog`. **Manual browser check:** the activity drawer reads Spanish.
+- [ ] Delete-confirm modal (`viewDeleteModal`/`viewModal`): "Delete race?" + body (interpolated race name) + Delete/Cancel.
+- [ ] Identity flows (`viewIdentityModals`): name prompt ("What's your name?" + the two contextual subtitles + save/export button), ownership choice ("Whose plan is this?" + "I'm X" / "Someone else's plan" + descriptions), device-link ("Link this device?" + explanation). Interpolated names.
+- [ ] Merge-review modal (`viewMergeReview`): "N change(s) overlap…", "M changes from X added automatically" (compound plural), per-card context labels + two person-named options (You / `<name>`), "N of M chosen", "Keep my version"/"Apply changes", the discard-confirm copy. **Person-named throughout** (WI-5) — reuse `you`; never "coach".
+- [ ] Storage-error toast: "Storage error".
+- [ ] New Spanish terms in glossary; no `_ ->`; CI green. **Manual browser check:** delete, an identity prompt, and a merge review read Spanish.
 
-**Notes:** `describeChange` is the dense one — many typed cases, all interpolating. Decide where it's localized: it's a view-layer descriptor renderer (in `Main.elm`), so thread `Language`. Verify `describeChange`'s signature + callers (`viewHistoryFeed`, and the merge path that emits `Merged`). `formatRestShort` is changelog-only (unlike `formatRest`) — localize it here. Author/person labels resolve via the WI-5 directory (already person-named; just localize the connective words). Spec WI-4 surface task. On close, pull TASK-068 (modals + toasts).
+**Notes:** Highest interpolation/plural density. `viewModal` is a generic shell (title/body/confirm/cancel passed in) — localize at call sites. The merge review person tints/names come from the WI-5 directory (already person-named — just localize the chrome/connectives). Compound plural ("M change was/were added") needs the one/other verb agreement (English) — Spanish "se agregó/agregaron". Spec WI-4 surface task. On close, pull TASK-069 (QA sweep + exhaustiveness check + `<html lang>` + `section.label`).
 
 ---
 
