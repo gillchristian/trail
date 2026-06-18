@@ -22,12 +22,14 @@ import Browser.Events
 import Browser.Navigation as Nav
 import Calibration
 import Changelog
+import Context exposing (Context)
 import Csv
 import Dict exposing (Dict)
 import Dom
 import Download
 import File exposing (File)
 import File.Select as Select
+import Format
 import Gpx exposing (Track)
 import GpxExport
 import Html exposing (Html, a, button, div, h1, h2, h3, input, label, p, span, text, textarea)
@@ -229,6 +231,14 @@ type alias Model =
     , historyOpen : Bool
     , settings : Settings
     }
+
+
+{-| The render-time locale context (WI-3). Derived from the model here; threaded
+into localized views so leaf views never read `model.settings` directly.
+-}
+toContext : Model -> Context
+toContext model =
+    { language = model.settings.language }
 
 
 type StravaPicker
@@ -4025,12 +4035,16 @@ compareUploadedAtDesc a b =
 
 viewRaceGrid : Model -> List Race -> Html Msg
 viewRaceGrid model races =
+    let
+        ctx =
+            toContext model
+    in
     div [ class "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5" ]
-        (List.map (\r -> viewRaceCard (Dict.get (raceIdToString r.id) model.sparklineCoords) r) races)
+        (List.map (\r -> viewRaceCard ctx (Dict.get (raceIdToString r.id) model.sparklineCoords) r) races)
 
 
-viewRaceCard : Maybe (List ( Float, Float )) -> Race -> Html Msg
-viewRaceCard maybeCoords race =
+viewRaceCard : Context -> Maybe (List ( Float, Float )) -> Race -> Html Msg
+viewRaceCard ctx maybeCoords race =
     let
         ( catLetter, catColor, catLabel ) =
             distanceCategory race.distance
@@ -4082,7 +4096,7 @@ viewRaceCard maybeCoords race =
                     ]
                 ]
             , div [ class "grid grid-cols-3 gap-2 text-center" ]
-                [ miniStat (formatKm race.distance) "km"
+                [ miniStat (Format.number ctx.language 1 (race.distance / 1000)) "km"
                 , miniStat (formatInt race.gain) "m+"
                 , miniStat (formatInt race.loss) "m−"
                 ]
@@ -4380,6 +4394,9 @@ viewOwnerLine model race =
 viewRaceDetail : Model -> Race -> Html Msg
 viewRaceDetail model race =
     let
+        ctx =
+            toContext model
+
         containerWidth =
             min (max 320 (model.viewportWidth - 48)) (1536 - 48)
 
@@ -4456,11 +4473,11 @@ viewRaceDetail model race =
                     equivalentFlatKm race.distance race.gain race.loss
               in
               div [ class "grid grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4" ]
-                [ bigStat "Distance" (formatKm race.distance) "km"
+                [ bigStat "Distance" (Format.number ctx.language 1 (race.distance / 1000)) "km"
                 , bigStat "Gain" (formatInt race.gain) "m"
                 , bigStat "Loss" (formatInt race.loss) "m"
                 , bigStat "Density" (formatInt dens) "m/km"
-                , bigStat "Flat eq." (formatFloat 1 eqKm) "km"
+                , bigStat "Flat eq." (Format.number ctx.language 1 eqKm) "km"
                 ]
             ]
         , case model.metaEditor of
@@ -8302,18 +8319,6 @@ viewErrorToast model =
 -- ============================================================
 -- FORMATTING
 -- ============================================================
-
-
-formatKm : Float -> String
-formatKm meters =
-    let
-        km =
-            meters / 1000
-
-        rounded =
-            toFloat (round (km * 10)) / 10
-    in
-    String.fromFloat rounded
 
 
 formatInt : Float -> String
