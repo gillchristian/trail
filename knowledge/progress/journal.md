@@ -2777,3 +2777,28 @@ why it belonged here, not 064. **Two deferrals to TASK-069:** `section.label`
 should carry. And the Strava activity-picker modal is TASK-066.
 **Next:** TASK-066 — profile/settings page + calibration panel + Strava card + the
 Strava picker modal (deferred here) + `AthleteProfile.elm`/`Profile.elm` labels.
+
+---
+## 2026-06-18 18:17 — TASK-066: translate profile / calibration / Strava / toolbar
+
+**Task:** TASK-066 (i18n epic, surface)
+**What I did:** Localized `#/profile` (settings fields + hints, calibration, identity
+card, Strava section + picker modal) and `Profile.elm`'s toolbar/legend.
+**What I verified:** type-check Success; build OK; smoke:i18n + smoke:calibration PASS;
+no leftover profile/Strava literals.
+**What changed in the repo:** `src/Translations.elm` (+profile block, now imports
+`AthleteProfile`), `src/Main.elm`, `src/Profile.elm` (+Language/Format/Translations).
+PR #144 (`608db11`).
+**What I learned:** **The skill `<select>` round-trip was a localization trap** (the
+same shape as the formatRest cascade): `profileSelect` derived the option *value*
+from the displayed label's first word, and the update handler (`ProfileSetDescentSkill`)
+pattern-matched English keys (`"cautious"`…). Naively localizing the label would have
+made every dropdown silently save its default. Fix: decouple — `profileSelect` now
+takes `(valueKey, displayLabel, selected)`, value from the canonical **English**
+`AthleteProfile.*Label`, display from `Translations.*`. General rule for this epic:
+**any string that's both shown AND parsed back must keep an English canonical for the
+parse; only the display localizes** (cf. `serviceLabel`/`serviceToString`,
+`Settings.fromFlags` decode). Also: `AthleteProfile`/`Profile` are leaf modules, so
+they can import `Translations`/`Format`/`Language` with no cycle.
+**Next:** TASK-067 — activity feed / changelog (`describeChange` typed descriptors +
+relative-time "hace …"; `smoke:changelog`).

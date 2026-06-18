@@ -14,19 +14,17 @@
 **Notes:** scope cuts, links, anything decided while planning.
 ```
 
-### TASK-066 — Translate: profile / calibration / Strava / elevation toolbar
+### TASK-067 — Translate: activity feed / changelog
 
 **Source:** BACKLOG (i18n epic). **Deps:** TASK-061 (done, PR #134).
-**Branch:** `feat/task-066-profile-translations`
+**Branch:** `feat/task-067-changelog-translations`
 **Acceptance criteria:**
-- [ ] `#/profile` page (`viewProfileSettings`): page title/intro, the performance-profile field rows (Vertical rate, Flat trail pace, Fatigue threshold/slope, Descent skill, Technicality, Aid stops, LTHR, Max HR — labels + help text), the HR-calibration opt-in, Save + confirmation.
-- [ ] Calibration panel: "Calibrate from your runs" + description, the two result rows (climb rate / flat pace) + their explanations, Apply.
-- [ ] Strava card: title, description, connection status, Connect/Disconnect, backend URL label — **and the Strava activity-picker modal** (`viewStravaPickerModal`/`viewStravaActivityRow`/`viewStravaPickerSearch`, deferred from 065): search/recent headings, loading/searching/error, "Close", empty-search states.
-- [ ] Identity card (the collaboration display-name card on `#/profile`).
-- [ ] `AthleteProfile.elm` labels (presets, descent/tech skill, aid style) + `Profile.elm` toolbar (Fit width/True scale, the legend) — both modules gain a `Language` arg.
-- [ ] New Spanish terms in glossary; no `_ ->`; CI green incl. `smoke:calibration`. **Manual browser check:** `#/profile` + the Strava picker read Spanish.
+- [ ] The feed surface (`viewHistoryFeed`/`viewHistoryDrawer`/button): header ("Activity" + "Every change to this plan, newest first"), empty state, the drawer open/close affordance.
+- [ ] `describeChange` typed `ChangeDescriptor`s: every variant (Aid Added/Removed/Moved/Renamed/Retimed, KmNote add/edit/clear, KmPace set/change/clear, RaceRenamed/DateChanged, CourseUploaded, Merged) — interpolated names/indices, and the `Merged N change(s)` plural. Quoted user content (aid/race names) stays verbatim.
+- [ ] Relative time (`relativeTime`/`formatTimeAgo`): "Ns/m/h/d ago" → "hace …", and `formatRestShort` if shown in the feed.
+- [ ] New Spanish terms in glossary; no `_ ->`; CI green incl. `smoke:changelog`. **Manual browser check:** the activity drawer reads Spanish.
 
-**Notes:** `AthleteProfile.elm`/`Profile.elm` are separate modules — pass `Language` (they don't have model). Their label fns (`presetLabel` etc., `formatKmShort`/`formatM` in Profile) take `Language`; the elevation-chart legend decimals route through `Format`. Confirm `AthleteProfile`/`Profile` don't import `Translations` in a way that cycles (Translations imports Route+Types; those modules are leaf-ish — likely fine, but check). Spec WI-4 surface task. On close, pull TASK-067 (activity feed / changelog).
+**Notes:** `describeChange` is the dense one — many typed cases, all interpolating. Decide where it's localized: it's a view-layer descriptor renderer (in `Main.elm`), so thread `Language`. Verify `describeChange`'s signature + callers (`viewHistoryFeed`, and the merge path that emits `Merged`). `formatRestShort` is changelog-only (unlike `formatRest`) — localize it here. Author/person labels resolve via the WI-5 directory (already person-named; just localize the connective words). Spec WI-4 surface task. On close, pull TASK-068 (modals + toasts).
 
 ---
 
