@@ -3186,7 +3186,7 @@ viewContent model =
             viewProfileSettings model
 
         ( _, LoadingRaces ) ->
-            viewLoading
+            viewLoading model.settings.language
 
         ( Route.Index, LoadedRaces races ) ->
             div [ class "px-6" ] [ viewIndex model races ]
@@ -3197,7 +3197,7 @@ viewContent model =
                     viewRaceDetail model race
 
                 Nothing ->
-                    viewRaceNotFound
+                    viewRaceNotFound model.settings.language
 
         ( Route.RaceMap rid, LoadedRaces races ) ->
             case findRace rid races of
@@ -3205,7 +3205,7 @@ viewContent model =
                     viewRaceMap model race
 
                 Nothing ->
-                    viewRaceNotFound
+                    viewRaceNotFound model.settings.language
 
         ( Route.PlanTable rid, LoadedRaces races ) ->
             case findRace rid races of
@@ -3213,7 +3213,7 @@ viewContent model =
                     viewPlanTable model race
 
                 Nothing ->
-                    viewRaceNotFound
+                    viewRaceNotFound model.settings.language
 
         ( Route.PlanKm rid kmIndex, LoadedRaces races ) ->
             case findRace rid races of
@@ -3221,7 +3221,7 @@ viewContent model =
                     viewPlanKm model race kmIndex
 
                 Nothing ->
-                    viewRaceNotFound
+                    viewRaceNotFound model.settings.language
 
         ( Route.PlanSection rid secIndex, LoadedRaces races ) ->
             case findRace rid races of
@@ -3229,10 +3229,10 @@ viewContent model =
                     viewPlanSection model race secIndex
 
                 Nothing ->
-                    viewRaceNotFound
+                    viewRaceNotFound model.settings.language
 
         ( Route.NotFound, LoadedRaces _ ) ->
-            viewNotFound
+            viewNotFound model.settings.language
 
 
 findRace : RaceId -> List Race -> Maybe Race
@@ -3240,27 +3240,27 @@ findRace rid =
     List.filter (\r -> raceIdToString r.id == raceIdToString rid) >> List.head
 
 
-viewLoading : Html msg
-viewLoading =
+viewLoading : Language -> Html msg
+viewLoading language =
     div [ class "max-w-screen-md mx-auto mt-20 text-center text-slate-500" ]
-        [ text "Loading races…" ]
+        [ text (Translations.loadingRaces language) ]
 
 
-viewNotFound : Html msg
-viewNotFound =
+viewNotFound : Language -> Html msg
+viewNotFound language =
     div [ class "max-w-screen-md mx-auto mt-20 text-center space-y-4 px-6" ]
-        [ p [ class "text-rose-400 text-lg" ] [ text "404 — that page doesn't exist." ]
+        [ p [ class "text-rose-400 text-lg" ] [ text (Translations.notFoundTitle language) ]
         , a [ Route.href Route.Index, class "inline-block px-4 py-2 border border-slate-700 rounded-md hover:bg-slate-800 text-slate-200" ]
-            [ text "Back to races" ]
+            [ text (Translations.backToRacesPlain language) ]
         ]
 
 
-viewRaceNotFound : Html msg
-viewRaceNotFound =
+viewRaceNotFound : Language -> Html msg
+viewRaceNotFound language =
     div [ class "max-w-screen-md mx-auto mt-20 text-center space-y-4 px-6" ]
-        [ p [ class "text-rose-400 text-lg" ] [ text "This race isn't in your library anymore." ]
+        [ p [ class "text-rose-400 text-lg" ] [ text (Translations.raceNotFoundMsg language) ]
         , a [ Route.href Route.Index, class "inline-block px-4 py-2 border border-slate-700 rounded-md hover:bg-slate-800 text-slate-200" ]
-            [ text "Back to races" ]
+            [ text (Translations.backToRacesPlain language) ]
         ]
 
 
@@ -4357,7 +4357,7 @@ viewRaceDetail model race =
     div [ class "max-w-screen-2xl mx-auto mt-8 space-y-8 px-6" ]
         [ div [ class "flex items-center justify-between gap-3" ]
             [ a [ Route.href Route.Index, class "inline-flex items-center gap-2 text-sm text-slate-400 hover:text-slate-100" ]
-                [ text "← Back to races" ]
+                [ text (Translations.backToRaces ctx.language) ]
             , viewHistoryButton race
             ]
         , viewRaceHero race
@@ -4371,7 +4371,7 @@ viewRaceDetail model race =
                                 [ onClick OpenMetaEdit
                                 , class "px-3 py-1.5 text-xs border border-slate-700 rounded-md hover:bg-slate-800 text-slate-300"
                                 ]
-                                [ text "Edit details" ]
+                                [ text (Translations.editDetails ctx.language) ]
 
                         MetaOpen _ ->
                             text ""
@@ -4414,16 +4414,16 @@ viewRaceDetail model race =
                     equivalentFlatKm race.distance race.gain race.loss
               in
               div [ class "grid grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4" ]
-                [ bigStat "Distance" (Format.number ctx.language 1 (race.distance / 1000)) "km"
-                , bigStat "Gain" (formatInt race.gain) "m"
-                , bigStat "Loss" (formatInt race.loss) "m"
-                , bigStat "Density" (formatInt dens) "m/km"
-                , bigStat "Flat eq." (Format.number ctx.language 1 eqKm) "km"
+                [ bigStat (Translations.statDistance ctx.language) (Format.number ctx.language 1 (race.distance / 1000)) "km"
+                , bigStat (Translations.statGain ctx.language) (formatInt race.gain) "m"
+                , bigStat (Translations.statLoss ctx.language) (formatInt race.loss) "m"
+                , bigStat (Translations.statDensity ctx.language) (formatInt dens) "m/km"
+                , bigStat (Translations.statFlatEq ctx.language) (Format.number ctx.language 1 eqKm) "km"
                 ]
             ]
         , case model.metaEditor of
             MetaOpen form ->
-                viewMetaForm form
+                viewMetaForm ctx.language form
 
             MetaClosed ->
                 text ""
@@ -4433,48 +4433,50 @@ viewRaceDetail model race =
 
             Nothing ->
                 div [ class "rounded-2xl bg-slate-900 border border-slate-800 p-10 text-center text-slate-500" ]
-                    [ text "Parsing GPX…" ]
+                    [ text (Translations.parsingGpx ctx.language) ]
         , viewAidStationsSection model race
         , div [ class "rounded-2xl bg-slate-900 border border-slate-800 p-5 flex items-center justify-between gap-4 flex-wrap" ]
             [ div []
-                [ p [ class "font-medium text-slate-100" ] [ text "Plan this race" ]
-                , p [ class "text-sm text-slate-400 mt-1" ] [ text "Set a target time. We'll distribute pace by km using the terrain. Override any km manually." ]
+                [ p [ class "font-medium text-slate-100" ] [ text (Translations.planThisRace ctx.language) ]
+                , p [ class "text-sm text-slate-400 mt-1" ] [ text (Translations.planThisRaceSub ctx.language) ]
                 ]
             , a
                 [ Route.href (Route.PlanTable race.id)
                 , class "px-4 py-2 bg-rose-600 text-white rounded-md hover:bg-rose-500 text-sm font-medium"
                 ]
-                [ text "Open the plan →" ]
+                [ text (Translations.openThePlan ctx.language) ]
             ]
         , viewMapTeaser model race
-        , viewExportPanel race
+        , viewExportPanel ctx.language race
         ]
 
 
 viewMapTeaser : Model -> Race -> Html Msg
 viewMapTeaser model race =
+    let
+        language =
+            model.settings.language
+    in
     div [ class "rounded-2xl bg-slate-900 border border-slate-800 p-5 flex items-center justify-between gap-4 flex-wrap" ]
         [ div []
-            [ p [ class "font-medium text-slate-100" ] [ text "Open on the map" ]
+            [ p [ class "font-medium text-slate-100" ] [ text (Translations.mapTeaserTitle language) ]
             , p [ class "text-sm text-slate-400 mt-1" ]
-                [ text "Real-world OSM tiles. Useful for spotting which forest you're about to enter."
-                ]
+                [ text (Translations.mapTeaserSub language) ]
             ]
-        , let
-            _ =
-                model
-          in
-          a
+        , a
             [ Route.href (Route.RaceMap race.id)
             , class "px-4 py-2 border border-slate-700 rounded-md hover:bg-slate-800 text-sm font-medium text-slate-100"
             ]
-            [ text "View on map →" ]
+            [ text (Translations.viewOnMap language) ]
         ]
 
 
 viewRaceMap : Model -> Race -> Html Msg
 viewRaceMap model race =
     let
+        language =
+            model.settings.language
+
         track =
             Dict.get (raceIdToString race.id) model.parsedTracks
 
@@ -4544,7 +4546,7 @@ viewRaceMap model race =
                                     , ( "lat", Encode.float p.lat )
                                     , ( "lon", Encode.float p.lon )
                                     , ( "label", Encode.string "S" )
-                                    , ( "name", Encode.string "Start" )
+                                    , ( "name", Encode.string (Translations.startLabel language) )
                                     ]
                             )
                     , last
@@ -4555,7 +4557,7 @@ viewRaceMap model race =
                                     , ( "lat", Encode.float p.lat )
                                     , ( "lon", Encode.float p.lon )
                                     , ( "label", Encode.string "F" )
-                                    , ( "name", Encode.string ("Finish · " ++ formatFloat 1 (race.distance / 1000) ++ " km") )
+                                    , ( "name", Encode.string (Translations.finishLabel language ++ " · " ++ Format.number language 1 (race.distance / 1000) ++ " km") )
                                     ]
                             )
                     ]
@@ -4575,25 +4577,19 @@ viewRaceMap model race =
     in
     div [ class "max-w-screen-2xl mx-auto mt-8 px-6 space-y-6" ]
         [ div [ class "text-sm text-slate-400 flex items-center gap-2" ]
-            [ a [ Route.href Route.Index, class "hover:text-slate-100" ] [ text "Races" ]
+            [ a [ Route.href Route.Index, class "hover:text-slate-100" ] [ text (Translations.breadcrumbRaces language) ]
             , span [ class "text-slate-700" ] [ text "/" ]
             , a [ Route.href (Route.RaceDetail race.id), class "hover:text-slate-100" ] [ text race.name ]
             , span [ class "text-slate-700" ] [ text "/" ]
-            , span [ class "text-slate-200" ] [ text "Map" ]
+            , span [ class "text-slate-200" ] [ text (Translations.breadcrumbMap language) ]
             ]
         , div [ class "flex items-end justify-between gap-4 flex-wrap" ]
             [ h1 [ class "text-3xl font-bold tracking-tight text-slate-100" ] [ text race.name ]
             , p [ class "text-sm text-slate-500" ]
                 [ text
-                    (formatFloat 1 (race.distance / 1000)
+                    (Format.number language 1 (race.distance / 1000)
                         ++ " km · "
-                        ++ String.fromInt (List.length sortedAids)
-                        ++ (if List.length sortedAids == 1 then
-                                " aid station"
-
-                            else
-                                " aid stations"
-                           )
+                        ++ Translations.aidStationCount language (List.length sortedAids)
                     )
                 ]
             ]
@@ -4611,9 +4607,9 @@ viewRaceMap model race =
 
             Nothing ->
                 div [ class "rounded-2xl bg-slate-900 border border-slate-800 p-10 text-center text-slate-500" ]
-                    [ text "Parsing GPX…" ]
+                    [ text (Translations.parsingGpx language) ]
         , p [ class "text-xs text-slate-500" ]
-            [ text "Tiles from OpenStreetMap. Once you've panned over an area, those tiles are cached for offline use." ]
+            [ text (Translations.mapTiles language) ]
         ]
 
 
@@ -4644,34 +4640,29 @@ findCoordAt distance track =
         |> Maybe.map (\( _, p ) -> ( p.lat, p.lon ))
 
 
-viewExportPanel : Race -> Html Msg
-viewExportPanel race =
+viewExportPanel : Language -> Race -> Html Msg
+viewExportPanel language race =
     let
         hasAids =
             not (List.isEmpty race.aidStations)
     in
     div [ class "rounded-2xl bg-slate-900 border border-slate-800 p-5 space-y-3" ]
         [ div [ class "flex items-baseline gap-3" ]
-            [ h2 [ class "text-xl font-semibold text-slate-100" ] [ text "Export" ]
-            , span [ class "text-xs text-slate-500" ] [ text "everything lives on this device · take it with you" ]
+            [ h2 [ class "text-xl font-semibold text-slate-100" ] [ text (Translations.exportTitle language) ]
+            , span [ class "text-xs text-slate-500" ] [ text (Translations.exportSub language) ]
             ]
         , div [ class "grid grid-cols-1 sm:grid-cols-2 gap-3" ]
             [ exportCard
-                { titleText = "GPX for Coros"
-                , description =
-                    if hasAids then
-                        "Re-emit the original GPX with your aid stations as standard waypoints. Upload it to the COROS app, then enable Waypoint Alerts on the route — that's what surfaces aid stations in Pace Strategy."
-
-                    else
-                        "Add aid stations first — without them the export is identical to the source."
-                , buttonText = "Download .gpx"
+                { titleText = Translations.exportGpxTitle language
+                , description = Translations.exportGpxDesc language hasAids
+                , buttonText = Translations.exportGpxButton language
                 , msg = ExportGpxForCoros
                 , disabled = not hasAids
                 }
             , exportCard
-                { titleText = "Project file (.trail)"
-                , description = "Everything about this race in one file: GPX, aid stations, target time, per-km plan, notes. Import it back here later, or share it."
-                , buttonText = "Download .trail"
+                { titleText = Translations.exportTrailTitle language
+                , description = Translations.exportTrailDesc language
+                , buttonText = Translations.exportTrailButton language
                 , msg = ExportProjectFile
                 , disabled = False
                 }
@@ -4729,17 +4720,17 @@ viewRaceHero race =
             text ""
 
 
-viewMetaForm : MetaForm -> Html Msg
-viewMetaForm form =
+viewMetaForm : Language -> MetaForm -> Html Msg
+viewMetaForm language form =
     div [ class "rounded-2xl bg-slate-900 border border-slate-800 p-5 space-y-4" ]
         [ div [ class "flex items-baseline justify-between" ]
-            [ h3 [ class "text-base font-semibold text-slate-100" ] [ text "Edit race details" ]
+            [ h3 [ class "text-base font-semibold text-slate-100" ] [ text (Translations.editRaceDetails language) ]
             , button
                 [ onClick CloseMetaEdit, class "text-xs text-slate-500 hover:text-slate-200" ]
-                [ text "Cancel" ]
+                [ text (Translations.cancel language) ]
             ]
         , div [ class "grid grid-cols-1 sm:grid-cols-2 gap-4" ]
-            [ field "Name"
+            [ field (Translations.fieldName language)
                 [ input
                     [ A.type_ "text"
                     , A.value form.name
@@ -4748,7 +4739,7 @@ viewMetaForm form =
                     ]
                     []
                 ]
-            , field "Date (optional)"
+            , field (Translations.fieldDate language)
                 [ input
                     [ A.type_ "date"
                     , A.value form.date
@@ -4757,7 +4748,7 @@ viewMetaForm form =
                     ]
                     []
                 ]
-            , field "Location (optional)"
+            , field (Translations.fieldLocation language)
                 [ input
                     [ A.type_ "text"
                     , A.value form.location
@@ -4767,7 +4758,7 @@ viewMetaForm form =
                     ]
                     []
                 ]
-            , field "URL (optional)"
+            , field (Translations.fieldUrl language)
                 [ input
                     [ A.type_ "url"
                     , A.value form.url
@@ -4778,10 +4769,10 @@ viewMetaForm form =
                     []
                 ]
             ]
-        , field "Notes"
+        , field (Translations.fieldNotes language)
             [ textarea
                 [ A.value form.notes
-                , A.placeholder "Anything that should travel with this race — checklist, strategy, mental cues…"
+                , A.placeholder (Translations.notesPlaceholder language)
                 , A.rows 4
                 , onInput MetaSetNotes
                 , inputClass
@@ -4789,7 +4780,7 @@ viewMetaForm form =
                 []
             ]
         , div [ class "space-y-2" ]
-            [ p [ class "text-xs text-slate-500 uppercase tracking-wider" ] [ text "Cover image (optional)" ]
+            [ p [ class "text-xs text-slate-500 uppercase tracking-wider" ] [ text (Translations.coverImage language) ]
             , case form.coverImage of
                 Just dataUrl ->
                     div [ class "flex items-center gap-3" ]
@@ -4805,12 +4796,12 @@ viewMetaForm form =
                                 [ onClick MetaPickCover
                                 , class "px-3 py-1.5 text-xs border border-slate-700 rounded hover:bg-slate-800 text-slate-200"
                                 ]
-                                [ text "Replace" ]
+                                [ text (Translations.replace language) ]
                             , button
                                 [ onClick MetaClearCover
                                 , class "px-3 py-1.5 text-xs text-slate-500 hover:text-rose-400"
                                 ]
-                                [ text "Remove" ]
+                                [ text (Translations.remove language) ]
                             ]
                         ]
 
@@ -4819,19 +4810,19 @@ viewMetaForm form =
                         [ onClick MetaPickCover
                         , class "px-3 py-1.5 text-xs border border-dashed border-slate-700 rounded hover:bg-slate-800 text-slate-300"
                         ]
-                        [ text "Pick an image" ]
+                        [ text (Translations.pickImage language) ]
             ]
         , div [ class "flex justify-end gap-2" ]
             [ button
                 [ onClick CloseMetaEdit
                 , class "px-4 py-2 text-sm border border-slate-700 rounded-md hover:bg-slate-800 text-slate-200"
                 ]
-                [ text "Cancel" ]
+                [ text (Translations.cancel language) ]
             , button
                 [ onClick MetaSubmit
                 , class "px-4 py-2 text-sm bg-rose-600 text-white rounded-md hover:bg-rose-500 font-medium"
                 ]
-                [ text "Save changes" ]
+                [ text (Translations.saveChanges language) ]
             ]
         ]
 
@@ -4840,8 +4831,8 @@ viewProfileSection : Model -> Track -> Float -> List Marker -> Html Msg
 viewProfileSection model track containerWidth markers =
     div [ class "space-y-3" ]
         [ div [ class "flex items-baseline gap-3" ]
-            [ h2 [ class "text-xl font-semibold text-slate-100" ] [ text "Elevation profile" ]
-            , span [ class "text-xs text-slate-500" ] [ text "true 1:1 scale · no vertical exaggeration" ]
+            [ h2 [ class "text-xl font-semibold text-slate-100" ] [ text (Translations.elevationProfile model.settings.language) ]
+            , span [ class "text-xs text-slate-500" ] [ text (Translations.trueScaleNote model.settings.language) ]
             ]
         , Profile.viewToolbar
             { mode = model.scaleMode

@@ -79,6 +79,9 @@ Water→Agua · Food→Comida · Warm food→Comida caliente · Medical→Asiste
 | Settings | Ajustes |
 | Plans (home section) | Planes |
 | Executions (home section) | Completadas |
+| Gain / Loss (stat label) | Desnivel + / Desnivel − |
+| Density (stat) | Densidad |
+| Flat eq. (stat) | Equiv. llano |
 
 ## Split terms — chosen value (flag if you'd prefer the alternative)
 
