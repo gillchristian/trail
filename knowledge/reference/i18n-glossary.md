@@ -85,6 +85,11 @@ Water→Agua · Food→Comida · Warm food→Comida caliente · Medical→Asiste
 | Gain / Loss (stat label) | Desnivel + / Desnivel − |
 | Density (stat) | Densidad |
 | Flat eq. (stat) | Equiv. llano |
+| Span (km column) | Rango |
+| Cum (column) | Acum. |
+| Actual (column/stat) | Real |
+| Grade (column) | Pendiente |
+| Δ ele / Δ vs plan (columns) | kept verbatim (compact symbols) |
 
 ## Split terms — chosen value (flag if you'd prefer the alternative)
 
