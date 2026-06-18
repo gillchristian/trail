@@ -14,18 +14,18 @@
 **Notes:** scope cuts, links, anything decided while planning.
 ```
 
-### TASK-068 — Translate: modals + toasts
+### TASK-069 — i18n QA sweep + exhaustiveness check + deferred labels (closes the epic)
 
-**Source:** BACKLOG (i18n epic). **Deps:** TASK-061 (done, PR #134). Person labels reuse `Translations.you` (TASK-067).
-**Branch:** `feat/task-068-modal-translations`
+**Source:** BACKLOG (i18n epic). **Deps:** TASK-058–068 (all done).
+**Branch:** `feat/task-069-i18n-qa`
 **Acceptance criteria:**
-- [ ] Delete-confirm modal (`viewDeleteModal`/`viewModal`): "Delete race?" + body (interpolated race name) + Delete/Cancel.
-- [ ] Identity flows (`viewIdentityModals`): name prompt ("What's your name?" + the two contextual subtitles + save/export button), ownership choice ("Whose plan is this?" + "I'm X" / "Someone else's plan" + descriptions), device-link ("Link this device?" + explanation). Interpolated names.
-- [ ] Merge-review modal (`viewMergeReview`): "N change(s) overlap…", "M changes from X added automatically" (compound plural), per-card context labels + two person-named options (You / `<name>`), "N of M chosen", "Keep my version"/"Apply changes", the discard-confirm copy. **Person-named throughout** (WI-5) — reuse `you`; never "coach".
-- [ ] Storage-error toast: "Storage error".
-- [ ] New Spanish terms in glossary; no `_ ->`; CI green. **Manual browser check:** delete, an identity prompt, and a merge review read Spanish.
+- [ ] **Straggler sweep:** grep all `src/*.elm` for hardcoded user-facing strings missed by 061–068 (`text "…"`, `A.placeholder`, `A.title`, `A.attribute "aria-label"`, button labels); localize any real display string found (exclude SVG attrs, CSS, DOM ids, export/CSV/GPX, dynamic error detail, proper nouns).
+- [ ] **`section.label` + `conflict.label`** (built in `Planning.elm` / `Merge.elm`, deferred from 065/068): localize. Thread `Language` into the label builders (or expose endpoints for the view to format); update `smoke:sections`/`smoke:merge` harnesses to pass a `Language`. "Start"/"Finish" → "Salida"/"Meta"; "Target pace · km N" etc.
+- [ ] **Exhaustiveness check (spec DoD):** temporarily add a third `Language` constructor, confirm `elm make` enumerates every untranslated `case` site, then revert. Document the result in the PR.
+- [ ] **`<html lang>`** tracks the toggle (wired TASK-059) — confirm in the build/code; note the manual check.
+- [ ] Glossary final pass; CI green: type-check, build, `smoke`, `smoke:i18n`, `smoke:sections`, `smoke:merge`, `smoke:changelog`, `smoke:calibration`, `smoke:aidcsv`. **Manual browser check:** toggle through every surface in Spanish.
 
-**Notes:** Highest interpolation/plural density. `viewModal` is a generic shell (title/body/confirm/cancel passed in) — localize at call sites. The merge review person tints/names come from the WI-5 directory (already person-named — just localize the chrome/connectives). Compound plural ("M change was/were added") needs the one/other verb agreement (English) — Spanish "se agregó/agregaron". Spec WI-4 surface task. On close, pull TASK-069 (QA sweep + exhaustiveness check + `<html lang>` + `section.label`).
+**Notes:** The capstone. If `section.label`/`conflict.label` localization turns out to be a large math-layer refactor (not just threading a param), carve it into a follow-up backlog item rather than bloat this PR — but attempt it first. Known intentional English: data exports (`.trail`/CSV/GPX), dynamic parse/HTTP error *detail*, format hints (`m:ss`/`h:mm`), unit suffixes (`km`/`m`/`bpm`/`/km`), `Δ ele`/`Δ vs plan` compact headers, category letters (S/M/L/XL), proper nouns (Coros/Strava/UTMB/Pace Strategy/Waypoint Alerts). On close: epic COMPLETE — update CURRENT to no-active-task, surface the standing manual checks + the units backlog item (TASK-070).
 
 ---
 

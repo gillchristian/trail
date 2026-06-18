@@ -2824,3 +2824,26 @@ either a "Tú" or a person-name author label. Reused `Translations.you` here; th
 merge review (068) reuses it too.
 **Next:** TASK-068 — modals + toasts (delete-confirm, identity flows, the merge-review
 surface — highest interpolation/plural density; person-named via WI-5, never "coach").
+
+---
+## 2026-06-18 18:30 — TASK-068: translate modals + toasts
+
+**Task:** TASK-068 (i18n epic, surface — last UI surface)
+**What I did:** Localized the delete-confirm modal (+ the race-card delete aria-label
+I'd missed), the WI-5 identity flows (name/ownership/link), the merge-review modal
+(title, plurals incl. the compound auto-merged one, per-card You/`<name>` options,
+hand-merge hint, footer), and the storage-error toast.
+**What I verified:** type-check Success; build OK; smoke:i18n PASS; grep clean.
+**What changed in the repo:** `src/Translations.elm` (+modal block), `src/Main.elm`.
+PR #148 (`694faf1`).
+**What I learned:** The merge review was already **person-named** (WI-5 retired the
+seat-relative "Coach" in TASK-056), so localizing it was just chrome + connectives +
+the reused `Translations.you` — the identity work paid off here. The grep sweep caught
+a stray I'd missed: the race-card delete button's `aria-label`/`title` ("Delete race")
+— a good reminder that accessibility attributes are app strings too (the 069 sweep
+will hunt the rest). `conflict.label` ("Target pace · km 14") is built in `Merge.elm`,
+same shape as `section.label` in `Planning.elm` — both deferred to 069.
+**Next:** TASK-069 — the epic capstone: straggler grep sweep, localize
+`section.label`/`conflict.label` (thread `Language` into the math/merge label
+builders), the deliberate add-a-3rd-`Language`-constructor exhaustiveness check, and
+`<html lang>` confirm. Closes the i18n epic.
