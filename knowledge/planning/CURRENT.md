@@ -14,18 +14,20 @@
 **Notes:** scope cuts, links, anything decided while planning.
 ```
 
-### TASK-058 — WI-1: `Language` type + codec
+### TASK-059 — WI-2: `Settings` + persistence + footer toggle
 
-**Source:** BACKLOG (i18n epic) — explicit user steer, 2026-06-18
-**Branch:** `feat/task-058-language-type`
+**Source:** BACKLOG (i18n epic). **Deps:** TASK-058 (done, PR #128).
+**Branch:** `feat/task-059-settings-persistence`
 **Acceptance criteria:**
-- [ ] `Language.elm` exposes `Language(..)`, `toCode`, `fromCode`, `encode`, `decoder` and compiles into the app (verify: `npx elm make src/Main.elm --output=/dev/null` once it's imported, and the harness compiles).
-- [ ] `toCode`/`fromCode` round-trip for every constructor (verify: `smoke:i18n` asserts `English↔"en"`, `Spanish↔"es"`).
-- [ ] `decoder` fails on an unknown code (verify: `smoke:i18n` decodes `"de"` → `Err`).
-- [ ] `toCode` has no `_ ->` fallthrough, so a third constructor would fail to compile (verify: code review of the `case`; the full add-a-constructor sweep is TASK-069's DoD).
-- [ ] CI green: type-check, `npm run build`, `npm run smoke`, and the new `npm run smoke:i18n`.
+- [ ] `Settings.elm` exposes `Settings { language }`, `defaultSettings` (`English`), `settingsDecoder` (per-field `D.oneOf` default), `encodeSettings`.
+- [ ] A v1/partial settings blob with **no `language` field decodes to `English`** without error (verify: `smoke:i18n` decodes `{}` → English).
+- [ ] Round-trip `encodeSettings >> decodeValue settingsDecoder` is identity for both languages (verify: `smoke:i18n`).
+- [ ] First-run (null IDB record) resolves browser language by subtag: `"es-AR"`/`"es"` → Spanish, `"en-US"` → English, unknown → English (verify: `smoke:i18n` over a `Settings.resolveFirstRun`-style helper).
+- [ ] `saveSettings` port persists to the `settings` IDB store under `deviceSettings`; flags carry `settings : D.Value` + `browserLanguage`; the JS boot awaits the settings read before `Elm.Main.init` (verify: storage smoke extended with a settings round-trip; build).
+- [ ] Footer right side shows an `English / Español` toggle (no flags); clicking it switches `model.settings.language`, emits exactly one `saveSettings`, and mutates no `.trail`/race data; `<html lang>` tracks it (verify: code review + **manual browser check** — switch, reload, choice sticks; first run on an `es-*` browser defaults to Spanish).
+- [ ] CI green: type-check, `npm run build`, `npm run smoke`, `npm run smoke:i18n`.
 
-**Notes:** Self-contained, no deps. Codec keyed on **ISO codes** (stable serialization), not constructor names (refactorable). Strict, total leaf decoder; back-compat/migration tolerance lives one level up in WI-2's `settingsDecoder` (TASK-059). New harness `src/I18nHarness.elm` + `scripts/smoke-i18n.mjs` + a `smoke:i18n` package script, mirroring the established compiled-`Platform.worker` harness pattern (`reference/local-ci.md`); it will grow to cover `Settings` (059) and `Format` (060). Spec WI-1; ADR-0014. **The i18n epic (058–069) is the active arc** — on close, the close PR pulls the next i18n task into this file.
+**Notes:** Reuse the existing `settings` IDB store (key `deviceSettings`), not a new store. New outbound port `saveSettings : E.Value -> Cmd msg` + a JS `put` handler; on save (and at boot) the JS also sets `document.documentElement.lang` so `<html lang>` tracks the choice without a second port. First-run subtag match: `String.left 2 browserLanguage |> Language.fromCode |> Maybe.withDefault English`. **No visible localized output yet** — the toggle flips a stored value; `Context`/`Format` (TASK-060) make the change visible (decimals) and `Translations` (061+) localize the words. Add a `settings`-store round-trip to `scripts/smoke-storage.mjs` (mirrors `main.js`). Spec WI-2; ADR-0014. On close, pull TASK-060.
 
 ---
 
