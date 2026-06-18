@@ -14,18 +14,18 @@
 **Notes:** scope cuts, links, anything decided while planning.
 ```
 
-### TASK-062 — Translate: home / upload / race cards
+### TASK-063 — Translate: race detail / edit dialog / map view
 
 **Source:** BACKLOG (i18n epic). **Deps:** TASK-061 (done, PR #134).
-**Branch:** `feat/task-062-home-translations`
+**Branch:** `feat/task-063-detail-translations`
 **Acceptance criteria:**
-- [ ] Index hero (page title + subtitle + race-count, with `plural`), upload banner (drop copy, parsing/saving/error states, button labels), and the empty state are localized via `Translations` (threaded `Language`/`Context`).
-- [ ] The race-card labels localize: `densityLabel` (Flat/Rolling/Hilly/Mountainous/Very mountainous/Extreme), `distanceCategory` (Short/Medium/Long/Ultra), and the aid-count line ("N aid stations planned" / "No aid stations yet") via `plural`. These label fns gain a `Language` arg.
-- [ ] All new Spanish terms match / are appended to `reference/i18n-glossary.md`.
-- [ ] No `_ ->` fallthrough in any new `Translations` fn (totality preserved).
-- [ ] CI green: type-check, `npm run build`, `npm run smoke`, `npm run smoke:i18n`. **Manual browser check:** home page reads Spanish under the toggle (hero, cards, upload states, empty state).
+- [ ] Race detail (`viewRaceDetail`, already threads `Context`): bigStat labels (Distance/Gain/Loss/Density/Flat eq. — labels localize; units `km`/`m`/`m/km` stay), the CTA cards (plan/map/export prose), the "Edit details" button, breadcrumb.
+- [ ] Edit dialog (`MetaEditor`): field labels (Name, Date/Location/URL optional, Notes) + placeholders, cover-image controls (Pick/Replace/Remove), Cancel/Save. (Shared buttons Save/Cancel land in `Translations` here — first multi-use.)
+- [ ] Map view (`viewRaceMap`): breadcrumb, title, OSM attribution/offline-cache prose.
+- [ ] New Spanish terms appended to `reference/i18n-glossary.md`; no `_ ->` in new `Translations` fns.
+- [ ] CI green: type-check, build, `smoke`, `smoke:i18n`. **Manual browser check:** detail page, edit dialog, and map view read Spanish.
 
-**Notes:** `viewIndex`/`viewIndexHero`/upload-banner views take `Language`; `viewRaceCard`/`viewRaceGrid` already thread `Context` (TASK-060) — reuse it (`ctx.language`). `densityLabel`/`distanceCategory` currently return `(String, tone)` — add a `Language` param. Watch the **single-letter category badge** (`catLetter`, e.g. "S/M/L/U") — decide whether it localizes (likely keep the letter language-neutral or map to S/M/L/U regardless). Spec WI-4 surface task. On close, pull TASK-063 (race detail / edit dialog / map view).
+**Notes:** `viewRaceDetail` has `ctx` (TASK-060). The edit dialog + map view fns gain `Language`. Placeholders ("Chamonix, FR", URL example) — translate the *hint* nature but keep example values plausible; the OSM attribution proper noun ("OpenStreetMap") stays. Define shared `save`/`cancel`/`close` in `Translations` here (used by the dialog; reused by 064/068). Spec WI-4 surface task. On close, pull TASK-064 (aid stations + service labels).
 
 ---
 

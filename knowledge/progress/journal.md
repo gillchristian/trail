@@ -2673,3 +2673,26 @@ takes exactly what it needs (footer/header = `Language`; race card = `Context`).
 **Next:** TASK-062 — translate home / upload / race cards (hero + race-count plural,
 upload states, density/category/aid-count labels). `viewRaceCard`/`viewRaceGrid`
 already thread `Context` from TASK-060.
+
+---
+## 2026-06-18 17:11 — TASK-062: translate home / upload / race cards
+
+**Task:** TASK-062 (i18n epic, surface)
+**What I did:** Localized the home page via `Translations` (switched to `exposing
+(..)`): hero (title/subtitle/race-count + `plural`), upload states, empty state,
+Plans/Executions + per-person grouping. Race cards: `distanceCategory`/`densityLabel`
+took a `Language` arg + a local `tr en es` helper for their threshold-derived labels;
+aid-count via `Translations`.
+**What I verified:** type-check Success, build OK, `smoke:i18n` unaffected; grep
+confirms the only `"Your races"` left in Main is a comment.
+**What changed in the repo:** `src/Translations.elm` (+home strings), `src/Main.elm`
+(index/cards/sections), `reference/i18n-glossary.md` (Plans/Executions terms). PR
+#136, merged `a1cc5d9`.
+**What I learned:** Settled the placement rule for the whole epic: **standalone UI
+strings → `Translations` (per-key `case language of`); threshold-derived labels
+returned with a colour/tone (`distanceCategory`/`densityLabel`/`gradeClass`) →
+localized inline via a local `tr en es` helper, kept beside their cutoffs.** Both
+stay exhaustive (a third language breaks the inner `case`/the `tr` helper). "Executions"
+→ "Completadas" (not literal) — the English label was always provisional (TASK-028).
+**Next:** TASK-063 — race detail / edit dialog / map view; defines the shared
+`save`/`cancel`/`close` keys (first multi-use) in `Translations`.
