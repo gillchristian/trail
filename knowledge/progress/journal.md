@@ -2748,3 +2748,32 @@ have read "· descanso … descanso" once localized).
 **Next:** TASK-065 — plan table + per-km + per-section (largest surface). Localizes
 `formatRest` (+ threads it through `kmsWithCumulative`/`viewKmRow`), `gradeClass`,
 effort tiers, the 6891 `serviceLabel` holdover, and all the plan columns/breadcrumbs.
+
+---
+## 2026-06-18 18:03 — TASK-065: translate plan table + per-km + per-section
+
+**Task:** TASK-065 (i18n epic, surface — the biggest)
+**What I did:** Localized all three plan views by threading `Language` through ~16
+helpers (plan table + target/predictor/tabs/km-table/section-table/actual-strip,
+per-section card+details+km-rows, per-km card+form). `gradeClass`/`intensityBand`
+got inline `tr` (threshold-derived). **Localized `formatRest`** and threaded it
+through all 7 callers (incl. the 2 aid-section ones deferred from 064). Slope % now
+renders with a Spanish comma via `Format`.
+**What I verified:** type-check Success; build OK; smoke:i18n + smoke:sections +
+smoke:calibration all PASS; grep confirms no leftover English literals (the one
+match is `gradeClass`'s inline `tr`).
+**What changed in the repo:** `src/Translations.elm` (~50 plan strings),
+`src/Main.elm` (the whole plan region + `formatRest`/`gradeClass`/`intensityBand`),
+`reference/i18n-glossary.md`. PR #142 (`5d22799`).
+**What I learned:** Compile-driven threading is the right tool for a deep change like
+this — changing `formatRest`/`gradeClass`/`intensityBand` signatures first, then
+letting `elm make` enumerate every broken caller, turned a sprawling migration into a
+mechanical worklist. Confirmed the `formatRest` cascade I predicted in 064:
+`viewKmRow` is reached via `kmsWithCumulative` (neither has `model`), so localizing
+`formatRest` *required* threading `Language` down that whole chain — which is exactly
+why it belonged here, not 064. **Two deferrals to TASK-069:** `section.label`
+("Start → Aid 1") is assembled in `Planning.elm` — localizing it means threading
+`Language` into the pure math layer, a bigger architectural change than a view task
+should carry. And the Strava activity-picker modal is TASK-066.
+**Next:** TASK-066 — profile/settings page + calibration panel + Strava card + the
+Strava picker modal (deferred here) + `AthleteProfile.elm`/`Profile.elm` labels.

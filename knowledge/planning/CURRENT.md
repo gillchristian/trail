@@ -14,19 +14,19 @@
 **Notes:** scope cuts, links, anything decided while planning.
 ```
 
-### TASK-065 — Translate: plan table + per-km + per-section (the big one)
+### TASK-066 — Translate: profile / calibration / Strava / elevation toolbar
 
 **Source:** BACKLOG (i18n epic). **Deps:** TASK-061 (done, PR #134).
-**Branch:** `feat/task-065-plan-translations`
+**Branch:** `feat/task-066-profile-translations`
 **Acceptance criteria:**
-- [ ] Plan table view: target-time UI + hint, Download CSV / Print buttons, by-km/by-section toggle, the "Tap a row to edit…" hint, all column headers (Km/Span/Δ ele/Grade/Pace/Time/Cum/Notes / stops/Actual/Δ vs plan/Avg HR), section headers + "Section time"/"Cum" help.
-- [ ] Per-km view (`viewPlanKm`): "Km N of M" breadcrumb, "Plan this km", Manual/Auto tabs, "Reset to auto (GAP)" + its note, "Aid stations in this km", clock-time note, the "Actual run linked…" messages.
-- [ ] Per-section view (`viewPlanSection`): "Section N of M" breadcrumb, "Section plan", "Ends at" label, "Edit aid station →", "🏁 finishes the race", section stats labels.
-- [ ] `gradeClass` (Steep climb/Climb/Runnable/Descent/Steep descent) localizes via the inline `tr` helper (threshold-derived, like density). Effort tiers (Conservative/Goal/Push/All-in) + "Effort"/"Predicted finish" labels. The `serviceLabel` at the plan-section aid header (the 6891 holdover) + **`formatRest`** localize here (5 of its 7 callers are these views; thread `Language` through `kmsWithCumulative`/`viewKmRow`).
-- [ ] Actual-run linking panel (`viewActualRun`-ish): section title, "Actual run linked", "Distance run"/"vs Target" headers, Replace/Unlink.
-- [ ] New Spanish terms in `reference/i18n-glossary.md`; no `_ ->` in new fns; CI green incl. `smoke:sections`, `smoke:calibration`. **Manual browser check:** all three plan views read Spanish.
+- [ ] `#/profile` page (`viewProfileSettings`): page title/intro, the performance-profile field rows (Vertical rate, Flat trail pace, Fatigue threshold/slope, Descent skill, Technicality, Aid stops, LTHR, Max HR — labels + help text), the HR-calibration opt-in, Save + confirmation.
+- [ ] Calibration panel: "Calibrate from your runs" + description, the two result rows (climb rate / flat pace) + their explanations, Apply.
+- [ ] Strava card: title, description, connection status, Connect/Disconnect, backend URL label — **and the Strava activity-picker modal** (`viewStravaPickerModal`/`viewStravaActivityRow`/`viewStravaPickerSearch`, deferred from 065): search/recent headings, loading/searching/error, "Close", empty-search states.
+- [ ] Identity card (the collaboration display-name card on `#/profile`).
+- [ ] `AthleteProfile.elm` labels (presets, descent/tech skill, aid style) + `Profile.elm` toolbar (Fit width/True scale, the legend) — both modules gain a `Language` arg.
+- [ ] New Spanish terms in glossary; no `_ ->`; CI green incl. `smoke:calibration`. **Manual browser check:** `#/profile` + the Strava picker read Spanish.
 
-**Notes:** Biggest surface — may take a large diff. Thread `Language`/`Context` into `viewPlanTable`/`viewPlanKm`/`viewPlanSection` and their row helpers (`viewKmRow`, `kmsWithCumulative`, section-row helpers). Localize `formatRest` here (the deferred TASK-064 item) + its plan-view callers + the 2 aid-section callers (revert them to the localized form). Decimal displays (km distances, gradient %) route through `Format`; pace/clock/HR stay as-is (colon/integer). Dynamic predictor confidence strings — check if app-defined or computed. Spec WI-4 surface task. On close, pull TASK-066 (profile / calibration / Strava / elevation toolbar).
+**Notes:** `AthleteProfile.elm`/`Profile.elm` are separate modules — pass `Language` (they don't have model). Their label fns (`presetLabel` etc., `formatKmShort`/`formatM` in Profile) take `Language`; the elevation-chart legend decimals route through `Format`. Confirm `AthleteProfile`/`Profile` don't import `Translations` in a way that cycles (Translations imports Route+Types; those modules are leaf-ish — likely fine, but check). Spec WI-4 surface task. On close, pull TASK-067 (activity feed / changelog).
 
 ---
 
