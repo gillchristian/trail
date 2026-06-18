@@ -2518,3 +2518,60 @@ CURRENT restored to no-active-task + the deploy standing reminder):
 is config (the env-var wiring above), which is the user's to apply on Vercel +
 cadence. The parking-lot / calibration candidates remain unprioritized — await
 the user's steer.
+
+---
+## 2026-06-18 16:10 — i18n epic ingested into the backlog
+
+**Task:** backlog grooming (epic ticketing) — i18n (English + Spanish)
+**What I did:** On the user's steer ("inject i18n into the backlog, then work
+it"), promoted the parking-lot "Multi-language UI" line into a full epic
+(TASK-058–069). Moved the user-authored spec to `reference/i18n-spec.md` with a
+**Resolved decisions** callout (the coach-collab "Reality corrections" pattern),
+wrote **ADR-0014**, and added `reference/i18n-glossary.md` as the cross-PR source
+of truth for neutral-Spanish terms. **The big scope call: units (metric/imperial)
+are descoped** — the spec bundles them with language, but the user wants language
+only, so units become unpromoted **TASK-070** (parking lot) with seams left
+(`Settings`/`Context` are records decoded field-by-field via `D.oneOf`) so they're
+additive later.
+**What I verified:** Docs-only; no source touched → no CI gates. `git diff --stat`
+= planning/decisions/reference only. The framework instance-free grep gate is N/A
+(`knowledge/framework/` untouched).
+**What changed in the repo:** `reference/i18n-spec.md` (moved + callout),
+`reference/i18n-glossary.md` (new), `decisions/0014-i18n-localization.md` (new) +
+INDEX, `planning/BACKLOG.md` (epic + TASK-070), `planning/CURRENT.md` (TASK-058
+active). PR #127, merged `c5a1c9b`.
+**What I learned:** The codebase audit (two Explore sweeps) found ~260 translatable
+strings, almost all in `Main.elm` (~8.5k lines); formatting is scattered but the
+*decimal-localization* surface is small (distances + a few floats — pace/clock are
+colon-neutral); **dates render as ISO strings with no month names anywhere**, so
+the spec's date/month machinery is dead code and is not being built; CSV/GPX/`.trail`
+exports must keep `.`-decimals (data, not display).
+**Next:** TASK-058 — WI-1 `Language` type + codec.
+
+---
+## 2026-06-18 16:26 — TASK-058: WI-1 Language type + codec
+
+**Task:** TASK-058 (i18n epic, WI-1)
+**What I did:** Added `src/Language.elm` — `Language(..) = English | Spanish` with
+an ISO-639-1 codec keyed on `"en"`/`"es"` (stable across constructor renames).
+`toCode` is total with **no `_ ->`** (a third constructor won't compile — the
+exhaustiveness guarantee); the leaf `decoder` is strict (unknown codes fail), so
+back-compat tolerance can live in WI-2's `settingsDecoder` instead. Not imported by
+the app yet — first consumer is WI-3's `Context`.
+**What I verified:** New `smoke:i18n` harness (`src/I18nHarness.elm` +
+`scripts/smoke-i18n.mjs` + package script, mirroring the established harness
+pattern) — `PASS`: `"en"→English→"en"`, `"es"→Spanish→"es"`, and `de`/`EN`/`""`/
+`english` all rejected. Plus the standing gates: `elm make src/Main.elm` →
+`Success!`; `npm run build` → built in 1.00s; `npm run smoke` → v5 storage schema
+round-trips (unaffected — only files added).
+**What changed in the repo:** `src/Language.elm`, `src/I18nHarness.elm`,
+`scripts/smoke-i18n.mjs` (new), `package.json` (`smoke:i18n` script). Commit
+`94f59ca`. PR #128, merged `e99a07f`.
+**What I learned:** The harness pattern (compiled `Platform.worker` + `run`/`result`
+ports, op-dispatched `handle`) extends cleanly — `I18nHarness` is built to host
+`Settings` (059) and `Format` (060) ops as the machinery lands, so the whole pure
+i18n core ends up under one `smoke:i18n`.
+**Next:** TASK-059 — WI-2 `Settings` record + IDB persistence + flags
+(`browserLanguage`) + the footer `English / Español` toggle. The one boot-sequence
+change: `main.js` must `await` the settings read before `Elm.Main.init` to avoid a
+flash-of-English.
