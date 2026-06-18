@@ -2448,3 +2448,73 @@ before hand-off (it caught real data-loss bugs in both 054 and 056).
 are the parking lot (light/dark, multi-language, GAP descent slider, per-km
 gain/loss) and roadmap §7's remaining calibration fits (paused). None is
 prioritized; await the user's steer rather than auto-promoting.
+
+---
+## 2026-06-18 00:15 — TASK-057: fix Vercel build (elm not a declared dep)
+
+**Task:** TASK-057 — first slice of preparing the app for Vercel. The user's
+deploy failed at `vite build` with `spawn elm ENOENT`.
+
+**Root cause.** `vite-plugin-elm` → `node-elm-compiler@5.0.6` spawns a **bare
+`elm`** binary off `PATH` (`pathToElm` defaults to `"elm"`). Elm was never a
+declared dependency — the local build only worked because a global elm
+(`~/.yarn/bin/elm`, a yarn-global install) happened to be on `PATH`. Vercel's
+clean `npm install` has no elm, so the spawn fails. Same for any fresh checkout
+or CI runner.
+
+**What I did (PR #125, merged `4dfd7ab`).** Added `elm@0.19.1-6` (the npm wrapper
+that downloads the 0.19.1 compiler binary; `0.19.1-6` is the `latest` dist-tag)
+to `devDependencies`. `npm install`/`ci` now installs the platform binary at
+`node_modules/.bin/elm`, which the build picks up (npm puts `node_modules/.bin`
+on `PATH` for `npm run`) and which the smoke harnesses' `npx --no-install elm`
+resolves directly — so the whole gate suite is now **hermetic** (no global elm
+needed). Also corrected `reference/local-ci.md`, whose Prerequisites had
+documented the *global* elm requirement (the TASK-038 note) — now false.
+
+**What I verified.** Reproduced the failure first, then proved the fix, both on a
+PATH stripped of `~/.yarn/bin` (so `command -v elm` → not found, matching
+Vercel):
+- **Before:** `npm run build` on the clean PATH → `Running elm make … / Error:
+  spawn elm ENOENT` — byte-for-byte the Vercel log.
+- **After**, from a cold `rm -rf node_modules && npm ci` on the clean PATH:
+  `node_modules/.bin/elm --version` → `0.19.1`; gate 1 `npx --no-install elm make
+  src/Main.elm` → `Success!` (exit 0); gate 2 `npm run build` → `Compiling …
+  Success!` → `✓ built in ~0.9s`, `dist/` holds `index.html` + hashed JS/CSS +
+  the PWA `icon*.svg`/`manifest.webmanifest`/`sw.js`; gates 3–10 all 8 smokes
+  PASS.
+
+**Scope held.** Compiler-dependency only. **No `vercel.json`** — the router is
+hash-based (`Route.elm`: "works as a static bundle without server-side
+rewrites"), so Vite's default static `dist/` is sufficient; the OAuth return
+(`/?token=…`) hits `/` and serves fine. The frontend↔backend wiring is
+**deploy-time config, not code** and is recorded as a CURRENT.md standing
+reminder: set `VITE_BACKEND_URL` in Vercel (inlined at *build* time), and on
+**cadence** add the Vercel origin to CORS (`FRONTEND_URLS`) + set
+`FRONTEND_URL_TRAIL` (the callback redirect target) — both are env/secret
+changes, the multi-origin CORS + origin-routing already shipped (cadence spec
+§4.1/§4.2). The Strava developer-app callback domain is cadence's and does not
+change.
+
+**Lesson worth keeping.** A tool the build *shells out to* (here the elm
+compiler, via a plugin) is a real dependency even when no `import` names it —
+declare it, or the build is silently coupled to whatever's on the dev's global
+PATH. The tell was `node-elm-compiler`'s bare-`elm` spawn + elm's absence from
+`package.json`. Verifying on a PATH with the global removed is the way to catch
+this class locally before the cloud does.
+
+**Observed, out of scope.** Vercel ran the build on **Node v24.15.0** while
+`.nvmrc`/dev pin **v22** — not the cause (the elm binary is Node-version-blind)
+and not blocking, but an `engines.node: "22.x"` pin would align the cloud with
+dev. Logged as an optional follow-up. Also: `npm install` reports 4 high-severity
+advisories from elm's install-time toolchain (binwrap → old `request`/`glob`/
+`rimraf`) — build-time only, not shipped; the same deprecation warnings already
+appeared in the Vercel log. Left as-is.
+
+**Delivery:** PR #125, merged `4dfd7ab`. Close PR (this entry + DONE move +
+CURRENT restored to no-active-task + the deploy standing reminder):
+`docs/task-057-close`.
+
+**Next:** **no active task.** The build is unblocked; the remaining deploy step
+is config (the env-var wiring above), which is the user's to apply on Vercel +
+cadence. The parking-lot / calibration candidates remain unprioritized — await
+the user's steer.
