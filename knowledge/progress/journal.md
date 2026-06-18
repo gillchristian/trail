@@ -2575,3 +2575,42 @@ i18n core ends up under one `smoke:i18n`.
 (`browserLanguage`) + the footer `English / Español` toggle. The one boot-sequence
 change: `main.js` must `await` the settings read before `Elm.Main.init` to avoid a
 flash-of-English.
+
+---
+## 2026-06-18 16:44 — TASK-059: WI-2 Settings + persistence + footer toggle
+
+**Task:** TASK-059 (i18n epic, WI-2)
+**What I did:** Added `Settings.elm` (`Settings { language }`, `decoder` with
+per-field `D.oneOf`, `encode`, `fromFlags`) and persisted it: a new outbound
+`Storage.saveSettings` port + `main.js` handler writes a `deviceSettings` record
+into the existing `settings` IDB store. `main.js` reads it *before* `Elm.Main.init`
+so the first paint is already in the right language; flags gained `settings` +
+`browserLanguage`. `Dom.setHtmlLang` syncs `<html lang>`. `Main` got
+`Model.settings`, init resolution, `ChangeLanguage` (persist + set lang; no
+`.trail`/race mutation), and the footer `English / Español` toggle.
+**What I verified:** `smoke:i18n` extended for Settings — PASS (back-compat: `{}` /
+invalid-lang → English; first-run `null` + `es-AR`/`es` → Spanish, `en-US`/`fr-FR`/
+`""` → English; encode→decode identity). `smoke` — PASS (deviceSettings IDB
+round-trip; absent→null on first run). `elm make src/Main.elm` → Success; `npm run
+build` → OK. `grep` of `dist/assets/index-*.js` shows `storageSaveSettings` +
+`setHtmlLang` present (2× each, like `storageSaveProfile`) → they survive Elm DCE,
+so the unguarded `.subscribe`s are safe.
+**What changed in the repo:** new `src/Settings.elm`; `src/Storage.elm`
+(saveSettings port), `src/Dom.elm` (setHtmlLang port), `src/main.js`
+(loadSettings/saveSettings + await-before-init), `src/Main.elm` (Flags/Model/init/
+Msg/update/footer), `scripts/smoke-i18n.mjs` + `src/I18nHarness.elm` (Settings ops),
+`scripts/smoke-storage.mjs` (deviceSettings round-trip). Commit `ca2c493`. PR #130,
+merged `269e01e`.
+**What I learned:** **Top-level await is NOT in the Vite build target** (`es2020` +
+chrome87/safari14…) — the obvious `const s = await loadSettings()` before init
+fails `vite build` with "Top-level await is not available." Rather than widen the
+browser-support matrix for a language toggle, I wrapped the boot + port wiring in
+an `async` IIFE (`;(async () => { … })()`), leaving the SW registration (no `app`
+ref) outside. Body kept its indentation → a clean diff (only the wrapper lines
+change). Also re-confirmed the DCE trap from the identity-port comment: an outbound
+port must be *used* in reachable Elm or it's stripped and `app.ports.X` is
+undefined — both new ports are used (init + ChangeLanguage), and the bundle grep
+proves it.
+**Next:** TASK-060 — WI-3 `Context` + WI-5 `Format` (language half). `Context` in
+its own module (Format takes Context, Main imports Format → no cycle). First task
+that makes the toggle visibly do something: `42.2 km` ↔ `42,2 km`.
