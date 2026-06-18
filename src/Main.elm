@@ -4864,6 +4864,9 @@ bigStat label value unit =
 viewAidStationsSection : Model -> Race -> Html Msg
 viewAidStationsSection model race =
     let
+        language =
+            model.settings.language
+
         sorted =
             sortAidStations race.aidStations
 
@@ -4873,33 +4876,23 @@ viewAidStationsSection model race =
     div [ class "space-y-3" ]
         [ div [ class "flex items-baseline justify-between gap-3" ]
             [ div [ class "flex items-baseline gap-3" ]
-                [ h2 [ class "text-xl font-semibold text-slate-100" ] [ text "Aid stations" ]
+                [ h2 [ class "text-xl font-semibold text-slate-100" ] [ text (Translations.aidSectionTitle language) ]
                 , span [ class "text-xs text-slate-500" ]
-                    [ text
-                        (if List.isEmpty sorted then
-                            "none yet"
-
-                         else if List.length sorted == 1 then
-                            "1 stop"
-
-                         else
-                            String.fromInt (List.length sorted) ++ " stops"
-                        )
-                    ]
+                    [ text (Translations.aidStopCount language (List.length sorted)) ]
                 ]
             , if idle then
                 div [ class "flex items-center gap-2" ]
-                    [ button [ onClick OpenAidImport, secondaryBtnClass ] [ text "Import CSV" ]
+                    [ button [ onClick OpenAidImport, secondaryBtnClass ] [ text (Translations.importCsv language) ]
                     , if List.isEmpty sorted then
                         text ""
 
                       else
-                        button [ onClick ExportAidCsv, secondaryBtnClass ] [ text "Export CSV" ]
+                        button [ onClick ExportAidCsv, secondaryBtnClass ] [ text (Translations.exportCsv language) ]
                     , button
                         [ onClick OpenAddAid
                         , class "px-3 py-1.5 text-sm rounded-md bg-rose-600 text-white hover:bg-rose-500"
                         ]
-                        [ text "+ Add" ]
+                        [ text (Translations.addAid language) ]
                     ]
 
               else
@@ -4911,25 +4904,25 @@ viewAidStationsSection model race =
 
             AidImportReading fileName ->
                 div [ class "rounded-2xl bg-slate-900 border border-slate-800 p-5 text-sm text-slate-400" ]
-                    [ text ("Reading " ++ fileName ++ "…") ]
+                    [ text (Translations.reading language fileName) ]
 
             AidImportPreview preview ->
-                viewAidImportPreview preview race
+                viewAidImportPreview language preview race
         , case model.aidEditor of
             AidOpen form ->
-                viewAidForm form race
+                viewAidForm language form race
 
             AidClosed ->
                 text ""
         , if List.isEmpty sorted then
             div [ class "rounded-2xl border border-dashed border-slate-800 p-8 text-center text-slate-500 text-sm" ]
-                [ p [] [ text "No aid stations yet." ]
-                , p [ class "mt-1 text-xs text-slate-600" ] [ text "Add them one at a time, or Import CSV from a race organiser's aid table." ]
+                [ p [] [ text (Translations.cardNoAid language) ]
+                , p [ class "mt-1 text-xs text-slate-600" ] [ text (Translations.aidEmptySub language) ]
                 ]
 
           else
             div [ class "rounded-2xl bg-slate-900 border border-slate-800 overflow-hidden" ]
-                (List.indexedMap (viewAidRow sorted race.distance) sorted)
+                (List.indexedMap (viewAidRow language sorted race.distance) sorted)
         ]
 
 
@@ -4938,8 +4931,8 @@ secondaryBtnClass =
     class "px-3 py-1.5 text-sm rounded-md border border-slate-700 text-slate-200 hover:bg-slate-800"
 
 
-viewAidImportPreview : ImportPreview -> Race -> Html Msg
-viewAidImportPreview preview race =
+viewAidImportPreview : Language -> ImportPreview -> Race -> Html Msg
+viewAidImportPreview language preview race =
     let
         r =
             preview.result
@@ -4949,59 +4942,42 @@ viewAidImportPreview preview race =
 
         existing =
             List.length race.aidStations
-
-        confirmLabel =
-            if n == 0 then
-                "Nothing to import"
-
-            else if existing > 0 then
-                "Replace with " ++ String.fromInt n
-
-            else
-                "Import " ++ String.fromInt n
     in
     div [ class "rounded-2xl bg-slate-900 border border-rose-500/30 p-5 space-y-4" ]
         [ div [ class "flex items-baseline justify-between gap-3" ]
-            [ h3 [ class "text-base font-semibold text-slate-100" ] [ text "Import preview" ]
+            [ h3 [ class "text-base font-semibold text-slate-100" ] [ text (Translations.importPreviewTitle language) ]
             , span [ class "text-xs text-slate-500 truncate max-w-[12rem]" ] [ text preview.fileName ]
             ]
         , p [ class "text-sm text-slate-300" ]
-            [ text (String.fromInt n ++ plural n " station" " stations" ++ " ready")
+            [ text (Translations.importReady language n)
             , if List.isEmpty r.errors then
                 text ""
 
               else
-                span [ class "text-rose-400" ] [ text (" · " ++ String.fromInt (List.length r.errors) ++ " skipped") ]
+                span [ class "text-rose-400" ] [ text (Translations.importSkipped language (List.length r.errors)) ]
             , if List.isEmpty r.warnings then
                 text ""
 
               else
-                span [ class "text-amber-400" ] [ text (" · " ++ String.fromInt (List.length r.warnings) ++ plural (List.length r.warnings) " warning" " warnings") ]
+                span [ class "text-amber-400" ] [ text (Translations.importWarningsCount language (List.length r.warnings)) ]
             ]
         , if n == 0 then
-            p [ class "text-sm text-slate-500" ] [ text "Nothing parsed — fix the file and try Import again." ]
+            p [ class "text-sm text-slate-500" ] [ text (Translations.nothingParsed language) ]
 
           else
             div [ class "rounded-xl bg-slate-950 border border-slate-800 overflow-hidden max-h-72 overflow-y-auto" ]
-                (List.indexedMap viewPreviewRow r.stations)
-        , viewIssueBlock "Skipped rows" "text-rose-300/80" r.errors
-        , viewIssueBlock "Warnings" "text-amber-300/80" r.warnings
+                (List.indexedMap (viewPreviewRow language) r.stations)
+        , viewIssueBlock language (Translations.issueSkipped language) "text-rose-300/80" r.errors
+        , viewIssueBlock language (Translations.issueWarnings language) "text-amber-300/80" r.warnings
         , div [ class "flex items-center justify-between gap-3 pt-1" ]
             [ p [ class "text-xs text-slate-500" ]
-                [ text
-                    (if existing > 0 then
-                        "Replaces your current " ++ String.fromInt existing ++ plural existing " stop." " stops."
-
-                     else
-                        "Adds these to the race."
-                    )
-                ]
+                [ text (Translations.importReplaceNote language existing) ]
             , div [ class "flex gap-2" ]
                 [ button
                     [ onClick AidImportCancel
                     , class "px-4 py-2 text-sm border border-slate-700 rounded-md hover:bg-slate-800 text-slate-200"
                     ]
-                    [ text "Cancel" ]
+                    [ text (Translations.cancel language) ]
                 , button
                     [ onClick AidImportConfirm
                     , A.disabled (n == 0)
@@ -5011,14 +4987,14 @@ viewAidImportPreview preview race =
                         , ( "bg-slate-800 text-slate-500 cursor-not-allowed", n == 0 )
                         ]
                     ]
-                    [ text confirmLabel ]
+                    [ text (Translations.importConfirmLabel language n existing) ]
                 ]
             ]
         ]
 
 
-viewPreviewRow : Int -> AidStation -> Html Msg
-viewPreviewRow index aid =
+viewPreviewRow : Language -> Int -> AidStation -> Html Msg
+viewPreviewRow language index aid =
     div
         [ classList
             [ ( "flex items-center gap-3 px-4 py-2.5", True )
@@ -5031,12 +5007,12 @@ viewPreviewRow index aid =
             [ p [ class "text-sm text-slate-100 truncate" ] [ text aid.name ]
             , p [ class "text-xs text-slate-500" ]
                 [ text
-                    (formatFloat 1 (aid.distance / 1000)
-                        ++ " km · rest "
+                    (Format.number language 1 (aid.distance / 1000)
+                        ++ " km · "
                         ++ formatRest aid.restSeconds
                         ++ (case aid.cutoff of
                                 Just secs ->
-                                    " · cutoff " ++ AidCsv.formatClock secs
+                                    " · " ++ Translations.cutoffLabel language ++ " " ++ AidCsv.formatClock secs
 
                                 Nothing ->
                                     ""
@@ -5054,12 +5030,12 @@ viewPreviewRow index aid =
 
           else
             span [ class "flex gap-1 text-sm flex-shrink-0" ]
-                (List.map (\s -> span [ A.title (serviceLabel s) ] [ text (serviceIcon s) ]) aid.services)
+                (List.map (\s -> span [ A.title (Translations.serviceLabel language s) ] [ text (serviceIcon s) ]) aid.services)
         ]
 
 
-viewIssueBlock : String -> String -> List AidCsv.RowIssue -> Html Msg
-viewIssueBlock heading toneClass issues =
+viewIssueBlock : Language -> String -> String -> List AidCsv.RowIssue -> Html Msg
+viewIssueBlock language heading toneClass issues =
     if List.isEmpty issues then
         text ""
 
@@ -5072,10 +5048,10 @@ viewIssueBlock heading toneClass issues =
                         p [ class ("text-xs " ++ toneClass) ]
                             [ text
                                 ((if issue.row == 0 then
-                                    "File"
+                                    Translations.issueFile language
 
                                   else
-                                    "Row " ++ String.fromInt issue.row
+                                    Translations.issueRow language issue.row
                                  )
                                     ++ ": "
                                     ++ issue.message
@@ -5096,8 +5072,8 @@ plural n singular pluralForm =
         pluralForm
 
 
-viewAidRow : List AidStation -> Float -> Int -> AidStation -> Html Msg
-viewAidRow allAids totalDistance index aid =
+viewAidRow : Language -> List AidStation -> Float -> Int -> AidStation -> Html Msg
+viewAidRow language allAids totalDistance index aid =
     let
         prev =
             allAids
@@ -5128,18 +5104,23 @@ viewAidRow allAids totalDistance index aid =
             [ p [ class "text-sm font-medium text-slate-100 truncate" ] [ text aid.name ]
             , p [ class "text-xs text-slate-500" ]
                 [ text
-                    (formatFloat 1 (aid.distance / 1000)
-                        ++ " km from start · +"
-                        ++ formatFloat 1 fromPrevKm
-                        ++ " km from previous · "
-                        ++ formatFloat 1 toFinishKm
-                        ++ " km to finish"
+                    (Format.number language 1 (aid.distance / 1000)
+                        ++ " km "
+                        ++ Translations.aidFromStart language
+                        ++ " · +"
+                        ++ Format.number language 1 fromPrevKm
+                        ++ " km "
+                        ++ Translations.aidFromPrevious language
+                        ++ " · "
+                        ++ Format.number language 1 toFinishKm
+                        ++ " km "
+                        ++ Translations.aidToFinish language
                     )
                 ]
             , case aid.cutoff of
                 Just secs ->
                     p [ class "text-xs text-amber-400/80" ]
-                        [ text ("⏱ cutoff " ++ AidCsv.formatClock secs) ]
+                        [ text ("⏱ " ++ Translations.cutoffLabel language ++ " " ++ AidCsv.formatClock secs) ]
 
                 Nothing ->
                     text ""
@@ -5153,7 +5134,7 @@ viewAidRow allAids totalDistance index aid =
 
               else
                 p [ class "mt-1 flex gap-1.5 text-base" ]
-                    (List.map (\s -> span [ A.title (serviceLabel s) ] [ text (serviceIcon s) ]) aid.services)
+                    (List.map (\s -> span [ A.title (Translations.serviceLabel language s) ] [ text (serviceIcon s) ]) aid.services)
             ]
         , div [ class "flex items-center gap-2 flex-shrink-0" ]
             [ span [ class "text-xs text-slate-500" ]
@@ -5162,7 +5143,7 @@ viewAidRow allAids totalDistance index aid =
                 [ onClick (OpenEditAid aid)
                 , class "px-2 py-1 text-xs border border-slate-700 rounded hover:bg-slate-800 text-slate-200 opacity-0 group-hover:opacity-100 transition-opacity"
                 ]
-                [ text "Edit" ]
+                [ text (Translations.edit language) ]
             , button
                 [ onClick (AidDelete aid.id)
                 , class "px-2 py-1 text-xs text-slate-500 hover:text-rose-400 opacity-0 group-hover:opacity-100 transition-opacity"
@@ -5172,33 +5153,26 @@ viewAidRow allAids totalDistance index aid =
         ]
 
 
-viewAidForm : AidForm -> Race -> Html Msg
-viewAidForm form race =
+viewAidForm : Language -> AidForm -> Race -> Html Msg
+viewAidForm language form race =
     let
         editing =
             form.editing /= Nothing
 
         prevHint =
             previousAidDistance form.editing race / 1000
-
-        title_ =
-            if editing then
-                "Edit aid station"
-
-            else
-                "New aid station"
     in
     div [ A.id aidFormDomId, class "rounded-2xl bg-slate-900 border border-slate-800 p-5 space-y-4 scroll-mt-4" ]
         [ div [ class "flex items-baseline justify-between" ]
-            [ h3 [ class "text-base font-semibold text-slate-100" ] [ text title_ ]
+            [ h3 [ class "text-base font-semibold text-slate-100" ] [ text (Translations.aidFormTitle language editing) ]
             , button
                 [ onClick CloseAid
                 , class "text-xs text-slate-500 hover:text-slate-200"
                 ]
-                [ text "Cancel" ]
+                [ text (Translations.cancel language) ]
             ]
         , div [ class "grid grid-cols-1 sm:grid-cols-2 gap-4" ]
-            [ field "Name"
+            [ field (Translations.fieldName language)
                 [ input
                     [ A.type_ "text"
                     , A.value form.name
@@ -5208,7 +5182,7 @@ viewAidForm form race =
                     ]
                     []
                 ]
-            , field "Rest (minutes)"
+            , field (Translations.fieldRestMinutes language)
                 [ input
                     [ A.type_ "number"
                     , A.min "0"
@@ -5219,11 +5193,11 @@ viewAidForm form race =
                     ]
                     []
                 ]
-            , field "Cutoff (optional)"
+            , field (Translations.fieldCutoff language)
                 [ input
                     [ A.type_ "text"
                     , A.value form.cutoffText
-                    , A.placeholder "h:mm from start, e.g. 6:30"
+                    , A.placeholder (Translations.cutoffPlaceholder language)
                     , onInput AidSetCutoff
                     , inputClass
                     ]
@@ -5231,10 +5205,10 @@ viewAidForm form race =
                 ]
             ]
         , div [ class "space-y-2" ]
-            [ p [ class "text-xs text-slate-500 uppercase tracking-wider" ] [ text "Distance" ]
+            [ p [ class "text-xs text-slate-500 uppercase tracking-wider" ] [ text (Translations.statDistance language) ]
             , div [ class "flex gap-1 bg-slate-950 border border-slate-800 rounded-lg p-1 w-fit" ]
-                [ modeChip "From previous" (form.mode == FromPrevious) (AidSetMode FromPrevious)
-                , modeChip "From start" (form.mode == FromStart) (AidSetMode FromStart)
+                [ modeChip (Translations.modeFromPrevious language) (form.mode == FromPrevious) (AidSetMode FromPrevious)
+                , modeChip (Translations.modeFromStart language) (form.mode == FromStart) (AidSetMode FromStart)
                 ]
             , div [ class "flex items-baseline gap-2" ]
                 [ input
@@ -5260,24 +5234,22 @@ viewAidForm form race =
                 [ text
                     (case form.mode of
                         FromStart ->
-                            "Absolute distance from the start line."
+                            Translations.modeHelpFromStart language
 
                         FromPrevious ->
-                            "Distance added on top of "
-                                ++ formatFloat 1 prevHint
-                                ++ " km (the previous stop, or start if there is none)."
+                            Translations.modeHelpFromPrevious language (Format.number language 1 prevHint)
                     )
                 ]
             ]
         , div [ class "space-y-2" ]
-            [ p [ class "text-xs text-slate-500 uppercase tracking-wider" ] [ text "Services" ]
+            [ p [ class "text-xs text-slate-500 uppercase tracking-wider" ] [ text (Translations.servicesLabel language) ]
             , div [ class "flex flex-wrap gap-2" ]
-                (List.map (serviceChip form.services) allServices)
+                (List.map (serviceChip language form.services) allServices)
             ]
-        , field "Notes (optional)"
+        , field (Translations.fieldNotesOptional language)
             [ textarea
                 [ A.value form.notesText
-                , A.placeholder "Crew access, drop-bag here, what to grab…"
+                , A.placeholder (Translations.aidNotesPlaceholder language)
                 , A.rows 2
                 , onInput AidSetNotes
                 , inputClass
@@ -5286,6 +5258,8 @@ viewAidForm form race =
             ]
         , case form.error of
             Just err ->
+                -- `err` is a dynamic validation message from validateAidForm
+                -- (English for now); see TASK-069.
                 p [ class "text-sm text-rose-400" ] [ text err ]
 
             Nothing ->
@@ -5295,17 +5269,17 @@ viewAidForm form race =
                 [ onClick CloseAid
                 , class "px-4 py-2 text-sm border border-slate-700 rounded-md hover:bg-slate-800 text-slate-200"
                 ]
-                [ text "Cancel" ]
+                [ text (Translations.cancel language) ]
             , button
                 [ onClick AidSubmit
                 , class "px-4 py-2 text-sm bg-rose-600 text-white rounded-md hover:bg-rose-500 font-medium"
                 ]
                 [ text
                     (if editing then
-                        "Save changes"
+                        Translations.saveChanges language
 
                      else
-                        "Add aid station"
+                        Translations.addAidStation language
                     )
                 ]
             ]
@@ -5338,8 +5312,8 @@ modeChip labelText active msg =
         [ text labelText ]
 
 
-serviceChip : List Service -> Service -> Html Msg
-serviceChip current s =
+serviceChip : Language -> List Service -> Service -> Html Msg
+serviceChip language current s =
     let
         active =
             List.member s current
@@ -5353,7 +5327,7 @@ serviceChip current s =
             ]
         ]
         [ span [] [ text (serviceIcon s) ]
-        , span [] [ text (serviceLabel s) ]
+        , span [] [ text (Translations.serviceLabel language s) ]
         ]
 
 
@@ -8314,6 +8288,11 @@ viewSignedDeltaCell diff =
         [ text (prefix ++ formatMmss mag) ]
 
 
+{-| NOTE: still English. Localizing this embeds the word "rest" and cascades
+`Language` through the plan-table machinery (`kmsWithCumulative` → `viewKmRow`),
+which is TASK-065's surface — so `formatRest` localizes there, where 5 of its 7
+callers live. The aid rows (TASK-064) render the rest value in English until then.
+-}
 formatRest : Int -> String
 formatRest seconds =
     if seconds <= 0 then

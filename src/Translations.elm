@@ -18,6 +18,7 @@ title. Later surface tasks (TASK-062–068) append their strings here.
 
 import Language exposing (Language(..))
 import Route exposing (Route)
+import Types exposing (Service(..))
 
 
 {-| English-style one/other pluralization — sufficient for English + Spanish.
@@ -939,3 +940,470 @@ backToRacesPlain language =
 
         Spanish ->
             "Volver a las carreras"
+
+
+
+-- AID STATIONS (TASK-064)
+
+
+{-| Localized **display** label for an aid-station service. The export/serialization
+path keeps `Types.serviceToString` (canonical) and `Types.serviceLabel` (stable
+English, used in the GPX `<desc>`) — only the on-screen chip/tooltip localizes.
+-}
+serviceLabel : Language -> Service -> String
+serviceLabel language service =
+    case language of
+        English ->
+            Types.serviceLabel service
+
+        Spanish ->
+            case service of
+                Water ->
+                    "Agua"
+
+                Food ->
+                    "Comida"
+
+                WarmFood ->
+                    "Comida caliente"
+
+                Medical ->
+                    "Asistencia médica"
+
+                WC ->
+                    "Baño"
+
+                DropBag ->
+                    "Bolsa de material"
+
+                Crew ->
+                    "Acceso para asistencia"
+
+
+aidSectionTitle : Language -> String
+aidSectionTitle language =
+    case language of
+        English ->
+            "Aid stations"
+
+        Spanish ->
+            "Avituallamientos"
+
+
+{-| Aid count beside the section title: "none yet" / "1 stop" / "N stops".
+-}
+aidStopCount : Language -> Int -> String
+aidStopCount language count =
+    if count == 0 then
+        case language of
+            English ->
+                "none yet"
+
+            Spanish ->
+                "ninguna todavía"
+
+    else
+        String.fromInt count
+            ++ " "
+            ++ (case language of
+                    English ->
+                        plural count { one = "stop", other = "stops" }
+
+                    Spanish ->
+                        plural count { one = "parada", other = "paradas" }
+               )
+
+
+importCsv : Language -> String
+importCsv language =
+    case language of
+        English ->
+            "Import CSV"
+
+        Spanish ->
+            "Importar CSV"
+
+
+exportCsv : Language -> String
+exportCsv language =
+    case language of
+        English ->
+            "Export CSV"
+
+        Spanish ->
+            "Exportar CSV"
+
+
+addAid : Language -> String
+addAid language =
+    case language of
+        English ->
+            "+ Add"
+
+        Spanish ->
+            "+ Agregar"
+
+
+reading : Language -> String -> String
+reading language fileName =
+    case language of
+        English ->
+            "Reading " ++ fileName ++ "…"
+
+        Spanish ->
+            "Leyendo " ++ fileName ++ "…"
+
+
+aidEmptySub : Language -> String
+aidEmptySub language =
+    case language of
+        English ->
+            "Add them one at a time, or Import CSV from a race organiser's aid table."
+
+        Spanish ->
+            "Agrégalos uno a uno, o importa un CSV con la tabla de avituallamientos del organizador."
+
+
+importPreviewTitle : Language -> String
+importPreviewTitle language =
+    case language of
+        English ->
+            "Import preview"
+
+        Spanish ->
+            "Vista previa de importación"
+
+
+{-| "N station(s) ready".
+-}
+importReady : Language -> Int -> String
+importReady language count =
+    String.fromInt count
+        ++ " "
+        ++ (case language of
+                English ->
+                    plural count { one = "station ready", other = "stations ready" }
+
+                Spanish ->
+                    plural count { one = "parada lista", other = "paradas listas" }
+           )
+
+
+{-| "· N skipped".
+-}
+importSkipped : Language -> Int -> String
+importSkipped language count =
+    " · "
+        ++ String.fromInt count
+        ++ " "
+        ++ (case language of
+                English ->
+                    "skipped"
+
+                Spanish ->
+                    plural count { one = "omitida", other = "omitidas" }
+           )
+
+
+{-| "· N warning(s)".
+-}
+importWarningsCount : Language -> Int -> String
+importWarningsCount language count =
+    " · "
+        ++ String.fromInt count
+        ++ " "
+        ++ (case language of
+                English ->
+                    plural count { one = "warning", other = "warnings" }
+
+                Spanish ->
+                    plural count { one = "aviso", other = "avisos" }
+           )
+
+
+nothingParsed : Language -> String
+nothingParsed language =
+    case language of
+        English ->
+            "Nothing parsed — fix the file and try Import again."
+
+        Spanish ->
+            "No se pudo leer nada — corrige el archivo e Importa de nuevo."
+
+
+issueSkipped : Language -> String
+issueSkipped language =
+    case language of
+        English ->
+            "Skipped rows"
+
+        Spanish ->
+            "Filas omitidas"
+
+
+issueWarnings : Language -> String
+issueWarnings language =
+    case language of
+        English ->
+            "Warnings"
+
+        Spanish ->
+            "Avisos"
+
+
+issueFile : Language -> String
+issueFile language =
+    case language of
+        English ->
+            "File"
+
+        Spanish ->
+            "Archivo"
+
+
+issueRow : Language -> Int -> String
+issueRow language row =
+    (case language of
+        English ->
+            "Row "
+
+        Spanish ->
+            "Fila "
+    )
+        ++ String.fromInt row
+
+
+{-| Footnote under the import preview: replaces existing stops, or adds new ones.
+-}
+importReplaceNote : Language -> Int -> String
+importReplaceNote language existing =
+    if existing > 0 then
+        (case language of
+            English ->
+                "Replaces your current " ++ String.fromInt existing ++ plural existing { one = " stop.", other = " stops." }
+
+            Spanish ->
+                "Reemplaza tus " ++ String.fromInt existing ++ plural existing { one = " parada actual.", other = " paradas actuales." }
+        )
+
+    else
+        case language of
+            English ->
+                "Adds these to the race."
+
+            Spanish ->
+                "Las agrega a la carrera."
+
+
+{-| Import confirm button: nothing / replace-with-N / import-N.
+-}
+importConfirmLabel : Language -> Int -> Int -> String
+importConfirmLabel language n existing =
+    if n == 0 then
+        case language of
+            English ->
+                "Nothing to import"
+
+            Spanish ->
+                "Nada que importar"
+
+    else if existing > 0 then
+        (case language of
+            English ->
+                "Replace with "
+
+            Spanish ->
+                "Reemplazar con "
+        )
+            ++ String.fromInt n
+
+    else
+        (case language of
+            English ->
+                "Import "
+
+            Spanish ->
+                "Importar "
+        )
+            ++ String.fromInt n
+
+
+cutoffLabel : Language -> String
+cutoffLabel language =
+    case language of
+        English ->
+            "cutoff"
+
+        Spanish ->
+            "corte"
+
+
+aidFromStart : Language -> String
+aidFromStart language =
+    case language of
+        English ->
+            "from start"
+
+        Spanish ->
+            "desde la salida"
+
+
+aidFromPrevious : Language -> String
+aidFromPrevious language =
+    case language of
+        English ->
+            "from previous"
+
+        Spanish ->
+            "desde el anterior"
+
+
+aidToFinish : Language -> String
+aidToFinish language =
+    case language of
+        English ->
+            "to finish"
+
+        Spanish ->
+            "hasta la meta"
+
+
+edit : Language -> String
+edit language =
+    case language of
+        English ->
+            "Edit"
+
+        Spanish ->
+            "Editar"
+
+
+aidFormTitle : Language -> Bool -> String
+aidFormTitle language editing =
+    if editing then
+        case language of
+            English ->
+                "Edit aid station"
+
+            Spanish ->
+                "Editar avituallamiento"
+
+    else
+        case language of
+            English ->
+                "New aid station"
+
+            Spanish ->
+                "Nuevo avituallamiento"
+
+
+fieldRestMinutes : Language -> String
+fieldRestMinutes language =
+    case language of
+        English ->
+            "Rest (minutes)"
+
+        Spanish ->
+            "Descanso (minutos)"
+
+
+fieldCutoff : Language -> String
+fieldCutoff language =
+    case language of
+        English ->
+            "Cutoff (optional)"
+
+        Spanish ->
+            "Corte (opcional)"
+
+
+cutoffPlaceholder : Language -> String
+cutoffPlaceholder language =
+    case language of
+        English ->
+            "h:mm from start, e.g. 6:30"
+
+        Spanish ->
+            "h:mm desde la salida, p. ej. 6:30"
+
+
+modeFromPrevious : Language -> String
+modeFromPrevious language =
+    case language of
+        English ->
+            "From previous"
+
+        Spanish ->
+            "Desde el anterior"
+
+
+modeFromStart : Language -> String
+modeFromStart language =
+    case language of
+        English ->
+            "From start"
+
+        Spanish ->
+            "Desde la salida"
+
+
+modeHelpFromStart : Language -> String
+modeHelpFromStart language =
+    case language of
+        English ->
+            "Absolute distance from the start line."
+
+        Spanish ->
+            "Distancia absoluta desde la línea de salida."
+
+
+{-| `prevKm` is the already-formatted "X.X" km string.
+-}
+modeHelpFromPrevious : Language -> String -> String
+modeHelpFromPrevious language prevKm =
+    case language of
+        English ->
+            "Distance added on top of " ++ prevKm ++ " km (the previous stop, or start if there is none)."
+
+        Spanish ->
+            "Distancia que se suma a " ++ prevKm ++ " km (la parada anterior, o la salida si no hay)."
+
+
+servicesLabel : Language -> String
+servicesLabel language =
+    case language of
+        English ->
+            "Services"
+
+        Spanish ->
+            "Servicios"
+
+
+fieldNotesOptional : Language -> String
+fieldNotesOptional language =
+    case language of
+        English ->
+            "Notes (optional)"
+
+        Spanish ->
+            "Notas (opcional)"
+
+
+aidNotesPlaceholder : Language -> String
+aidNotesPlaceholder language =
+    case language of
+        English ->
+            "Crew access, drop-bag here, what to grab…"
+
+        Spanish ->
+            "Acceso de asistencia, bolsa de material aquí, qué agarrar…"
+
+
+addAidStation : Language -> String
+addAidStation language =
+    case language of
+        English ->
+            "Add aid station"
+
+        Spanish ->
+            "Agregar avituallamiento"

@@ -31,6 +31,9 @@ term and it changes here once, everywhere.
 | course | recorrido | the GPX track/route |
 | effort | esfuerzo | |
 | predicted finish | llegada estimada | |
+| aid stop (short count) | parada | "N stops" → "N paradas"; full noun stays *avituallamiento* |
+| cutoff | corte | |
+| rest | descanso | (`formatRest` localizes in TASK-065 — still English in 064) |
 
 ### Effort tiers (Conservative / Goal / Push / All-in)
 Conservador / Objetivo / Fuerte / Al máximo  *(neutral — avoid "a tope" (ES))*
