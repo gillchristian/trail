@@ -14,18 +14,18 @@
 **Notes:** scope cuts, links, anything decided while planning.
 ```
 
-### TASK-060 — WI-3 + WI-5 (language half): `Context` + `Format`
+### TASK-061 — WI-4: `Translations` module + global chrome
 
-**Source:** BACKLOG (i18n epic). **Deps:** TASK-058, TASK-059 (both done — PR #128, #130).
-**Branch:** `feat/task-060-context-format`
+**Source:** BACKLOG (i18n epic). **Deps:** TASK-058–060 (all done — PR #128/#130/#132).
+**Branch:** `feat/task-061-translations-chrome`
 **Acceptance criteria:**
-- [ ] New `Context { language }` + `toContext : Model -> Context`. **`Context` lives in its own module** (`Context.elm`), not `Main` — `Format` takes a `Context`, and `Main` imports `Format`, so a `Context` defined in `Main` would cycle. Leaf localized views take `Context` (or its `.language`), never `model.settings`.
-- [ ] `Format.elm` localizes **decimal quantities** — Spanish renders `,`, English `.` — by wrapping trail's existing hand-rolled rounding (no `myrho/elm-round` dep). Colon-formatted values (pace `M:SS`, clock) are **unchanged** in both languages. **No unit conversion** (descoped). Each formatter total over `Language`.
-- [ ] The *display* call sites for distances + decimal floats route through `Format` (threaded via `Context`); **CSV / GPX / `.trail` formatters are left untouched** (data interchange keeps `.`-decimals).
-- [ ] Visible proof: with the footer toggle on Spanish, a distance shows `42,2 km`; on English `42.2 km`; pace/clock keep `:` in both (verify: `smoke:i18n` Format ops + **manual browser check**).
-- [ ] `smoke:i18n` extended with `Format` ops (Spanish comma, English period, colon-neutral pace/clock). CI green: type-check, build, `smoke`, `smoke:i18n`.
+- [ ] New `Translations.elm`: function-per-key, each `case`-matching `Language`, **total** (no `_ ->` fallthrough that hides a missing translation); typed-argument interpolation (no string-template lookup); a one/other `plural : Int -> { one : String, other : String } -> String` helper.
+- [ ] Translate the **global chrome**: header/nav route labels ("Your races", "Race detail", "Map view", "Plan · …", "Profile · settings", "Lost?"), the footer privacy line, and the `Browser.Document` title — threaded via `Context`/`Language` (header takes the language; no `model.settings` in leaf views).
+- [ ] Adding a third `Language` constructor would make every `Translations` `case` non-exhaustive (the WI-4 guarantee) — confirmed by review; the full add-a-constructor sweep is TASK-069's DoD.
+- [ ] Spanish terms match `reference/i18n-glossary.md` (append any new term introduced).
+- [ ] CI green: type-check, `npm run build`, `npm run smoke`, `npm run smoke:i18n`. **Manual browser check:** toggle → header/nav/footer/title read Spanish, and back.
 
-**Notes:** Module shape that avoids cycles — `Context.elm` imports `Language`; `Format.elm` imports `Context` + `Language`; `Main` imports both; `toContext` in `Main`. `Format` takes `Context` (not bare `Language`) so the descoped `units` (TASK-070) reads `ctx.units` later with no signature churn. `Translations` (TASK-061) will take `Language` directly (words never depend on units). Decimal-localization surface is **small** — distances (`formatKm`/`formatKmShort`) + a few decimal floats; integers (elevation in m, HR) and colon values need no swap (per the formatting audit). This is the first task that makes a toggle visibly *do* something. Spec WI-3 + WI-5; ADR-0014. On close, pull TASK-061.
+**Notes:** Establishes the pattern every later surface task reuses. Keep the module's first slice to the chrome strings + `plural`; **don't pre-define shared buttons** (Save/Cancel/…) until a surface task needs them (three-uses rule) — they'll be added where first used (063/064/068) and consolidated. `viewHeader : Route -> …` gains a `Language`/`Context` param; thread `ctx` from `view`. Footer privacy line moves from the hardcoded English string (TASK-059 left it) into `Translations`. Spec WI-4; ADR-0014. On close, pull TASK-062 (home / upload / race cards).
 
 ---
 

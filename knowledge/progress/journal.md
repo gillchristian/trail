@@ -2614,3 +2614,32 @@ proves it.
 **Next:** TASK-060 — WI-3 `Context` + WI-5 `Format` (language half). `Context` in
 its own module (Format takes Context, Main imports Format → no cycle). First task
 that makes the toggle visibly do something: `42.2 km` ↔ `42,2 km`.
+
+---
+## 2026-06-18 16:54 — TASK-060: WI-3 Context + WI-5 Format (language half)
+
+**Task:** TASK-060 (i18n epic, WI-3 + WI-5 language half)
+**What I did:** `Context.elm` (`Context { language }`) + `Main.toContext`; `Format.elm`
+(`localizeDecimal` = Spanish `.`→`,`, and `number` = round + localize, reusing the
+app's existing rounding — no new dep). Routed the race-distance displays (card +
+detail) and flat-eq through `Format.number ctx.language`, threading `Context` via
+`viewRaceGrid`/`viewRaceCard`/`viewRaceDetail`. Removed the now-unused `formatKm`.
+**What I verified:** `smoke:i18n` Format ops — PASS (`es 42.2 → "42,2"`, `en →
+"42.2"`, whole numbers drop the fraction, `"5:30"`/`"13:59:00"` colon-neutral).
+`elm make src/Main.elm` → Success (6 modules); `npm run build` → OK; `npm run smoke`
+unaffected.
+**What changed in the repo:** new `src/Context.elm`, `src/Format.elm`; `src/Main.elm`
+(imports, `toContext`, 3 view migrations, `formatKm` removed); `src/I18nHarness.elm`
++ `scripts/smoke-i18n.mjs` (Format ops). Commit `8d4da59`. PR #132, merged `3ae9cee`.
+**What I learned:** **`formatFloat` is NOT safe to blanket-localize** — the same
+helper formats SVG path `d` coordinates (`"L " ++ formatFloat 2 x …`), input
+`A.value`s (which round-trip through `String.toFloat`, expecting `.`), and exported
+GPX waypoint names — all needing a literal `.`. Localization must be surgical,
+call-site by call-site, to read-only display decimals. That reshaped the plan: the
+decimal sweep rides along with each surface's translation task (Context is already
+threaded there), and TASK-069 verifies nothing display-facing was missed. `formatKm`
+by contrast was a pure display helper used in exactly 2 spots → cleanly migrated +
+deleted.
+**Next:** TASK-061 — `Translations` module (function-per-key, total over `Language`,
+`plural` helper) + the global chrome (header/nav/footer/title). Starts the
+translation sweep; reuses this task's `Context` threading.
