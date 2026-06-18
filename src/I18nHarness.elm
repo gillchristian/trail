@@ -7,8 +7,8 @@ real compiled modules from Node via `scripts/smoke-i18n.mjs`, the same
 Grows with the machinery tasks:
 
   - TASK-058: `Language` — codec round-trip + strict decode.
-  - TASK-059 (this slice): `Settings` — first-run/back-compat resolution + codec.
-  - TASK-060 will add `Format` (decimal-separator localization).
+  - TASK-059: `Settings` — first-run/back-compat resolution + codec.
+  - TASK-060 (this slice): `Format` — decimal-separator localization.
 
 Never imported by the app.
 
@@ -17,9 +17,12 @@ Ops:
   - `decode` (Language code → ok? + re-encoded code)
   - `resolveSettings` (raw value + browser locale → resolved language code)
   - `encodeSettings` (language code → the encoded Settings JSON)
+  - `format` (language + decimals + value → localized number string)
+  - `localize` (language + string → separator-localized string)
 
 -}
 
+import Format
 import Json.Decode as D
 import Json.Encode as E
 import Language
@@ -94,6 +97,22 @@ handle v =
                             Language.fromCode code |> Maybe.withDefault Language.English
                     in
                     E.object [ ( "encoded", Settings.encode { language = lang } ) ]
+
+        Ok "format" ->
+            case D.decodeValue (D.map3 (\l d val -> ( l, d, val )) (D.field "lang" Language.decoder) (D.field "decimals" D.int) (D.field "value" D.float)) v of
+                Err e ->
+                    err (D.errorToString e)
+
+                Ok ( lang, decimals, value ) ->
+                    E.object [ ( "out", E.string (Format.number lang decimals value) ) ]
+
+        Ok "localize" ->
+            case D.decodeValue (D.map2 Tuple.pair (D.field "lang" Language.decoder) (D.field "s" D.string)) v of
+                Err e ->
+                    err (D.errorToString e)
+
+                Ok ( lang, s ) ->
+                    E.object [ ( "out", E.string (Format.localizeDecimal lang s) ) ]
 
         Ok other ->
             err ("unknown op: " ++ other)

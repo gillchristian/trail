@@ -86,9 +86,25 @@ const run = async () => {
     }
   }
 
+  console.log('Format: decimals localize (Spanish comma, English period)')
+  {
+    check('en 1 42.2 → "42.2"', (await call({ op: 'format', lang: 'en', decimals: 1, value: 42.2 })).out === '42.2')
+    check('es 1 42.2 → "42,2"', (await call({ op: 'format', lang: 'es', decimals: 1, value: 42.2 })).out === '42,2')
+    check('es 0 42 → "42" (whole, no fraction)', (await call({ op: 'format', lang: 'es', decimals: 0, value: 42 })).out === '42')
+    check('es 2 1234.5 → "1234,5"', (await call({ op: 'format', lang: 'es', decimals: 2, value: 1234.5 })).out === '1234,5')
+  }
+
+  console.log('Format: colon-formatted values (pace/clock) are locale-neutral')
+  {
+    check('es leaves "5:30" unchanged', (await call({ op: 'localize', lang: 'es', s: '5:30' })).out === '5:30')
+    check('es leaves "13:59:00" unchanged', (await call({ op: 'localize', lang: 'es', s: '13:59:00' })).out === '13:59:00')
+    check('es swaps "42.2" → "42,2"', (await call({ op: 'localize', lang: 'es', s: '42.2' })).out === '42,2')
+    check('en leaves "42.2" unchanged', (await call({ op: 'localize', lang: 'en', s: '42.2' })).out === '42.2')
+  }
+
   console.log('')
   if (failures === 0) {
-    console.log('PASS — Language codec + Settings resolution/codec hold')
+    console.log('PASS — Language codec + Settings resolution + Format localization hold')
     process.exit(0)
   } else {
     console.log(`FAIL — ${failures} check(s) failed`)
