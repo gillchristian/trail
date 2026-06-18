@@ -2847,3 +2847,59 @@ same shape as `section.label` in `Planning.elm` — both deferred to 069.
 `section.label`/`conflict.label` (thread `Language` into the math/merge label
 builders), the deliberate add-a-3rd-`Language`-constructor exhaustiveness check, and
 `<html lang>` confirm. Closes the i18n epic.
+
+---
+## 2026-06-18 18:40 — TASK-069: i18n QA sweep + exhaustiveness + conflict labels (epic capstone)
+
+**Task:** TASK-069 (i18n epic — capstone)
+**What I did:** Straggler sweep of the view modules (localized the last two misses:
+"Plan by `<name>`" and the race-card delete `aria-label`); localized `conflict.label`
+(merge-review) by giving `Merge.conflictKeyLabel`/`aidFieldLabel` a `Language` arg
+and having the view re-derive from the typed `conflict.key` (engine keeps an English
+`.label` so `smoke:merge` is untouched); ran the DoD exhaustiveness check; confirmed
+`<html lang>`.
+**What I verified:** the 3rd-constructor check flagged **304** non-exhaustive `case
+language of` sites (301 `Translations`, + `Format`/`Merge`) then reverted; type-check
+Success; build OK; **all 9 smokes PASS**; final straggler grep shows only symbols /
+units / `.trail` / proper nouns remain.
+**What changed in the repo:** `src/Merge.elm` (Language-aware labels + import),
+`src/Main.elm` (Plan-by, delete aria, conflict label via key), `src/Language.elm`
+(touched + reverted for the check), `reference/i18n-glossary.md`. PR #150 (`30edb84`).
+**What I learned:** The DoD check needs the constructor handled in `Language.toCode`
+first (a leaf) or the compiler stops there before reaching the downstream modules —
+adding `Catalan -> "ca"` temporarily let the full 304-site punch-list surface, which
+is the real proof. `conflict.label` and `section.label` were sibling "label built in
+a non-view module" problems with **different** answers: `conflict.label` is
+display-only with a typed `key`, so the view re-derives it (clean); `section.label`
+is CSV-canonical, so it needs a display/canonical split — deferred to TASK-071.
+**Next:** none — close the epic.
+
+---
+## 2026-06-18 18:40 — i18n epic COMPLETE (TASK-058–069)
+
+**Task:** epic wrap-up (English + Spanish localization)
+**What shipped:** machinery — `Language` (ISO codec), `Settings` (IDB `deviceSettings`
++ `saveSettings` port + `browserLanguage` flag + await-before-init boot), `Context`,
+`Format` (decimal separator), `Translations` (function-per-key, total over `Language`);
+footer `English / Español` toggle; `<html lang>` sync. Then every UI surface localized
+(061 chrome → 068 modals) + the 069 QA pass. 13 feat PRs + 13 close PRs (#127–#150),
+all squash-merged to `master`; ADR-0014; spec + glossary in `reference/`.
+**What I verified:** all 9 smoke harnesses green throughout; type-check + build green
+on every PR; exhaustiveness proven (a missing translation can't compile). UI behavior
+(toggle, persistence, first-run default, the skill-dropdown round-trip, decimals) is a
+standing **manual browser check** for the user — the headless env can't drive the
+compiled Elm (see CURRENT's standing-checks list).
+**What I learned (epic-level):** (1) **The cross-cutting-formatter trap** recurred —
+`formatRest` (shared aid↔plan), the skill `<select>` value/display, `serviceLabel`
+(display↔GPX), `section.label` (display↔CSV): any string that's both *shown* and
+*parsed-back-or-exported* needs an English canonical for the machine path; only the
+display localizes. (2) **Compile-driven threading** — change a shared signature first,
+let `elm make` enumerate the broken callers — turned the huge plan-views migration
+into a worklist. (3) The **inline `tr en es`** helper for threshold/enum-derived labels
+(gradeClass, density, conflictKeyLabel) kept them beside their logic while staying
+exhaustive; standalone strings went in `Translations`.
+**Deferred (parking lot, unpromoted):** TASK-070 (units metric/imperial — the
+deliberate descope), TASK-071 (`section.label` split). Intentional English-by-design:
+exports, dynamic error detail, format hints, unit suffixes, compact Δ headers, S/M/L/XL
+letters, proper nouns.
+**Next:** **no active task.** Await a fresh user steer (CURRENT updated).

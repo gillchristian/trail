@@ -14,18 +14,31 @@
 **Notes:** scope cuts, links, anything decided while planning.
 ```
 
-### TASK-069 — i18n QA sweep + exhaustiveness check + deferred labels (closes the epic)
+### (no active task)
 
-**Source:** BACKLOG (i18n epic). **Deps:** TASK-058–068 (all done).
-**Branch:** `feat/task-069-i18n-qa`
-**Acceptance criteria:**
-- [ ] **Straggler sweep:** grep all `src/*.elm` for hardcoded user-facing strings missed by 061–068 (`text "…"`, `A.placeholder`, `A.title`, `A.attribute "aria-label"`, button labels); localize any real display string found (exclude SVG attrs, CSS, DOM ids, export/CSV/GPX, dynamic error detail, proper nouns).
-- [ ] **`section.label` + `conflict.label`** (built in `Planning.elm` / `Merge.elm`, deferred from 065/068): localize. Thread `Language` into the label builders (or expose endpoints for the view to format); update `smoke:sections`/`smoke:merge` harnesses to pass a `Language`. "Start"/"Finish" → "Salida"/"Meta"; "Target pace · km N" etc.
-- [ ] **Exhaustiveness check (spec DoD):** temporarily add a third `Language` constructor, confirm `elm make` enumerates every untranslated `case` site, then revert. Document the result in the PR.
-- [ ] **`<html lang>`** tracks the toggle (wired TASK-059) — confirm in the build/code; note the manual check.
-- [ ] Glossary final pass; CI green: type-check, build, `smoke`, `smoke:i18n`, `smoke:sections`, `smoke:merge`, `smoke:changelog`, `smoke:calibration`, `smoke:aidcsv`. **Manual browser check:** toggle through every surface in Spanish.
+The **i18n epic is COMPLETE** (2026-06-18): TASK-058–069 all shipped + verified.
+English + Spanish, hand-rolled and type-driven (ADR-0014); default from
+`navigator.language`, footer `English / Español` toggle, persisted in IDB, never in
+`.trail`. Machinery (`Language`/`Settings`/`Context`/`Format`/`Translations`) +
+every UI surface localized; the add-a-3rd-constructor exhaustiveness check proved a
+missing translation can't compile (304 sites flagged). Spec `reference/i18n-spec.md`,
+glossary `reference/i18n-glossary.md`. **Pull the next item only on a fresh user
+steer.** Two scoped follow-ups remain in the parking lot, neither prioritized:
+**TASK-070** (units metric/imperial — the deliberate descope) and **TASK-071**
+(`section.label` display/canonical split — the one i18n residue). Do **not**
+auto-promote either.
 
-**Notes:** The capstone. If `section.label`/`conflict.label` localization turns out to be a large math-layer refactor (not just threading a param), carve it into a follow-up backlog item rather than bloat this PR — but attempt it first. Known intentional English: data exports (`.trail`/CSV/GPX), dynamic parse/HTTP error *detail*, format hints (`m:ss`/`h:mm`), unit suffixes (`km`/`m`/`bpm`/`/km`), `Δ ele`/`Δ vs plan` compact headers, category letters (S/M/L/XL), proper nouns (Coros/Strava/UTMB/Pace Strategy/Waypoint Alerts). On close: epic COMPLETE — update CURRENT to no-active-task, surface the standing manual checks + the units backlog item (TASK-070).
+**Standing manual checks (headless env can't drive the compiled app — for the user):**
+- **i18n end-to-end:** toggle to Español in the footer → header/home/cards, race
+  detail + edit dialog, map, aid stations + CSV preview, all three plan views,
+  `#/profile` (incl. the skill dropdowns still **save** correctly), Strava picker,
+  activity drawer, and the delete/identity/merge modals all read Spanish; decimals
+  show `42,2 km` / `12,5 %`; pace/clock stay `M:SS`/`H:MM:SS`; reload keeps the
+  choice; a fresh `es-*` browser profile defaults to Spanish; `<html lang>` flips.
+- **Known intentional English:** `.trail`/CSV/GPX exports, dynamic parse/HTTP error
+  *detail*, format hints (`m:ss`/`h:mm`), unit suffixes, `Δ ele`/`Δ vs plan`,
+  category letters (S/M/L/XL), `section.label`'s Start/Finish (→ TASK-071), proper
+  nouns (Coros/Strava/UTMB/Pace Strategy/Waypoint Alerts).
 
 ---
 
@@ -42,13 +55,12 @@ is live and user-verified in-browser.
 
 ## Standing reminders (not active tasks)
 
-- **i18n epic is the active arc (started 2026-06-18).** English + Spanish,
-  type-driven, no library — TASK-058–069, sequenced machinery (058→060) →
-  translation sweep (061→069). Spec `reference/i18n-spec.md` (read its *Resolved
-  decisions* callout), ADR-0014, glossary `reference/i18n-glossary.md`. **Units
-  (metric/imperial) are descoped** to TASK-070 (parking lot) — language only.
-  Translation PRs are large-surface and user-reviewed; keep terms consistent via
-  the glossary.
+- **i18n epic COMPLETE (2026-06-18).** English + Spanish, type-driven, no library —
+  TASK-058–069 all shipped (machinery 058→060, translation sweep 061→068, QA 069).
+  Spec `reference/i18n-spec.md`, ADR-0014, glossary `reference/i18n-glossary.md`.
+  **Units (metric/imperial) descoped** to TASK-070; the one i18n residue
+  (`section.label` Start/Finish) is TASK-071. Both parking-lot, unpromoted. Keep
+  any future translation terms consistent via the glossary.
 - **Calibration is paused (user, 2026-06-15).** The two core continuous rates
   shipped (TASK-043 vmh, TASK-044 flat pace); the harder roadmap §7 fits
   (descent / fatigue / Riegel / sustainable-HR / decoupling) stay queued —
