@@ -60,6 +60,7 @@ import Types
         , ChangeEntry
         , KmTime(..)
         , Plan
+        , PlanningLayer
         , Race
         , RaceId
         , Service
@@ -213,6 +214,7 @@ type alias Model =
     , identityFlow : IdentityFlow
     , nameDraft : String
     , renameDraft : String
+    , mergeReview : Maybe MergeReview
     , stravaPicker : StravaPicker
     , stravaPickerSearch : String
     , sliderDraft : Maybe Float
@@ -264,6 +266,37 @@ type alias PendingImport =
     }
 
 
+{-| The suggestion-review modal state (TASK-056 / ADR-0013). Open only when a
+returned `.trail` *diverged* with true collisions the engine couldn't auto-merge;
+fast-forwards and disjoint merges apply without it. `merged` is the engine's
+result (every conflict defaulted to mine, so it always applies cleanly);
+`choices` is the user's per-conflict resolution, keyed by the conflict's index in
+`conflicts`. `autoMergedCount` is the disjoint changes already folded in (the
+reassurance line). `touched` gates the confirm-on-dismiss (Q-U4).
+-}
+type alias MergeReview =
+    { target : Race
+    , incoming : Race
+    , filePeople : Identity.Directory
+    , merged : PlanningLayer
+    , conflicts : List Merge.Conflict
+    , choices : Dict Int MergeChoice
+    , autoMergedCount : Int
+    , touched : Bool
+    , confirmingDiscard : Bool
+    }
+
+
+{-| A per-conflict resolution. `ChooseCustom` carries a hand-merged note string
+(Q-U3) — used only for `KKmNote` conflicts, where `resolve`'s flip-to-theirs
+isn't enough.
+-}
+type MergeChoice
+    = ChooseMine
+    | ChooseTheirs
+    | ChooseCustom String
+
+
 init : Flags -> Url -> Nav.Key -> ( Model, Cmd Msg )
 init flags url key =
     ( { key = key
@@ -297,6 +330,7 @@ init flags url key =
       , identityFlow = FlowIdle
       , nameDraft = ""
       , renameDraft = ""
+      , mergeReview = Nothing
       , stravaPicker = PickerClosed
       , stravaPickerSearch = ""
       , sliderDraft = Nothing
@@ -411,6 +445,14 @@ type Msg
     | LinkCancel
     | RenameDraftInput String
     | RenameMeCommit
+      -- merge review (WI-3 part 2 / TASK-056)
+    | MergePickMine Int
+    | MergePickTheirs Int
+    | MergeEditNote Int String
+    | MergeApply
+    | MergeKeepMine
+    | MergeConfirmDiscard
+    | MergeCancelDiscard
       -- profile
     | ProfileLoaded Encode.Value
     | ProfilePickPreset Preset
@@ -516,68 +558,22 @@ update msg model =
                         ( { model | upload = UploadFailed fileName err }, Cmd.none )
 
                     Ok ( importedRace, filePeople ) ->
-                        let
-                            -- Drop the imported id so JS assigns a fresh one
-                            -- (lets users import the same .trail twice safely)
-                            -- and stamp a new createdAt so it sorts to the top.
-                            -- shareId is *kept* (the round-trip identity); only
-                            -- the local IDB key is regenerated. A v1 file has no
-                            -- courseHash — compute it from the embedded GPX so
-                            -- the race is fully stamped (TASK-047).
-                            draft =
-                                { importedRace
-                                    | id = raceIdFromString ""
-                                    , createdAt = model.now
-                                    , courseHash =
-                                        if importedRace.courseHash == "" then
-                                            TrailSync.courseHashFromGpxText importedRace.gpxText
+                        case findShareMatch importedRace model of
+                            Just localRace ->
+                                -- A returned file for a race we already have →
+                                -- merge, not import-as-new (TASK-056). A course
+                                -- mismatch on a matching shareId hard-blocks (WI-1).
+                                case TrailSync.classify importedRace localRace of
+                                    TrailSync.DifferentCourse ->
+                                        ( { model | upload = UploadFailed fileName (TrailSync.verdictMessage TrailSync.DifferentCourse) }
+                                        , Cmd.none
+                                        )
 
-                                        else
-                                            importedRace.courseHash
-                                }
+                                    _ ->
+                                        routeMerge localRace importedRace filePeople model
 
-                            -- Owner display name for the prompt copy: the file's
-                            -- denormalized names over what we already know. The
-                            -- model directory itself is touched only on completion.
-                            ownerName =
-                                Identity.resolveNameWith "this athlete"
-                                    (Identity.mergeDirectory filePeople model.directory)
-                                    draft.owner
-
-                            pending =
-                                { draft = draft
-                                , fileName = fileName
-                                , filePeople = filePeople
-                                , ownerName = ownerName
-                                }
-                        in
-                        if draft.owner == "" then
-                            -- Pre-identity / v1 file: no owner to attribute. It
-                            -- becomes mine on touch if I have an identity (AC3),
-                            -- else stays unowned until a first export stamps it.
-                            -- No prompt (there's no person to disambiguate).
-                            let
-                                claimed =
-                                    case model.me of
-                                        Just m ->
-                                            { pending | draft = { draft | owner = m.userId } }
-
-                                        Nothing ->
-                                            pending
-                            in
-                            completeImport claimed model
-
-                        else
-                            case Identity.decideImport model.me draft.owner of
-                                Identity.ImportAsOwner ->
-                                    -- A file I already own → import silently (AC6).
-                                    completeImport pending model
-
-                                Identity.AskOwnership ->
-                                    -- Owner ≠ me (or I have no identity) → ask.
-                                    ( { model | identityFlow = FlowOwnership pending, upload = NotUploading }
-                                    , Cmd.none
-                                    )
+                            Nothing ->
+                                importAsNew importedRace filePeople fileName model
 
             else
                 case Gpx.parseGPX content of
@@ -1531,6 +1527,72 @@ update msg model =
                 Nothing ->
                     ( model, Cmd.none )
 
+        MergePickMine i ->
+            ( { model | mergeReview = Maybe.map (pickChoice i ChooseMine) model.mergeReview }, Cmd.none )
+
+        MergePickTheirs i ->
+            ( { model | mergeReview = Maybe.map (pickChoice i ChooseTheirs) model.mergeReview }, Cmd.none )
+
+        MergeEditNote i noteText ->
+            ( { model | mergeReview = Maybe.map (pickChoice i (ChooseCustom noteText)) model.mergeReview }, Cmd.none )
+
+        MergeApply ->
+            case model.mergeReview of
+                Just review ->
+                    if Dict.size review.choices < List.length review.conflicts then
+                        -- Not every card resolved (Apply is disabled in the UI too).
+                        ( model, Cmd.none )
+
+                    else
+                        let
+                            theirsLayer =
+                                Merge.planningLayer review.incoming
+
+                            finalLayer =
+                                review.conflicts
+                                    |> List.indexedMap Tuple.pair
+                                    |> List.foldl
+                                        (\( i, c ) acc ->
+                                            case Dict.get i review.choices of
+                                                Just ChooseTheirs ->
+                                                    Merge.resolve c.key theirsLayer acc
+
+                                                Just (ChooseCustom noteText) ->
+                                                    Merge.setNote c.key noteText acc
+
+                                                _ ->
+                                                    -- ChooseMine (or, defensively,
+                                                    -- unresolved): `merged` already
+                                                    -- carries mine.
+                                                    acc
+                                        )
+                                        review.merged
+                        in
+                        applyMerge review.target review.incoming review.filePeople finalLayer model
+
+                Nothing ->
+                    ( model, Cmd.none )
+
+        MergeKeepMine ->
+            -- Reject the whole import (no state change). Confirm only when the
+            -- user has actually made picks (Q-U4 / ADR-0013).
+            case model.mergeReview of
+                Just review ->
+                    if review.touched then
+                        ( { model | mergeReview = Just { review | confirmingDiscard = True } }, Cmd.none )
+
+                    else
+                        ( { model | mergeReview = Nothing }, Cmd.none )
+
+                Nothing ->
+                    ( model, Cmd.none )
+
+        MergeConfirmDiscard ->
+            ( { model | mergeReview = Nothing }, Cmd.none )
+
+        MergeCancelDiscard ->
+            ( { model | mergeReview = Maybe.map (\r -> { r | confirmingDiscard = False }) model.mergeReview }, Cmd.none )
+
         ProfileLoaded value ->
             case D.decodeValue (D.nullable AthleteProfile.decode) value of
                 Ok (Just p) ->
@@ -2386,6 +2448,331 @@ exportDownload directory race =
         }
 
 
+
+-- MERGE (WI-3 part 2 / TASK-056) — route a returned .trail into the engine
+
+
+{-| A local race this incoming `.trail` is a returned copy of — matched by the
+stable `shareId` (TASK-047). Empty shareId (v1 / unstamped) never matches, so
+those still import as new.
+-}
+findShareMatch : Race -> Model -> Maybe Race
+findShareMatch incoming model =
+    if incoming.shareId == "" then
+        Nothing
+
+    else
+        currentRaces model
+            |> List.filter (\r -> r.shareId == incoming.shareId)
+            |> List.head
+
+
+{-| Route a returned `.trail` against the local race it belongs to: classify the
+version vectors (Q4), then fast-forward / auto-merge / open the review modal /
+no-op accordingly (TASK-056 / ADR-0013).
+-}
+routeMerge : Race -> Race -> Identity.Directory -> Model -> ( Model, Cmd Msg )
+routeMerge local incoming filePeople model =
+    case Merge.classifyVersions local.version incoming.version of
+        Merge.Same ->
+            landOnRace local model
+
+        Merge.Behind ->
+            landOnRace local model
+
+        Merge.FastForward ->
+            -- Theirs strictly dominates → adopt their plan directly, no UI.
+            applyMerge local incoming filePeople (Merge.planningLayer incoming) model
+
+        Merge.Diverged ->
+            let
+                -- The common ancestor is what we last shared (`local.mergeBase`).
+                -- If it's missing (a race shared on a pre-merge-state build, then
+                -- re-imported), fall back to a *neutral empty* layer — NOT the
+                -- local layer: base == mine would make `field3` resolve every
+                -- field to theirs with zero conflicts, silently discarding my
+                -- edits. An empty base instead surfaces every genuine difference
+                -- as a conflict to review (a field I left at default + they
+                -- changed → theirs disjointly; both changed from default →
+                -- conflict). Safe over silent.
+                base =
+                    local.mergeBase |> Maybe.withDefault emptyPlanningLayer
+
+                result =
+                    Merge.mergePlanningLayer base (Merge.planningLayer local) (Merge.planningLayer incoming)
+            in
+            if List.isEmpty result.conflicts then
+                -- Both edited, but disjoint → auto-merge, no UI.
+                applyMerge local incoming filePeople result.merged model
+
+            else
+                ( { model | mergeReview = Just (openReview local incoming filePeople result), upload = NotUploading }
+                , Cmd.none
+                )
+
+
+landOnRace : Race -> Model -> ( Model, Cmd Msg )
+landOnRace race model =
+    ( { model | upload = NotUploading }
+    , Nav.pushUrl model.key (Route.toString (Route.RaceDetail race.id))
+    )
+
+
+{-| A neutral, all-default planning layer — the safe ancestor when none was
+recorded (see `routeMerge`). -}
+emptyPlanningLayer : PlanningLayer
+emptyPlanningLayer =
+    { name = ""
+    , date = Nothing
+    , location = ""
+    , url = ""
+    , notes = ""
+    , aidStations = []
+    , aidStationSeq = 0
+    , plan = defaultPlan
+    }
+
+
+{-| Build the review state for a divergence with true conflicts: pre-fill each
+same-km-note conflict's textarea with both versions combined (Q-U3); binary
+conflicts start unresolved. `autoMergedCount` = the disjoint changes the engine
+already folded into `merged` (the reassurance line).
+-}
+openReview : Race -> Race -> Identity.Directory -> Merge.MergeResult -> MergeReview
+openReview local incoming filePeople result =
+    let
+        noteChoices =
+            result.conflicts
+                |> List.indexedMap
+                    (\i c ->
+                        if isProseConflict c.key then
+                            Just ( i, ChooseCustom (combineNotes c.mine c.theirs) )
+
+                        else
+                            Nothing
+                    )
+                |> List.filterMap identity
+                |> Dict.fromList
+    in
+    { target = local
+    , incoming = incoming
+    , filePeople = filePeople
+    , merged = result.merged
+    , conflicts = result.conflicts
+    , choices = noteChoices
+    , autoMergedCount = List.length (Changelog.diff (Merge.planningLayer local) result.merged)
+
+    -- Pre-filled note resolutions count as "something to lose", so dismissing
+    -- confirms even before the user touches a binary card (Q-U4). A
+    -- binary-only review starts untouched → closing it discards silently.
+    , touched = not (Dict.isEmpty noteChoices)
+    , confirmingDiscard = False
+    }
+
+
+{-| The person whose changes are being merged in — the most recent author in the
+incoming history who isn't me (e.g. the coach who reviewed *my* race, so the
+file's `owner` is still me, not them). Person-named via the directory (WI-5);
+falls back to the file owner, then a neutral label.
+-}
+suggesterName : Maybe Identity.Me -> Identity.Directory -> Race -> String
+suggesterName me dir incoming =
+    let
+        myId =
+            me |> Maybe.map .userId |> Maybe.withDefault ""
+
+        lastOtherAuthor =
+            incoming.history
+                |> List.filter (\e -> e.authorId /= "" && e.authorId /= myId)
+                |> List.reverse
+                |> List.head
+                |> Maybe.map .authorId
+    in
+    case lastOtherAuthor of
+        Just uid ->
+            Identity.resolveName dir uid
+
+        Nothing ->
+            -- No distinct author in the history (e.g. they edited without an
+            -- identity). The file owner is usually *me* (they reviewed my race),
+            -- so don't label theirs with my own name — stay neutral.
+            if incoming.owner == "" || incoming.owner == myId then
+                "the other person"
+
+            else
+                Identity.resolveName dir incoming.owner
+
+
+combineNotes : String -> String -> String
+combineNotes mine theirs =
+    if mine == "" then
+        theirs
+
+    else if theirs == "" then
+        mine
+
+    else
+        mine ++ "\n" ++ theirs
+
+
+{-| Apply a merged planning layer onto the local race: rebuild from the layer
+(course frozen, WI-2), advance the version vector (seen both sides) + the merge
+ancestor, **union the incoming change history** (so the other person's granular
+edits join the feed — WI-4), and — when the plan actually changed — log a
+person-named `Merged` marker entry. Always persists + lands on the race; even a
+content-identical fast-forward advances the version so it isn't re-offered.
+-}
+applyMerge : Race -> Race -> Identity.Directory -> PlanningLayer -> Model -> ( Model, Cmd Msg )
+applyMerge local incoming filePeople finalLayer model =
+    let
+        dir =
+            Identity.mergeDirectory filePeople model.directory
+
+        planChanged =
+            finalLayer /= Merge.planningLayer local
+
+        -- The taxonomy diff under-counts non-taxonomy fields (target/location/
+        -- url/notes), so floor at 1 when the plan changed — never "Merged 0".
+        count =
+            Basics.max
+                (List.length (Changelog.diff (Merge.planningLayer local) finalLayer))
+                (if planChanged then
+                    1
+
+                 else
+                    0
+                )
+
+        -- Union the other side's history first (conflict-free by entryId, WI-4),
+        -- then append the merge marker when there was a real change.
+        unioned =
+            Changelog.union local.history incoming.history
+
+        history =
+            if planChanged then
+                case Changelog.entryFromChanges model.deviceId (myUserId model) model.now (List.length local.history) "merge" [ Merged { fromAuthor = suggesterName model.me dir incoming, count = count } ] of
+                    Just e ->
+                        unioned ++ [ e ]
+
+                    Nothing ->
+                        unioned
+
+            else
+                unioned
+
+        applied =
+            -- withPlanningLayer keeps the frozen course + identity verbatim (WI-2).
+            let
+                rebuilt =
+                    Merge.withPlanningLayer finalLayer local
+            in
+            { rebuilt
+                | version = Merge.mergeVersions local.version incoming.version
+                , mergeBase = Just finalLayer
+                , history = history
+            }
+
+        nextRaces =
+            applied :: List.filter (\r -> r.id /= local.id) (currentRaces model)
+    in
+    ( { model
+        | races = LoadedRaces (sortRaces nextRaces)
+        , directory = dir
+        , mergeReview = Nothing
+        , upload = NotUploading
+      }
+    , Cmd.batch
+        [ Storage.saveIdentity (Identity.encodeStored { me = model.me, directory = dir })
+        , Storage.saveRaceMeta (encodeRaceMeta applied)
+
+        -- Defer the navigation a tick. Applying a merge tears down the
+        -- full-screen review modal AND reorders the race list in the same
+        -- update; navigating synchronously on top of that races the virtual-DOM
+        -- patch ahead of the teardown and corrupts it (a `childNodes of
+        -- undefined` crash that survives until reload). Letting the teardown
+        -- render commit first makes the nav a clean Index→detail transition.
+        -- Mirrors the `GotContent` → `StartParse` sleep.
+        , Task.perform (\_ -> NavigateTo (Route.RaceDetail local.id)) (Process.sleep 50)
+        ]
+    )
+
+
+{-| Record a per-card resolution in the review state (and mark it touched, so
+dismiss confirms — Q-U4). -}
+pickChoice : Int -> MergeChoice -> MergeReview -> MergeReview
+pickChoice i choice review =
+    { review | choices = Dict.insert i choice review.choices, touched = True }
+
+
+{-| Import a `.trail` as a *new* race — no local race shares its `shareId`. The
+WI-5 identity branching (TASK-054): silent for a file I own, prompt
+yourself/someone-else otherwise, claim-on-touch for an owner-less file. (The
+merge path — a returned file for a race I already have — is handled before this,
+in `StartParse` via `findShareMatch`/`routeMerge`.)
+-}
+importAsNew : Race -> Identity.Directory -> String -> Model -> ( Model, Cmd Msg )
+importAsNew importedRace filePeople fileName model =
+    let
+        -- Drop the imported id so JS assigns a fresh one (lets users import the
+        -- same .trail twice safely) and stamp a new createdAt so it sorts to the
+        -- top. shareId is *kept* (the round-trip identity); only the local IDB key
+        -- is regenerated. A v1 file has no courseHash — compute it from the
+        -- embedded GPX so the race is fully stamped (TASK-047).
+        draft =
+            { importedRace
+                | id = raceIdFromString ""
+                , createdAt = model.now
+                , courseHash =
+                    if importedRace.courseHash == "" then
+                        TrailSync.courseHashFromGpxText importedRace.gpxText
+
+                    else
+                        importedRace.courseHash
+            }
+
+        -- Owner display name for the prompt copy: the file's denormalized names
+        -- over what we already know. The model directory is touched only on
+        -- completion.
+        ownerName =
+            Identity.resolveNameWith "this athlete"
+                (Identity.mergeDirectory filePeople model.directory)
+                draft.owner
+
+        pending =
+            { draft = draft
+            , fileName = fileName
+            , filePeople = filePeople
+            , ownerName = ownerName
+            }
+    in
+    if draft.owner == "" then
+        -- Pre-identity / v1 file: no owner to attribute. It becomes mine on touch
+        -- if I have an identity (AC3), else stays unowned until a first export
+        -- stamps it. No prompt (there's no person to disambiguate).
+        let
+            claimed =
+                case model.me of
+                    Just m ->
+                        { pending | draft = { draft | owner = m.userId } }
+
+                    Nothing ->
+                        pending
+        in
+        completeImport claimed model
+
+    else
+        case Identity.decideImport model.me draft.owner of
+            Identity.ImportAsOwner ->
+                -- A file I already own → import silently (AC6).
+                completeImport pending model
+
+            Identity.AskOwnership ->
+                -- Owner ≠ me (or I have no identity) → ask.
+                ( { model | identityFlow = FlowOwnership pending, upload = NotUploading }
+                , Cmd.none
+                )
+
+
 readFile : File -> Cmd Msg
 readFile file =
     Task.perform (GotContent (File.name file)) (File.toString file)
@@ -2614,6 +3001,7 @@ view model =
             , viewDeleteModal model
             , viewHistoryDrawer model
             , viewIdentityModals model
+            , viewMergeReview model
             , viewErrorToast model
             ]
         ]
@@ -7605,6 +7993,223 @@ identitySecondaryButton msg label =
         , class "px-4 py-2 text-sm border border-slate-700 rounded-md hover:bg-slate-800 text-slate-200"
         ]
         [ text label ]
+
+
+
+-- MERGE REVIEW MODAL (WI-3 part 2 / TASK-056 / ADR-0013)
+
+
+{-| The suggestion-review modal: only the true-collision residue, person-named,
+no red/green; two equal options per card (or a hand-merge textarea for a
+same-km-note overlap), forced choice, Apply enabled only once all are resolved.
+"Keep my version" / close reject the whole import (confirm only if picks exist).
+-}
+viewMergeReview : Model -> Html Msg
+viewMergeReview model =
+    case model.mergeReview of
+        Nothing ->
+            text ""
+
+        Just review ->
+            let
+                name =
+                    suggesterName model.me
+                        (Identity.mergeDirectory review.filePeople model.directory)
+                        review.incoming
+
+                n =
+                    List.length review.conflicts
+
+                chosen =
+                    Dict.size review.choices
+            in
+            div [ class "fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center px-4 py-8" ]
+                [ div [ class "max-w-lg w-full max-h-full bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl flex flex-col" ]
+                    [ div [ class "flex items-start justify-between gap-3 px-6 py-4 border-b border-slate-800" ]
+                        [ div [ class "min-w-0" ]
+                            [ h2 [ class "text-lg font-semibold text-slate-100" ] [ text (name ++ "’s suggestions") ]
+                            , p [ class "text-xs text-slate-500 mt-0.5" ]
+                                [ text
+                                    (String.fromInt n
+                                        ++ (if n == 1 then
+                                                " change overlaps"
+
+                                            else
+                                                " changes overlap"
+                                           )
+                                        ++ " with edits you made"
+                                    )
+                                ]
+                            ]
+                        , button
+                            [ onClick MergeKeepMine
+                            , class "shrink-0 text-slate-500 hover:text-slate-100 text-2xl leading-none -mt-1"
+                            ]
+                            [ text "×" ]
+                        ]
+                    , if review.autoMergedCount > 0 then
+                        div [ class "px-6 pt-3" ]
+                            [ p [ class "flex items-start gap-2 text-xs text-emerald-300/90 bg-emerald-500/10 rounded-lg px-3 py-2" ]
+                                [ span [ class "shrink-0" ] [ text "✓" ]
+                                , text
+                                    (String.fromInt review.autoMergedCount
+                                        ++ (if review.autoMergedCount == 1 then
+                                                " other change from "
+
+                                            else
+                                                " other changes from "
+                                           )
+                                        ++ name
+                                        ++ (if review.autoMergedCount == 1 then
+                                                " was added automatically."
+
+                                            else
+                                                " were added automatically."
+                                           )
+                                    )
+                                ]
+                            ]
+
+                      else
+                        text ""
+                    , div [ class "flex-1 overflow-y-auto px-6 py-4 space-y-3" ]
+                        (List.indexedMap (viewConflictCard name review) review.conflicts)
+                    , viewMergeFooter review chosen n
+                    ]
+                ]
+
+
+viewConflictCard : String -> MergeReview -> Int -> Merge.Conflict -> Html Msg
+viewConflictCard name review i conflict =
+    let
+        choice =
+            Dict.get i review.choices
+    in
+    div [ class "rounded-xl border border-slate-800 bg-slate-950/50 p-3 space-y-2" ]
+        [ p [ class "text-xs font-medium text-slate-400" ] [ text conflict.label ]
+        , if isProseConflict conflict.key then
+            viewNoteMerge name i conflict choice
+
+          else
+            div [ class "grid grid-cols-1 sm:grid-cols-2 gap-2" ]
+                [ mergeOption (MergePickMine i) "You" "text-sky-300" conflict.mine (choice == Just ChooseMine)
+                , mergeOption (MergePickTheirs i) name "text-amber-300" conflict.theirs (choice == Just ChooseTheirs)
+                ]
+        ]
+
+
+{-| Prose fields get the hand-merge textarea (Q-U3) rather than a binary pick:
+race notes, a per-km note, or an aid station's notes. -}
+isProseConflict : Merge.ConflictKey -> Bool
+isProseConflict key =
+    case key of
+        Merge.KNotes ->
+            True
+
+        Merge.KKmNote _ ->
+            True
+
+        Merge.KAid _ Merge.AidNotes ->
+            True
+
+        _ ->
+            False
+
+
+{-| One tappable option on a binary card — identity-tinted (no red/green),
+selected by a ring + check (TASK-056 / ADR-0013). -}
+mergeOption : Msg -> String -> String -> String -> Bool -> Html Msg
+mergeOption msg who tone val selected =
+    button
+        [ onClick msg
+        , class
+            ("text-left rounded-lg border px-3 py-2 transition-colors "
+                ++ (if selected then
+                        "border-rose-500 ring-2 ring-rose-500/50 bg-slate-900"
+
+                    else
+                        "border-slate-800 bg-slate-900/40 hover:border-slate-600"
+                   )
+            )
+        ]
+        [ div [ class "flex items-center justify-between gap-2" ]
+            [ span [ class ("text-xs font-semibold " ++ tone) ] [ text who ]
+            , if selected then
+                span [ class "text-rose-400 text-xs" ] [ text "✓" ]
+
+              else
+                text ""
+            ]
+        , p [ class "text-sm text-slate-200 mt-1 break-words" ] [ text (mergeValueOrDash val) ]
+        ]
+
+
+{-| A same-km-note overlap (Q-U3): both versions shown for reference, plus an
+editable textarea pre-filled with the two combined to splice. -}
+viewNoteMerge : String -> Int -> Merge.Conflict -> Maybe MergeChoice -> Html Msg
+viewNoteMerge name i conflict choice =
+    let
+        current =
+            case choice of
+                Just (ChooseCustom t) ->
+                    t
+
+                _ ->
+                    combineNotes conflict.mine conflict.theirs
+    in
+    div [ class "space-y-2" ]
+        [ div [ class "grid grid-cols-2 gap-2" ]
+            [ div []
+                [ p [ class "text-xs font-semibold text-sky-300" ] [ text "You" ]
+                , p [ class "text-xs text-slate-500 break-words" ] [ text (mergeValueOrDash conflict.mine) ]
+                ]
+            , div []
+                [ p [ class "text-xs font-semibold text-amber-300" ] [ text name ]
+                , p [ class "text-xs text-slate-500 break-words" ] [ text (mergeValueOrDash conflict.theirs) ]
+                ]
+            ]
+        , textarea
+            [ A.value current
+            , A.rows 3
+            , onInput (MergeEditNote i)
+            , class "w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-rose-500/50"
+            ]
+            []
+        , p [ class "text-[11px] text-slate-500" ] [ text "Edit to combine both notes." ]
+        ]
+
+
+mergeValueOrDash : String -> String
+mergeValueOrDash v =
+    if v == "" then
+        "—"
+
+    else
+        v
+
+
+viewMergeFooter : MergeReview -> Int -> Int -> Html Msg
+viewMergeFooter review chosen n =
+    div [ class "px-6 py-4 border-t border-slate-800" ]
+        (if review.confirmingDiscard then
+            [ p [ class "text-sm text-slate-300 mb-3" ] [ text "Discard your choices and keep your own version?" ]
+            , div [ class "flex justify-end gap-2" ]
+                [ identitySecondaryButton MergeCancelDiscard "Keep editing"
+                , identityPrimaryButton MergeConfirmDiscard "Discard" False
+                ]
+            ]
+
+         else
+            [ div [ class "flex items-center justify-between gap-3" ]
+                [ p [ class "text-xs text-slate-500 tabular-nums" ]
+                    [ text (String.fromInt chosen ++ " of " ++ String.fromInt n ++ " chosen") ]
+                , div [ class "flex gap-2" ]
+                    [ identitySecondaryButton MergeKeepMine "Keep my version"
+                    , identityPrimaryButton MergeApply "Apply changes" (chosen < n)
+                    ]
+                ]
+            ]
+        )
 
 
 viewErrorToast : Model -> Html msg
