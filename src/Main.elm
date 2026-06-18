@@ -3316,35 +3316,36 @@ calibrationContributors model =
 
 
 {-| One fit's row: a description (built by the caller) and an Apply button. -}
-calibRow : List (Html Msg) -> Msg -> Html Msg
-calibRow descr applyMsg =
+calibRow : Language -> List (Html Msg) -> Msg -> Html Msg
+calibRow language descr applyMsg =
     div [ class "flex items-start justify-between gap-3" ]
         [ p [ class "text-sm text-slate-400" ] descr
         , button
             [ onClick applyMsg
             , class "shrink-0 px-3 py-1.5 text-sm border border-slate-700 rounded-md hover:bg-slate-800 text-slate-200"
             ]
-            [ text "Apply" ]
+            [ text (Translations.apply language) ]
         ]
 
 
 viewCalibrationPanel : Model -> Html Msg
 viewCalibrationPanel model =
     let
+        language =
+            model.settings.language
+
         runs =
             linkedRuns model
 
         vmhRow =
             case Calibration.fitVmh runs of
                 Just fit ->
-                    [ calibRow
-                        [ text "Climb rate "
+                    [ calibRow language
+                        [ text (Translations.calibClimbRate language)
                         , span [ class "text-slate-100 font-semibold tabular-nums" ]
                             [ text (formatInt fit.vmh ++ " m/h") ]
                         , text
-                            (" — from "
-                                ++ String.fromInt fit.climbKmCount
-                                ++ " climb km · current "
+                            (Translations.calibClimbFrom language fit.climbKmCount
                                 ++ formatInt model.profile.verticalRateVmh
                                 ++ " m/h"
                             )
@@ -3358,14 +3359,12 @@ viewCalibrationPanel model =
         flatRow =
             case Calibration.fitFlatPace runs of
                 Just fit ->
-                    [ calibRow
-                        [ text "Flat pace "
+                    [ calibRow language
+                        [ text (Translations.calibFlatPace language)
                         , span [ class "text-slate-100 font-semibold tabular-nums" ]
                             [ text (formatMmss fit.paceSecPerKm ++ " /km") ]
                         , text
-                            (" — from "
-                                ++ String.fromInt fit.runnableKmCount
-                                ++ " runnable km · current "
+                            (Translations.calibFlatFrom language fit.runnableKmCount
                                 ++ formatMmss model.profile.flatTrailPaceSecPerKm
                                 ++ " /km"
                             )
@@ -3386,14 +3385,14 @@ viewCalibrationPanel model =
 
                 names ->
                     [ p [ class "text-xs text-slate-500" ]
-                        [ text ("From your linked runs: " ++ String.join ", " names) ]
+                        [ text (Translations.calibContributors language ++ String.join ", " names) ]
                     ]
     in
     div [ class "rounded-2xl bg-slate-900 border border-slate-800 p-5 space-y-3" ]
-        (p [ class "text-sm font-medium text-slate-100" ] [ text "Calibrate from your runs" ]
+        (p [ class "text-sm font-medium text-slate-100" ] [ text (Translations.calibrateTitle language) ]
             :: (if List.isEmpty rows then
                     [ p [ class "text-sm text-slate-500" ]
-                        [ text "Link an actual run to a race (via Strava or a GPX upload) to calibrate your climb rate and flat pace from real data." ]
+                        [ text (Translations.calibrateEmpty language) ]
                     ]
 
                 else
@@ -3405,9 +3404,14 @@ viewCalibrationPanel model =
 viewProfileSettings : Model -> Html Msg
 viewProfileSettings model =
     let
+        language =
+            model.settings.language
+
         prof =
             model.profile
 
+        -- Input `value`s stay `.`-decimal (formatFloat, not Format): they round-trip
+        -- through String.toFloat on edit, so a localized comma would break parsing.
         paceText =
             formatMmss prof.flatTrailPaceSecPerKm
 
@@ -3419,17 +3423,17 @@ viewProfileSettings model =
     in
     div [ class "max-w-screen-md mx-auto mt-8 space-y-6 px-6 pb-12" ]
         [ a [ Route.href Route.Index, class "inline-flex items-center gap-2 text-sm text-slate-400 hover:text-slate-100" ]
-            [ text "← Back to races" ]
+            [ text (Translations.backToRaces language) ]
         , div []
-            [ h1 [ class "text-3xl font-bold tracking-tight text-slate-100" ] [ text "Profile" ]
-            , p2 "Population-tier defaults seed the predictor. Tweak any field; values stick on save."
+            [ h1 [ class "text-3xl font-bold tracking-tight text-slate-100" ] [ text (Translations.profileNav language) ]
+            , p2 (Translations.profileIntro language)
             ]
         , viewIdentityCard model
-        , profilePresetsRow
+        , profilePresetsRow language
         , viewCalibrationPanel model
         , div [ class "rounded-2xl bg-slate-900 border border-slate-800 p-5 space-y-5" ]
-            [ profileFieldRow "Vertical rate"
-                "m / h on moderate climbs (~10-20% grade). Strong mid-pack ≈ 850."
+            [ profileFieldRow (Translations.fieldVertRate language)
+                (Translations.fieldVertRateHint language)
                 (input
                     [ A.type_ "number"
                     , A.value (formatInt prof.verticalRateVmh)
@@ -3440,8 +3444,8 @@ viewProfileSettings model =
                     []
                 )
                 "vm/h"
-            , profileFieldRow "Flat trail pace"
-                "On moderate trail at sustainable effort. Add 30-60 s/km vs road pace."
+            , profileFieldRow (Translations.fieldFlatPace language)
+                (Translations.fieldFlatPaceHint language)
                 (input
                     [ A.type_ "text"
                     , A.value paceText
@@ -3452,8 +3456,8 @@ viewProfileSettings model =
                     []
                 )
                 "/km"
-            , profileFieldRow "Fatigue threshold"
-                "Hours of effort before pace inflation starts."
+            , profileFieldRow (Translations.fieldFatigueThreshold language)
+                (Translations.fieldFatigueThresholdHint language)
                 (input
                     [ A.type_ "number"
                     , A.attribute "step" "0.1"
@@ -3463,9 +3467,9 @@ viewProfileSettings model =
                     ]
                     []
                 )
-                "hours"
-            , profileFieldRow "Fatigue slope"
-                "Pace inflation per hour after the threshold."
+                (Translations.unitHours language)
+            , profileFieldRow (Translations.fieldFatigueSlope language)
+                (Translations.fieldFatigueSlopeHint language)
                 (input
                     [ A.type_ "number"
                     , A.attribute "step" "0.1"
@@ -3476,28 +3480,28 @@ viewProfileSettings model =
                     []
                 )
                 "% / h"
-            , profileFieldRow "Descent skill"
-                "Faster descenders run technical downhill closer to runnable pace."
+            , profileFieldRow (Translations.fieldDescentSkill language)
+                (Translations.fieldDescentSkillHint language)
                 (profileSelect ProfileSetDescentSkill
-                    (List.map (\d -> ( AthleteProfile.descentSkillLabel d, AthleteProfile.descentSkillLabel d == AthleteProfile.descentSkillLabel prof.descentSkill )) AthleteProfile.allDescentSkills)
+                    (List.map (\d -> ( AthleteProfile.descentSkillLabel d, Translations.descentSkill language d, AthleteProfile.descentSkillLabel d == AthleteProfile.descentSkillLabel prof.descentSkill )) AthleteProfile.allDescentSkills)
                 )
                 ""
-            , profileFieldRow "Technicality"
-                "Slows flat pace on rooty / rocky terrain."
+            , profileFieldRow (Translations.fieldTechnicality language)
+                (Translations.fieldTechnicalityHint language)
                 (profileSelect ProfileSetTechSkill
-                    (List.map (\t -> ( AthleteProfile.techSkillLabel t, AthleteProfile.techSkillLabel t == AthleteProfile.techSkillLabel prof.technicalitySkill )) AthleteProfile.allTechSkills)
+                    (List.map (\t -> ( AthleteProfile.techSkillLabel t, Translations.techSkill language t, AthleteProfile.techSkillLabel t == AthleteProfile.techSkillLabel prof.technicalitySkill )) AthleteProfile.allTechSkills)
                 )
                 ""
-            , profileFieldRow "Aid stops"
-                "Default time per aid station. Override per race later."
+            , profileFieldRow (Translations.fieldAidStops language)
+                (Translations.fieldAidStopsHint language)
                 (profileSelect ProfileSetAidStyle
-                    (List.map (\a -> ( AthleteProfile.aidStyleLabel a, AthleteProfile.aidStyleLabel a == AthleteProfile.aidStyleLabel prof.aidStyle )) AthleteProfile.allAidStyles)
+                    (List.map (\a -> ( AthleteProfile.aidStyleLabel a, Translations.aidStyle language a, AthleteProfile.aidStyleLabel a == AthleteProfile.aidStyleLabel prof.aidStyle )) AthleteProfile.allAidStyles)
                 )
                 ""
             , div [ class "border-t border-slate-800 pt-5 space-y-5" ]
-                [ p2 "Optional — used by future HR-based calibration. Leave empty if you don't have the numbers."
-                , profileFieldRow "Lactate threshold HR"
-                    "Approx 95% of max HR for trained runners."
+                [ p2 (Translations.hrSectionIntro language)
+                , profileFieldRow (Translations.fieldLthr language)
+                    (Translations.fieldLthrHint language)
                     (input
                         [ A.type_ "number"
                         , A.value (Maybe.map String.fromInt prof.lthrBpm |> Maybe.withDefault "")
@@ -3508,8 +3512,8 @@ viewProfileSettings model =
                         []
                     )
                     "bpm"
-                , profileFieldRow "Max HR"
-                    "Highest sustained beat-rate you've actually hit."
+                , profileFieldRow (Translations.fieldMaxHr language)
+                    (Translations.fieldMaxHrHint language)
                     (input
                         [ A.type_ "number"
                         , A.value (Maybe.map String.fromInt prof.maxHrBpm |> Maybe.withDefault "")
@@ -3524,7 +3528,7 @@ viewProfileSettings model =
             ]
         , div [ class "flex items-center justify-end gap-3" ]
             [ if model.profileSaved then
-                p [ class "text-sm text-emerald-400" ] [ text "Saved ✓" ]
+                p [ class "text-sm text-emerald-400" ] [ text (Translations.savedConfirm language) ]
 
               else
                 text ""
@@ -3532,7 +3536,7 @@ viewProfileSettings model =
                 [ onClick ProfileSave
                 , class "px-4 py-2 bg-rose-600 text-white rounded-md hover:bg-rose-500 text-sm font-medium"
                 ]
-                [ text "Save profile" ]
+                [ text (Translations.saveProfile language) ]
             ]
         , viewStravaSection model
         ]
@@ -3545,17 +3549,21 @@ yet (deferred mint), so it just explains when the name is asked for.
 -}
 viewIdentityCard : Model -> Html Msg
 viewIdentityCard model =
+    let
+        language =
+            model.settings.language
+    in
     div [ class "rounded-2xl bg-slate-900 border border-slate-800 p-5 space-y-3" ]
         [ div []
-            [ p [ class "text-sm font-medium text-slate-100" ] [ text "Your name (for sharing)" ]
+            [ p [ class "text-sm font-medium text-slate-100" ] [ text (Translations.identityCardTitle language) ]
             , p [ class "text-xs text-slate-500 mt-0.5" ]
-                [ text "How collaborators see your changes when you share a plan. Separate from the performance settings below — renaming relabels every plan you own." ]
+                [ text (Translations.identityCardHelp language) ]
             ]
         , case model.me of
             Just m ->
                 div [ class "space-y-3" ]
                     [ p [ class "text-sm text-slate-300" ]
-                        [ text "You are "
+                        [ text (Translations.youArePrefix language)
                         , span [ class "font-semibold text-slate-100" ] [ text m.displayName ]
                         , text "."
                         ]
@@ -3563,43 +3571,47 @@ viewIdentityCard model =
                         [ input
                             [ A.type_ "text"
                             , A.value model.renameDraft
-                            , A.placeholder "New name"
+                            , A.placeholder (Translations.newNamePlaceholder language)
                             , onInput RenameDraftInput
                             , class "flex-1 min-w-40 bg-slate-950 border border-slate-700 rounded-md px-3 py-2 text-sm text-slate-100 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-rose-500/50"
                             ]
                             []
-                        , identityPrimaryButton RenameMeCommit "Rename" (String.trim model.renameDraft == "")
+                        , identityPrimaryButton RenameMeCommit (Translations.rename language) (String.trim model.renameDraft == "")
                         ]
                     ]
 
             Nothing ->
                 p [ class "text-sm text-slate-400" ]
-                    [ text "We'll ask for your name the first time you share a plan (export a "
+                    [ text (Translations.identityDeferredPrefix language)
                     , span [ class "text-slate-300" ] [ text ".trail" ]
-                    , text " file)."
+                    , text (Translations.identityDeferredSuffix language)
                     ]
         ]
 
 
 viewStravaSection : Model -> Html Msg
 viewStravaSection model =
+    let
+        language =
+            model.settings.language
+    in
     div [ class "rounded-2xl bg-slate-900 border border-slate-800 p-5 space-y-3" ]
         [ div [ class "flex items-center justify-between gap-4 flex-wrap" ]
             [ div []
-                [ p [ class "text-sm font-medium text-slate-100" ] [ text "Strava integration" ]
+                [ p [ class "text-sm font-medium text-slate-100" ] [ text (Translations.stravaTitle language) ]
                 , p [ class "text-xs text-slate-500 mt-0.5" ]
-                    [ text "Optional. Lets you link a completed race directly from Strava and (later) calibrate the profile from past activities. App works fully offline without it." ]
+                    [ text (Translations.stravaHelp language) ]
                 ]
             , case model.stravaToken of
                 Just _ ->
                     div [ class "flex items-center gap-2" ]
                         [ span [ class "px-2 py-1 text-xs rounded bg-emerald-500/15 text-emerald-300 ring-1 ring-inset ring-emerald-500/30" ]
-                            [ text "Connected" ]
+                            [ text (Translations.connected language) ]
                         , button
                             [ onClick StravaDisconnect
                             , class "px-3 py-1.5 text-sm border border-slate-700 rounded-md hover:bg-slate-800 text-slate-400 hover:text-rose-400"
                             ]
-                            [ text "Disconnect" ]
+                            [ text (Translations.disconnect language) ]
                         ]
 
                 Nothing ->
@@ -3607,29 +3619,29 @@ viewStravaSection model =
                         [ A.href (model.backendUrl ++ "/auth/strava?origin=trail")
                         , class "px-4 py-2 bg-orange-500 text-white rounded-md hover:bg-orange-400 text-sm font-medium"
                         ]
-                        [ text "Connect Strava" ]
+                        [ text (Translations.connectStrava language) ]
             ]
         , p [ class "text-xs text-slate-600" ]
-            [ text ("Backend: " ++ model.backendUrl) ]
+            [ text (Translations.backendPrefix language ++ model.backendUrl) ]
         ]
 
 
-profilePresetsRow : Html Msg
-profilePresetsRow =
+profilePresetsRow : Language -> Html Msg
+profilePresetsRow language =
     div [ class "rounded-2xl bg-slate-900 border border-slate-800 p-4 flex items-center gap-3 flex-wrap" ]
-        [ p [ class "text-xs text-slate-500 uppercase tracking-wider mr-2" ] [ text "Reset to preset" ]
+        [ p [ class "text-xs text-slate-500 uppercase tracking-wider mr-2" ] [ text (Translations.resetToPreset language) ]
         , div [ class "flex items-center gap-2 flex-wrap" ]
-            (List.map presetButton AthleteProfile.allPresets)
+            (List.map (presetButton language) AthleteProfile.allPresets)
         ]
 
 
-presetButton : Preset -> Html Msg
-presetButton preset =
+presetButton : Language -> Preset -> Html Msg
+presetButton language preset =
     button
         [ onClick (ProfilePickPreset preset)
         , class "px-3 py-1.5 text-sm border border-slate-700 rounded-md hover:bg-slate-800 text-slate-200"
         ]
-        [ text (AthleteProfile.presetLabel preset) ]
+        [ text (Translations.preset language preset) ]
 
 
 profileFieldRow : String -> String -> Html Msg -> String -> Html Msg
@@ -3650,19 +3662,23 @@ profileFieldRow lbl hint control suffix =
         ]
 
 
-profileSelect : (String -> Msg) -> List ( String, Bool ) -> Html Msg
+{-| Each option is `(valueKey, displayLabel, selected)`. The option **value** is
+derived from `valueKey` — the canonical English label — so the `onInput` round-trip
+to the update handler is language-independent; only `displayLabel` localizes.
+-}
+profileSelect : (String -> Msg) -> List ( String, String, Bool ) -> Html Msg
 profileSelect toMsg options =
     Html.select
         [ onInput toMsg
         , class "w-full bg-slate-950 border border-slate-800 rounded-md px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-rose-500/60"
         ]
         (List.map
-            (\( lbl, selected ) ->
+            (\( valueKey, displayLabel, selected ) ->
                 Html.option
-                    [ A.value (String.toLower (String.split " " lbl |> List.head |> Maybe.withDefault lbl))
+                    [ A.value (String.toLower (String.split " " valueKey |> List.head |> Maybe.withDefault valueKey))
                     , A.selected selected
                     ]
-                    [ text lbl ]
+                    [ text displayLabel ]
             )
             options
         )
@@ -4848,6 +4864,7 @@ viewProfileSection model track containerWidth markers =
             , track = track
             , containerWidth = containerWidth
             , onSetMode = SetScaleMode
+            , language = model.settings.language
             }
         , Html.Lazy.lazy4 Profile.view track model.scaleMode containerWidth markers
         ]
@@ -5391,6 +5408,9 @@ viewPlanTable model race =
 viewStravaPickerModal : Model -> RaceId -> Html Msg
 viewStravaPickerModal model raceId =
     let
+        language =
+            model.settings.language
+
         sameRace pickerRid =
             raceIdToString pickerRid == raceIdToString raceId
 
@@ -5399,10 +5419,10 @@ viewStravaPickerModal model raceId =
 
         heading =
             if isSearching then
-                "Search Strava activities"
+                Translations.stravaSearchHeading language
 
             else
-                "Recent Strava activities (60 days)"
+                Translations.stravaRecentHeading language
     in
     case model.stravaPicker of
         PickerClosed ->
@@ -5412,14 +5432,14 @@ viewStravaPickerModal model raceId =
             if sameRace pickerRid then
                 modalShell heading
                     (div [ class "space-y-3" ]
-                        [ viewStravaPickerSearch pickerRid model.stravaPickerSearch
+                        [ viewStravaPickerSearch language pickerRid model.stravaPickerSearch
                         , p [ class "text-sm text-slate-500 py-6 text-center" ]
                             [ text
                                 (if isSearching then
-                                    "Searching…"
+                                    Translations.stravaSearching language
 
                                  else
-                                    "Loading recent activities…"
+                                    Translations.stravaLoadingRecent language
                                 )
                             ]
                         ]
@@ -5430,21 +5450,21 @@ viewStravaPickerModal model raceId =
 
         PickerLoadingStreams pickerRid actId ->
             if sameRace pickerRid then
-                modalShell ("Fetching streams for activity " ++ String.fromInt actId ++ "…") (text "")
+                modalShell (Translations.stravaFetchingStreams language actId) (text "")
 
             else
                 text ""
 
         PickerError pickerRid err ->
             if sameRace pickerRid then
-                modalShell "Strava error"
+                modalShell (Translations.stravaError language)
                     (div [ class "space-y-3" ]
                         [ p [ class "text-sm text-rose-400" ] [ text err ]
                         , button
                             [ onClick StravaPickerClose
                             , class "px-4 py-2 text-sm border border-slate-700 rounded-md hover:bg-slate-800 text-slate-100"
                             ]
-                            [ text "Close" ]
+                            [ text (Translations.close language) ]
                         ]
                     )
 
@@ -5455,22 +5475,22 @@ viewStravaPickerModal model raceId =
             if sameRace pickerRid then
                 modalShell heading
                     (div [ class "space-y-3" ]
-                        [ viewStravaPickerSearch pickerRid model.stravaPickerSearch
+                        [ viewStravaPickerSearch language pickerRid model.stravaPickerSearch
                         , div [ class "space-y-2 max-h-[60vh] overflow-y-auto" ]
                             (if List.isEmpty acts then
                                 [ p [ class "text-sm text-slate-400 py-6 text-center" ]
                                     [ text
                                         (if isSearching then
-                                            "No activities match this search."
+                                            Translations.stravaNoMatch language
 
                                          else
-                                            "No activities found in the past 60 days. Try searching."
+                                            Translations.stravaNoneRecent language
                                         )
                                     ]
                                 ]
 
                              else
-                                List.map (viewStravaActivityRow pickerRid) acts
+                                List.map (viewStravaActivityRow language pickerRid) acts
                             )
                         ]
                     )
@@ -5479,13 +5499,13 @@ viewStravaPickerModal model raceId =
                 text ""
 
 
-viewStravaPickerSearch : RaceId -> String -> Html Msg
-viewStravaPickerSearch rid current =
+viewStravaPickerSearch : Language -> RaceId -> String -> Html Msg
+viewStravaPickerSearch language rid current =
     div [ class "relative" ]
         [ input
             [ A.type_ "text"
             , A.value current
-            , A.placeholder "Search activity names · full history"
+            , A.placeholder (Translations.stravaSearchPlaceholder language)
             , onInput (StravaPickerSetSearch rid)
             , class "w-full bg-slate-950 border border-slate-800 rounded-md pl-9 pr-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-rose-500/60"
             ]
@@ -5523,8 +5543,8 @@ stopPropagation =
     E.stopPropagationOn "click" (D.succeed ( ModalNoOp, True ))
 
 
-viewStravaActivityRow : RaceId -> StravaApi.Activity -> Html Msg
-viewStravaActivityRow rid act =
+viewStravaActivityRow : Language -> RaceId -> StravaApi.Activity -> Html Msg
+viewStravaActivityRow language rid act =
     button
         [ onClick (StravaPickerSelect rid act.id)
         , class "w-full text-left px-4 py-3 rounded-lg bg-slate-950 hover:bg-slate-800 border border-slate-800 hover:border-rose-500/60 transition-colors"
@@ -5536,7 +5556,7 @@ viewStravaActivityRow rid act =
             ]
         , p [ class "text-xs text-slate-500 mt-1 tabular-nums" ]
             [ text
-                (formatFloat 2 (act.distance / 1000)
+                (Format.number language 2 (act.distance / 1000)
                     ++ " km · "
                     ++ formatHhmm act.movingTime
                     ++ " · "

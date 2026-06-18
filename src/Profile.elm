@@ -25,12 +25,15 @@ sub-pixel detail isn't visible anyway, and the simplification keeps
 
 -}
 
+import Format
 import Gpx exposing (Track)
 import Html exposing (Html, button, div, span, text)
 import Html.Attributes as A exposing (class, classList)
 import Html.Events exposing (onClick)
+import Language exposing (Language)
 import Svg exposing (Svg, g, line, path, svg, text_)
 import Svg.Attributes as SA
+import Translations
 
 
 
@@ -92,13 +95,14 @@ viewToolbar :
     , track : Track
     , containerWidth : Float
     , onSetMode : ScaleMode -> msg
+    , language : Language
     }
     -> Html msg
 viewToolbar opts =
     div [ class "flex flex-wrap items-center gap-3 mb-3" ]
         [ div [ class "flex items-center gap-1 bg-slate-900 border border-slate-800 rounded-lg p-1" ]
-            [ modeButton "Fit width" (opts.mode == FitWidth) (opts.onSetMode FitWidth)
-            , modeButton "True scale"
+            [ modeButton (Translations.fitWidth opts.language) (opts.mode == FitWidth) (opts.onSetMode FitWidth)
+            , modeButton (Translations.trueScale opts.language)
                 (isTrueScale opts.mode)
                 (opts.onSetMode (defaultTrueScale opts.track opts.containerWidth))
             ]
@@ -110,7 +114,7 @@ viewToolbar opts =
             FitWidth ->
                 text ""
         , div [ class "text-xs text-slate-500 ml-auto" ]
-            [ text (scaleLegend opts.mode opts.track opts.containerWidth) ]
+            [ text (scaleLegend opts.language opts.mode opts.track opts.containerWidth) ]
         ]
 
 
@@ -147,13 +151,13 @@ presetButton current onSetMode value =
         [ text (String.fromInt value ++ " m/px") ]
 
 
-scaleLegend : ScaleMode -> Track -> Float -> String
-scaleLegend mode track containerWidth =
+scaleLegend : Language -> ScaleMode -> Track -> Float -> String
+scaleLegend language mode track containerWidth =
     let
         mpp =
             metersPerPixel mode track.totalDist containerWidth
     in
-    "1 px = " ++ formatFloat 1 mpp ++ " m (both axes · 1:1)"
+    Translations.elevationLegend language (Format.number language 1 mpp)
 
 
 
