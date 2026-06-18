@@ -15,6 +15,7 @@
     "smoke:merge": "node scripts/smoke-merge.mjs",
     "smoke:changelog": "node scripts/smoke-changelog.mjs",
     "smoke:identity": "node scripts/smoke-identity.mjs",
+    "smoke:i18n": "node scripts/smoke-i18n.mjs",
     "perf:trace": "node scripts/profile-trace.mjs"
   },
   "devDependencies": {
