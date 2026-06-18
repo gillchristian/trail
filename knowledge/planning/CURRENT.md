@@ -14,20 +14,18 @@
 **Notes:** scope cuts, links, anything decided while planning.
 ```
 
-### TASK-059 — WI-2: `Settings` + persistence + footer toggle
+### TASK-060 — WI-3 + WI-5 (language half): `Context` + `Format`
 
-**Source:** BACKLOG (i18n epic). **Deps:** TASK-058 (done, PR #128).
-**Branch:** `feat/task-059-settings-persistence`
+**Source:** BACKLOG (i18n epic). **Deps:** TASK-058, TASK-059 (both done — PR #128, #130).
+**Branch:** `feat/task-060-context-format`
 **Acceptance criteria:**
-- [ ] `Settings.elm` exposes `Settings { language }`, `defaultSettings` (`English`), `settingsDecoder` (per-field `D.oneOf` default), `encodeSettings`.
-- [ ] A v1/partial settings blob with **no `language` field decodes to `English`** without error (verify: `smoke:i18n` decodes `{}` → English).
-- [ ] Round-trip `encodeSettings >> decodeValue settingsDecoder` is identity for both languages (verify: `smoke:i18n`).
-- [ ] First-run (null IDB record) resolves browser language by subtag: `"es-AR"`/`"es"` → Spanish, `"en-US"` → English, unknown → English (verify: `smoke:i18n` over a `Settings.resolveFirstRun`-style helper).
-- [ ] `saveSettings` port persists to the `settings` IDB store under `deviceSettings`; flags carry `settings : D.Value` + `browserLanguage`; the JS boot awaits the settings read before `Elm.Main.init` (verify: storage smoke extended with a settings round-trip; build).
-- [ ] Footer right side shows an `English / Español` toggle (no flags); clicking it switches `model.settings.language`, emits exactly one `saveSettings`, and mutates no `.trail`/race data; `<html lang>` tracks it (verify: code review + **manual browser check** — switch, reload, choice sticks; first run on an `es-*` browser defaults to Spanish).
-- [ ] CI green: type-check, `npm run build`, `npm run smoke`, `npm run smoke:i18n`.
+- [ ] New `Context { language }` + `toContext : Model -> Context`. **`Context` lives in its own module** (`Context.elm`), not `Main` — `Format` takes a `Context`, and `Main` imports `Format`, so a `Context` defined in `Main` would cycle. Leaf localized views take `Context` (or its `.language`), never `model.settings`.
+- [ ] `Format.elm` localizes **decimal quantities** — Spanish renders `,`, English `.` — by wrapping trail's existing hand-rolled rounding (no `myrho/elm-round` dep). Colon-formatted values (pace `M:SS`, clock) are **unchanged** in both languages. **No unit conversion** (descoped). Each formatter total over `Language`.
+- [ ] The *display* call sites for distances + decimal floats route through `Format` (threaded via `Context`); **CSV / GPX / `.trail` formatters are left untouched** (data interchange keeps `.`-decimals).
+- [ ] Visible proof: with the footer toggle on Spanish, a distance shows `42,2 km`; on English `42.2 km`; pace/clock keep `:` in both (verify: `smoke:i18n` Format ops + **manual browser check**).
+- [ ] `smoke:i18n` extended with `Format` ops (Spanish comma, English period, colon-neutral pace/clock). CI green: type-check, build, `smoke`, `smoke:i18n`.
 
-**Notes:** Reuse the existing `settings` IDB store (key `deviceSettings`), not a new store. New outbound port `saveSettings : E.Value -> Cmd msg` + a JS `put` handler; on save (and at boot) the JS also sets `document.documentElement.lang` so `<html lang>` tracks the choice without a second port. First-run subtag match: `String.left 2 browserLanguage |> Language.fromCode |> Maybe.withDefault English`. **No visible localized output yet** — the toggle flips a stored value; `Context`/`Format` (TASK-060) make the change visible (decimals) and `Translations` (061+) localize the words. Add a `settings`-store round-trip to `scripts/smoke-storage.mjs` (mirrors `main.js`). Spec WI-2; ADR-0014. On close, pull TASK-060.
+**Notes:** Module shape that avoids cycles — `Context.elm` imports `Language`; `Format.elm` imports `Context` + `Language`; `Main` imports both; `toContext` in `Main`. `Format` takes `Context` (not bare `Language`) so the descoped `units` (TASK-070) reads `ctx.units` later with no signature churn. `Translations` (TASK-061) will take `Language` directly (words never depend on units). Decimal-localization surface is **small** — distances (`formatKm`/`formatKmShort`) + a few decimal floats; integers (elevation in m, HR) and colon values need no swap (per the formatting audit). This is the first task that makes a toggle visibly *do* something. Spec WI-3 + WI-5; ADR-0014. On close, pull TASK-061.
 
 ---
 
