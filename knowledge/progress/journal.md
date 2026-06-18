@@ -2378,3 +2378,73 @@ exits), and the apply path (`resolve` fold + the custom-value note set →
 `withPlanningLayer` → save → bump → `Merged` feed entries). Held a clean checkpoint
 at slice 1 rather than rush the arc's largest UI tired; it needs in-browser
 verification regardless (like the WI-4 feed / WI-5 flows / the home view).
+
+---
+## 2026-06-17 — TASK-056 slice 2: merge UI (DONE) → coach-collab arc COMPLETE
+
+The capstone. **PR #123, merged `4287ee6`** → TASK-056 done → the whole
+coach-collaboration arc (WI-1→WI-5 + the merge UI) is shipped and user-verified.
+
+**What slice 2 shipped:** the live merge. Entry point in `StartParse` —
+`findShareMatch` routes a returned `.trail` (matching `shareId`) to merge, not
+import-as-new (a course mismatch hard-blocks per WI-1); `classifyVersions` →
+FastForward adopts theirs, disjoint Diverged auto-merges, true-conflict Diverged
+opens the modal, Same/Behind no-op. Apply path: fold `Merge.resolve` (+
+`Merge.setNote` for hand-merged prose) → `withPlanningLayer` → advance version +
+ancestor → union the other side's history (WI-4) + a person-named `Merged` marker
+→ save. The review **modal** (ADR-0013): person-named, residue-only + reassurance,
+two equal identity-tinted options (no red/green), forced choice, hand-merge
+textarea for prose, two reject exits with confirm-only-if-picks.
+
+**Independent review before hand-off caught a data-loss bug** — a Diverged merge
+with no recorded ancestor fell back to `base = local layer`, which makes the
+engine resolve every field to *theirs* with zero conflicts → silent loss of local
+edits. Fixed: neutral empty base (surfaces differences as conflicts to review).
+Plus history union, the suggester-name fallback (the file owner is *me* in the
+coach flow, so "whose suggestions" = the last non-me author), and a fast-forward
+version advance.
+
+**Three rounds of in-browser feedback from the user, all addressed:**
+1. *How do I merge?* — there's no "update" button; it's the regular home-page
+   import (matching `shareId` → merge). Documented the two-context test setup
+   (the version vector is `deviceId`-keyed, so a single browser can't represent
+   two editors — use normal + incognito).
+2. *Card polish* — times were raw seconds → `Merge.showSeconds` now formats at
+   the coarsest frame (`5m` / `5:30` / `13:59:00`); only km notes got the
+   hand-merge textarea → generalized to all prose (`setKmNote`→`setNote`, keyed
+   on the conflict: race notes / km note / aid notes); services now render as
+   icons.
+3. *Crash on Apply* (the important one) — `_VirtualDom_addDomNodesHelp`
+   "childNodes of undefined", repeating every frame until reload. **"Works after
+   reload" = the merge SAVED fine; it was a transient patch crash, not data.**
+   Root cause: Apply tore down the full-screen modal + reordered the race list +
+   navigated in **one** update; the synchronous nav raced the vdom patch ahead of
+   the modal teardown and corrupted it. Unique to merge-Apply (delete/identity
+   modals close without nav; normal nav has no modal). **Fixed by deferring the
+   nav a tick** (`NavigateTo` via `Process.sleep`, mirroring `GotContent` →
+   `StartParse`) so the teardown render commits first. Lesson worth keeping:
+   *don't tear down a full-screen overlay and navigate in the same update — let
+   the teardown render commit, then navigate.*
+
+**Verified:** all 8 smokes + type-check + build green throughout (engine via
+`smoke:merge`; `setNote` rides the tested `updateKm`); the full
+import→classify→review→apply flow + the card polish + the crash fix confirmed
+in-browser by the user ("I think we are good to go").
+
+**Delivery:** PR #123, merged `4287ee6` (slice 1: #121, `f330d68`). Close PR (this
+entry + DONE/BACKLOG + CURRENT emptied): `docs/task-056-close`.
+
+**Arc retrospective.** Coach collaboration, Layer-0, accountless, offline: share a
+`.trail` → annotate → import back → three-way merge with a person-named review
+surface. Shipped across 11 tasks (046–051, 053–056) + 5 ADRs (0009–0013), each
+sliced pure-core-first so the engine/codecs are headlessly smoke-tested and only
+the genuinely-visual surfaces went to the user for in-browser verification. The
+recurring wins: model outcomes as types not runtime failures (the merge never
+"fails"); freeze the course, merge the plan (structurally enforced); label by
+person not role (WI-5); and adversarially review the big/destructive slices
+before hand-off (it caught real data-loss bugs in both 054 and 056).
+
+**Next:** **no active task** — the active backlog is exhausted. The candidates
+are the parking lot (light/dark, multi-language, GAP descent slider, per-km
+gain/loss) and roadmap §7's remaining calibration fits (paused). None is
+prioritized; await the user's steer rather than auto-promoting.
