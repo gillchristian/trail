@@ -4061,8 +4061,8 @@ viewRaceCard ctx maybeCoords race =
         , button
             [ onClick (RequestDelete race.id)
             , class "absolute top-3 right-3 w-8 h-8 rounded-full bg-slate-950/70 text-slate-500 hover:text-rose-400 hover:bg-slate-950 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-sm"
-            , A.attribute "aria-label" "Delete race"
-            , A.title "Delete race"
+            , A.attribute "aria-label" (Translations.deleteRaceAction ctx.language)
+            , A.title (Translations.deleteRaceAction ctx.language)
             ]
             [ text "✕" ]
         ]
@@ -7901,11 +7901,15 @@ viewDeleteModal model =
         ( Just rid, LoadedRaces races ) ->
             case findRace rid races of
                 Just race ->
+                    let
+                        language =
+                            model.settings.language
+                    in
                     viewModal
-                        { title = "Delete race?"
-                        , body = "This will remove “" ++ race.name ++ "” and any planning data attached to it. This cannot be undone."
-                        , confirmLabel = "Delete"
-                        , cancelLabel = "Cancel"
+                        { title = Translations.deleteRaceTitle language
+                        , body = Translations.deleteRaceBody language race.name
+                        , confirmLabel = Translations.delete language
+                        , cancelLabel = Translations.cancel language
                         }
 
                 Nothing ->
@@ -7945,6 +7949,10 @@ at a time — driven by `model.identityFlow`.
 -}
 viewIdentityModals : Model -> Html Msg
 viewIdentityModals model =
+    let
+        language =
+            model.settings.language
+    in
     case model.identityFlow of
         FlowIdle ->
             text ""
@@ -7954,76 +7962,76 @@ viewIdentityModals model =
                 ( subtitle, confirmLabel ) =
                     case after of
                         ThenExport _ ->
-                            ( "Your plans and changes are labelled with this name when you share them. You can rename yourself any time on the Profile page."
-                            , "Save & export"
+                            ( Translations.nameSubtitleExport language
+                            , Translations.saveAndExport language
                             )
 
                         ThenImportReviewer _ ->
-                            ( "So your suggestions on this plan are attributed to you."
-                            , "Save & import"
+                            ( Translations.nameSubtitleReviewer language
+                            , Translations.saveAndImport language
                             )
 
                 disabled =
                     String.trim model.nameDraft == ""
             in
-            identityModalShell "What's your name?"
+            identityModalShell (Translations.whatsYourName language)
                 [ p [ class "text-sm text-slate-400" ] [ text subtitle ]
                 , input
                     [ A.type_ "text"
                     , A.value model.nameDraft
-                    , A.placeholder "e.g. Alex"
+                    , A.placeholder (Translations.namePlaceholder language)
                     , A.autofocus True
                     , onInput NameDraftInput
                     , class "w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 text-slate-100 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-rose-500/50"
                     ]
                     []
                 , div [ class "flex justify-end gap-2" ]
-                    [ identitySecondaryButton NamePromptCancel "Cancel"
+                    [ identitySecondaryButton NamePromptCancel (Translations.cancel language)
                     , identityPrimaryButton NamePromptConfirm confirmLabel disabled
                     ]
                 ]
 
         FlowOwnership pending ->
-            identityModalShell "Whose plan is this?"
+            identityModalShell (Translations.whosePlan language)
                 [ p [ class "text-sm text-slate-400" ]
                     [ text "“"
                     , span [ class "text-slate-200" ] [ text pending.draft.name ]
-                    , text ("” was shared by " ++ pending.ownerName ++ ".")
+                    , text (Translations.ownershipSharedBy language pending.ownerName)
                     ]
                 , button
                     [ onClick (OwnershipChoose Identity.Myself)
                     , class "w-full text-left px-4 py-3 rounded-lg bg-slate-950 hover:bg-slate-800 border border-slate-800 hover:border-rose-500/60 transition-colors"
                     ]
-                    [ p [ class "font-medium text-slate-100" ] [ text ("I'm " ++ pending.ownerName) ]
-                    , p [ class "text-xs text-slate-500 mt-0.5" ] [ text "Claim it as yours — this device is recognized as the same person." ]
+                    [ p [ class "font-medium text-slate-100" ] [ text (Translations.imOwner language pending.ownerName) ]
+                    , p [ class "text-xs text-slate-500 mt-0.5" ] [ text (Translations.imOwnerDesc language) ]
                     ]
                 , button
                     [ onClick (OwnershipChoose Identity.SomeoneElse)
                     , class "w-full text-left px-4 py-3 rounded-lg bg-slate-950 hover:bg-slate-800 border border-slate-800 hover:border-rose-500/60 transition-colors"
                     ]
-                    [ p [ class "font-medium text-slate-100" ] [ text "Someone else's plan" ]
-                    , p [ class "text-xs text-slate-500 mt-0.5" ] [ text ("Import it as " ++ pending.ownerName ++ "'s — you're reviewing.") ]
+                    [ p [ class "font-medium text-slate-100" ] [ text (Translations.someoneElsesPlan language) ]
+                    , p [ class "text-xs text-slate-500 mt-0.5" ] [ text (Translations.someoneElsesDesc language pending.ownerName) ]
                     ]
                 , div [ class "flex justify-end" ]
-                    [ identitySecondaryButton OwnershipCancel "Cancel" ]
+                    [ identitySecondaryButton OwnershipCancel (Translations.cancel language) ]
                 ]
 
         FlowLink pending ->
             let
                 myName =
-                    model.me |> Maybe.map .displayName |> Maybe.withDefault "someone"
+                    model.me |> Maybe.map .displayName |> Maybe.withDefault (Translations.someone language)
             in
-            identityModalShell "Link this device?"
+            identityModalShell (Translations.linkDeviceTitle language)
                 [ p [ class "text-sm text-slate-400" ]
-                    [ text ("This device is already " ++ myName ++ ". Link it to ")
+                    [ text (Translations.linkBodyPrefix language myName)
                     , span [ class "text-slate-200" ] [ text pending.ownerName ]
-                    , text " so they're recognized as the same person?"
+                    , text (Translations.linkBodySuffix language)
                     ]
                 , p [ class "text-xs text-slate-500" ]
-                    [ text ("Your plans on this device move to " ++ pending.ownerName ++ "'s identity. Use this when you've imported your own plan from another device.") ]
+                    [ text (Translations.linkExplain language pending.ownerName) ]
                 , div [ class "flex justify-end gap-2" ]
-                    [ identitySecondaryButton LinkCancel "Not now"
-                    , identityPrimaryButton LinkConfirm "Link" False
+                    [ identitySecondaryButton LinkCancel (Translations.notNow language)
+                    , identityPrimaryButton LinkConfirm (Translations.link language) False
                     ]
                 ]
 
@@ -8080,6 +8088,9 @@ viewMergeReview model =
 
         Just review ->
             let
+                language =
+                    model.settings.language
+
                 name =
                     suggesterName model.me
                         (Identity.mergeDirectory review.filePeople model.directory)
@@ -8095,19 +8106,9 @@ viewMergeReview model =
                 [ div [ class "max-w-lg w-full max-h-full bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl flex flex-col" ]
                     [ div [ class "flex items-start justify-between gap-3 px-6 py-4 border-b border-slate-800" ]
                         [ div [ class "min-w-0" ]
-                            [ h2 [ class "text-lg font-semibold text-slate-100" ] [ text (name ++ "’s suggestions") ]
+                            [ h2 [ class "text-lg font-semibold text-slate-100" ] [ text (Translations.suggestionsTitle language name) ]
                             , p [ class "text-xs text-slate-500 mt-0.5" ]
-                                [ text
-                                    (String.fromInt n
-                                        ++ (if n == 1 then
-                                                " change overlaps"
-
-                                            else
-                                                " changes overlap"
-                                           )
-                                        ++ " with edits you made"
-                                    )
-                                ]
+                                [ text (Translations.changesOverlap language n) ]
                             ]
                         , button
                             [ onClick MergeKeepMine
@@ -8119,48 +8120,35 @@ viewMergeReview model =
                         div [ class "px-6 pt-3" ]
                             [ p [ class "flex items-start gap-2 text-xs text-emerald-300/90 bg-emerald-500/10 rounded-lg px-3 py-2" ]
                                 [ span [ class "shrink-0" ] [ text "✓" ]
-                                , text
-                                    (String.fromInt review.autoMergedCount
-                                        ++ (if review.autoMergedCount == 1 then
-                                                " other change from "
-
-                                            else
-                                                " other changes from "
-                                           )
-                                        ++ name
-                                        ++ (if review.autoMergedCount == 1 then
-                                                " was added automatically."
-
-                                            else
-                                                " were added automatically."
-                                           )
-                                    )
+                                , text (Translations.autoMerged language review.autoMergedCount name)
                                 ]
                             ]
 
                       else
                         text ""
                     , div [ class "flex-1 overflow-y-auto px-6 py-4 space-y-3" ]
-                        (List.indexedMap (viewConflictCard name review) review.conflicts)
-                    , viewMergeFooter review chosen n
+                        (List.indexedMap (viewConflictCard language name review) review.conflicts)
+                    , viewMergeFooter language review chosen n
                     ]
                 ]
 
 
-viewConflictCard : String -> MergeReview -> Int -> Merge.Conflict -> Html Msg
-viewConflictCard name review i conflict =
+viewConflictCard : Language -> String -> MergeReview -> Int -> Merge.Conflict -> Html Msg
+viewConflictCard language name review i conflict =
     let
         choice =
             Dict.get i review.choices
     in
     div [ class "rounded-xl border border-slate-800 bg-slate-950/50 p-3 space-y-2" ]
+        -- conflict.label ("Target pace · km 14") is built in Merge.elm; localizing
+        -- it needs Language in the merge layer — deferred to TASK-069.
         [ p [ class "text-xs font-medium text-slate-400" ] [ text conflict.label ]
         , if isProseConflict conflict.key then
-            viewNoteMerge name i conflict choice
+            viewNoteMerge language name i conflict choice
 
           else
             div [ class "grid grid-cols-1 sm:grid-cols-2 gap-2" ]
-                [ mergeOption (MergePickMine i) "You" "text-sky-300" conflict.mine (choice == Just ChooseMine)
+                [ mergeOption (MergePickMine i) (Translations.you language) "text-sky-300" conflict.mine (choice == Just ChooseMine)
                 , mergeOption (MergePickTheirs i) name "text-amber-300" conflict.theirs (choice == Just ChooseTheirs)
                 ]
         ]
@@ -8214,8 +8202,8 @@ mergeOption msg who tone val selected =
 
 {-| A same-km-note overlap (Q-U3): both versions shown for reference, plus an
 editable textarea pre-filled with the two combined to splice. -}
-viewNoteMerge : String -> Int -> Merge.Conflict -> Maybe MergeChoice -> Html Msg
-viewNoteMerge name i conflict choice =
+viewNoteMerge : Language -> String -> Int -> Merge.Conflict -> Maybe MergeChoice -> Html Msg
+viewNoteMerge language name i conflict choice =
     let
         current =
             case choice of
@@ -8228,7 +8216,7 @@ viewNoteMerge name i conflict choice =
     div [ class "space-y-2" ]
         [ div [ class "grid grid-cols-2 gap-2" ]
             [ div []
-                [ p [ class "text-xs font-semibold text-sky-300" ] [ text "You" ]
+                [ p [ class "text-xs font-semibold text-sky-300" ] [ text (Translations.you language) ]
                 , p [ class "text-xs text-slate-500 break-words" ] [ text (mergeValueOrDash conflict.mine) ]
                 ]
             , div []
@@ -8243,7 +8231,7 @@ viewNoteMerge name i conflict choice =
             , class "w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-rose-500/50"
             ]
             []
-        , p [ class "text-[11px] text-slate-500" ] [ text "Edit to combine both notes." ]
+        , p [ class "text-[11px] text-slate-500" ] [ text (Translations.editToCombine language) ]
         ]
 
 
@@ -8256,24 +8244,24 @@ mergeValueOrDash v =
         v
 
 
-viewMergeFooter : MergeReview -> Int -> Int -> Html Msg
-viewMergeFooter review chosen n =
+viewMergeFooter : Language -> MergeReview -> Int -> Int -> Html Msg
+viewMergeFooter language review chosen n =
     div [ class "px-6 py-4 border-t border-slate-800" ]
         (if review.confirmingDiscard then
-            [ p [ class "text-sm text-slate-300 mb-3" ] [ text "Discard your choices and keep your own version?" ]
+            [ p [ class "text-sm text-slate-300 mb-3" ] [ text (Translations.discardConfirm language) ]
             , div [ class "flex justify-end gap-2" ]
-                [ identitySecondaryButton MergeCancelDiscard "Keep editing"
-                , identityPrimaryButton MergeConfirmDiscard "Discard" False
+                [ identitySecondaryButton MergeCancelDiscard (Translations.keepEditing language)
+                , identityPrimaryButton MergeConfirmDiscard (Translations.discard language) False
                 ]
             ]
 
          else
             [ div [ class "flex items-center justify-between gap-3" ]
                 [ p [ class "text-xs text-slate-500 tabular-nums" ]
-                    [ text (String.fromInt chosen ++ " of " ++ String.fromInt n ++ " chosen") ]
+                    [ text (Translations.chosenOfN language chosen n) ]
                 , div [ class "flex gap-2" ]
-                    [ identitySecondaryButton MergeKeepMine "Keep my version"
-                    , identityPrimaryButton MergeApply "Apply changes" (chosen < n)
+                    [ identitySecondaryButton MergeKeepMine (Translations.keepMyVersion language)
+                    , identityPrimaryButton MergeApply (Translations.applyChanges language) (chosen < n)
                     ]
                 ]
             ]
@@ -8285,7 +8273,7 @@ viewErrorToast model =
     case model.storageError of
         Just err ->
             div [ class "fixed bottom-6 right-6 z-50 max-w-sm bg-rose-600/20 border border-rose-500/60 text-rose-100 rounded-lg p-4 text-sm shadow-lg" ]
-                [ p [ class "font-medium" ] [ text "Storage error" ]
+                [ p [ class "font-medium" ] [ text (Translations.storageErrorTitle model.settings.language) ]
                 , p [ class "mt-1 text-xs opacity-80" ] [ text err ]
                 ]
 

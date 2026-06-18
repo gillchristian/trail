@@ -3003,3 +3003,369 @@ relativeAgo language magnitude =
 
         Spanish ->
             "hace " ++ magnitude
+
+
+
+-- MODALS + TOASTS (TASK-068)
+
+
+deleteRaceTitle : Language -> String
+deleteRaceTitle language =
+    case language of
+        English ->
+            "Delete race?"
+
+        Spanish ->
+            "¿Eliminar carrera?"
+
+
+deleteRaceBody : Language -> String -> String
+deleteRaceBody language raceName =
+    case language of
+        English ->
+            "This will remove “" ++ raceName ++ "” and any planning data attached to it. This cannot be undone."
+
+        Spanish ->
+            "Esto eliminará “" ++ raceName ++ "” y todos los datos de planificación asociados. No se puede deshacer."
+
+
+delete : Language -> String
+delete language =
+    case language of
+        English ->
+            "Delete"
+
+        Spanish ->
+            "Eliminar"
+
+
+{-| Accessible label for the race-card delete button (aria-label + title).
+-}
+deleteRaceAction : Language -> String
+deleteRaceAction language =
+    case language of
+        English ->
+            "Delete race"
+
+        Spanish ->
+            "Eliminar carrera"
+
+
+storageErrorTitle : Language -> String
+storageErrorTitle language =
+    case language of
+        English ->
+            "Storage error"
+
+        Spanish ->
+            "Error de almacenamiento"
+
+
+
+-- Identity flows
+
+
+whatsYourName : Language -> String
+whatsYourName language =
+    case language of
+        English ->
+            "What's your name?"
+
+        Spanish ->
+            "¿Cómo te llamas?"
+
+
+nameSubtitleExport : Language -> String
+nameSubtitleExport language =
+    case language of
+        English ->
+            "Your plans and changes are labelled with this name when you share them. You can rename yourself any time on the Profile page."
+
+        Spanish ->
+            "Tus planes y cambios se etiquetan con este nombre al compartirlos. Puedes renombrarte cuando quieras en la página de Perfil."
+
+
+nameSubtitleReviewer : Language -> String
+nameSubtitleReviewer language =
+    case language of
+        English ->
+            "So your suggestions on this plan are attributed to you."
+
+        Spanish ->
+            "Para que tus sugerencias en este plan se te atribuyan."
+
+
+saveAndExport : Language -> String
+saveAndExport language =
+    case language of
+        English ->
+            "Save & export"
+
+        Spanish ->
+            "Guardar y exportar"
+
+
+saveAndImport : Language -> String
+saveAndImport language =
+    case language of
+        English ->
+            "Save & import"
+
+        Spanish ->
+            "Guardar e importar"
+
+
+namePlaceholder : Language -> String
+namePlaceholder language =
+    case language of
+        English ->
+            "e.g. Alex"
+
+        Spanish ->
+            "p. ej. Alex"
+
+
+whosePlan : Language -> String
+whosePlan language =
+    case language of
+        English ->
+            "Whose plan is this?"
+
+        Spanish ->
+            "¿De quién es este plan?"
+
+
+{-| Suffix after the quoted plan name: "” was shared by <owner>."
+-}
+ownershipSharedBy : Language -> String -> String
+ownershipSharedBy language owner =
+    case language of
+        English ->
+            "” was shared by " ++ owner ++ "."
+
+        Spanish ->
+            "” lo compartió " ++ owner ++ "."
+
+
+imOwner : Language -> String -> String
+imOwner language owner =
+    case language of
+        English ->
+            "I'm " ++ owner
+
+        Spanish ->
+            "Soy " ++ owner
+
+
+imOwnerDesc : Language -> String
+imOwnerDesc language =
+    case language of
+        English ->
+            "Claim it as yours — this device is recognized as the same person."
+
+        Spanish ->
+            "Reclámalo como tuyo — este dispositivo se reconoce como la misma persona."
+
+
+someoneElsesPlan : Language -> String
+someoneElsesPlan language =
+    case language of
+        English ->
+            "Someone else's plan"
+
+        Spanish ->
+            "El plan de otra persona"
+
+
+someoneElsesDesc : Language -> String -> String
+someoneElsesDesc language owner =
+    case language of
+        English ->
+            "Import it as " ++ owner ++ "'s — you're reviewing."
+
+        Spanish ->
+            "Impórtalo como de " ++ owner ++ " — estás revisando."
+
+
+linkDeviceTitle : Language -> String
+linkDeviceTitle language =
+    case language of
+        English ->
+            "Link this device?"
+
+        Spanish ->
+            "¿Vincular este dispositivo?"
+
+
+{-| "This device is already <myName>. Link it to " — the owner name (a span) and
+the suffix follow.
+-}
+linkBodyPrefix : Language -> String -> String
+linkBodyPrefix language myName =
+    case language of
+        English ->
+            "This device is already " ++ myName ++ ". Link it to "
+
+        Spanish ->
+            "Este dispositivo ya es " ++ myName ++ ". Vincúlalo a "
+
+
+linkBodySuffix : Language -> String
+linkBodySuffix language =
+    case language of
+        English ->
+            " so they're recognized as the same person?"
+
+        Spanish ->
+            " para que se reconozcan como la misma persona?"
+
+
+linkExplain : Language -> String -> String
+linkExplain language owner =
+    case language of
+        English ->
+            "Your plans on this device move to " ++ owner ++ "'s identity. Use this when you've imported your own plan from another device."
+
+        Spanish ->
+            "Tus planes en este dispositivo pasan a la identidad de " ++ owner ++ ". Úsalo cuando hayas importado tu propio plan desde otro dispositivo."
+
+
+notNow : Language -> String
+notNow language =
+    case language of
+        English ->
+            "Not now"
+
+        Spanish ->
+            "Ahora no"
+
+
+link : Language -> String
+link language =
+    case language of
+        English ->
+            "Link"
+
+        Spanish ->
+            "Vincular"
+
+
+
+-- Merge review
+
+
+{-| Modal title: "<name>'s suggestions".
+-}
+suggestionsTitle : Language -> String -> String
+suggestionsTitle language name =
+    case language of
+        English ->
+            name ++ "’s suggestions"
+
+        Spanish ->
+            "Sugerencias de " ++ name
+
+
+changesOverlap : Language -> Int -> String
+changesOverlap language count =
+    case language of
+        English ->
+            String.fromInt count
+                ++ plural count { one = " change overlaps", other = " changes overlap" }
+                ++ " with edits you made"
+
+        Spanish ->
+            String.fromInt count
+                ++ plural count { one = " cambio coincide", other = " cambios coinciden" }
+                ++ " con tus ediciones"
+
+
+{-| "M other change(s) from <name> was/were added automatically." (compound plural).
+-}
+autoMerged : Language -> Int -> String -> String
+autoMerged language count name =
+    case language of
+        English ->
+            String.fromInt count
+                ++ plural count { one = " other change from ", other = " other changes from " }
+                ++ name
+                ++ plural count { one = " was added automatically.", other = " were added automatically." }
+
+        Spanish ->
+            "Se "
+                ++ plural count { one = "agregó", other = "agregaron" }
+                ++ " automáticamente "
+                ++ String.fromInt count
+                ++ plural count { one = " cambio más de ", other = " cambios más de " }
+                ++ name
+                ++ "."
+
+
+editToCombine : Language -> String
+editToCombine language =
+    case language of
+        English ->
+            "Edit to combine both notes."
+
+        Spanish ->
+            "Edita para combinar ambas notas."
+
+
+discardConfirm : Language -> String
+discardConfirm language =
+    case language of
+        English ->
+            "Discard your choices and keep your own version?"
+
+        Spanish ->
+            "¿Descartar tus elecciones y conservar tu versión?"
+
+
+keepEditing : Language -> String
+keepEditing language =
+    case language of
+        English ->
+            "Keep editing"
+
+        Spanish ->
+            "Seguir editando"
+
+
+discard : Language -> String
+discard language =
+    case language of
+        English ->
+            "Discard"
+
+        Spanish ->
+            "Descartar"
+
+
+chosenOfN : Language -> Int -> Int -> String
+chosenOfN language chosen total =
+    case language of
+        English ->
+            String.fromInt chosen ++ " of " ++ String.fromInt total ++ " chosen"
+
+        Spanish ->
+            String.fromInt chosen ++ " de " ++ String.fromInt total ++ " elegidas"
+
+
+keepMyVersion : Language -> String
+keepMyVersion language =
+    case language of
+        English ->
+            "Keep my version"
+
+        Spanish ->
+            "Conservar mi versión"
+
+
+applyChanges : Language -> String
+applyChanges language =
+    case language of
+        English ->
+            "Apply changes"
+
+        Spanish ->
+            "Aplicar cambios"
