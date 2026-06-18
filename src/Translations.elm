@@ -16,6 +16,7 @@ title. Later surface tasks (TASK-062–068) append their strings here.
 
 -}
 
+import AthleteProfile exposing (AidStyle(..), DescentSkill(..), Preset(..), TechSkill(..))
 import Language exposing (Language(..))
 import Route exposing (Route)
 import Types exposing (Service(..))
@@ -2220,3 +2221,706 @@ aidStationsInKm language =
 
         Spanish ->
             "Avituallamientos en este km"
+
+
+
+-- PROFILE PAGE (TASK-066)
+
+
+profileIntro : Language -> String
+profileIntro language =
+    case language of
+        English ->
+            "Population-tier defaults seed the predictor. Tweak any field; values stick on save."
+
+        Spanish ->
+            "Los valores por nivel poblacional alimentan el predictor. Ajusta cualquier campo; se guardan al guardar."
+
+
+resetToPreset : Language -> String
+resetToPreset language =
+    case language of
+        English ->
+            "Reset to preset"
+
+        Spanish ->
+            "Restablecer a preset"
+
+
+saveProfile : Language -> String
+saveProfile language =
+    case language of
+        English ->
+            "Save profile"
+
+        Spanish ->
+            "Guardar perfil"
+
+
+savedConfirm : Language -> String
+savedConfirm language =
+    case language of
+        English ->
+            "Saved ✓"
+
+        Spanish ->
+            "Guardado ✓"
+
+
+fieldVertRate : Language -> String
+fieldVertRate language =
+    case language of
+        English ->
+            "Vertical rate"
+
+        Spanish ->
+            "Ritmo vertical"
+
+
+fieldVertRateHint : Language -> String
+fieldVertRateHint language =
+    case language of
+        English ->
+            "m / h on moderate climbs (~10-20% grade). Strong mid-pack ≈ 850."
+
+        Spanish ->
+            "m / h en subidas moderadas (~10-20% de pendiente). Intermedio avanzado ≈ 850."
+
+
+fieldFlatPace : Language -> String
+fieldFlatPace language =
+    case language of
+        English ->
+            "Flat trail pace"
+
+        Spanish ->
+            "Ritmo en llano"
+
+
+fieldFlatPaceHint : Language -> String
+fieldFlatPaceHint language =
+    case language of
+        English ->
+            "On moderate trail at sustainable effort. Add 30-60 s/km vs road pace."
+
+        Spanish ->
+            "En sendero moderado a esfuerzo sostenible. Suma 30-60 s/km respecto al ritmo en asfalto."
+
+
+fieldFatigueThreshold : Language -> String
+fieldFatigueThreshold language =
+    case language of
+        English ->
+            "Fatigue threshold"
+
+        Spanish ->
+            "Umbral de fatiga"
+
+
+fieldFatigueThresholdHint : Language -> String
+fieldFatigueThresholdHint language =
+    case language of
+        English ->
+            "Hours of effort before pace inflation starts."
+
+        Spanish ->
+            "Horas de esfuerzo antes de que el ritmo empiece a inflarse."
+
+
+fieldFatigueSlope : Language -> String
+fieldFatigueSlope language =
+    case language of
+        English ->
+            "Fatigue slope"
+
+        Spanish ->
+            "Pendiente de fatiga"
+
+
+fieldFatigueSlopeHint : Language -> String
+fieldFatigueSlopeHint language =
+    case language of
+        English ->
+            "Pace inflation per hour after the threshold."
+
+        Spanish ->
+            "Inflación del ritmo por hora tras el umbral."
+
+
+fieldDescentSkill : Language -> String
+fieldDescentSkill language =
+    case language of
+        English ->
+            "Descent skill"
+
+        Spanish ->
+            "Habilidad en bajada"
+
+
+fieldDescentSkillHint : Language -> String
+fieldDescentSkillHint language =
+    case language of
+        English ->
+            "Faster descenders run technical downhill closer to runnable pace."
+
+        Spanish ->
+            "Quienes bajan más rápido corren las bajadas técnicas a un ritmo más cercano al corrible."
+
+
+fieldTechnicality : Language -> String
+fieldTechnicality language =
+    case language of
+        English ->
+            "Technicality"
+
+        Spanish ->
+            "Tecnicidad"
+
+
+fieldTechnicalityHint : Language -> String
+fieldTechnicalityHint language =
+    case language of
+        English ->
+            "Slows flat pace on rooty / rocky terrain."
+
+        Spanish ->
+            "Ralentiza el ritmo en llano sobre terreno con raíces / rocas."
+
+
+fieldAidStops : Language -> String
+fieldAidStops language =
+    case language of
+        English ->
+            "Aid stops"
+
+        Spanish ->
+            "Paradas en avituallamiento"
+
+
+fieldAidStopsHint : Language -> String
+fieldAidStopsHint language =
+    case language of
+        English ->
+            "Default time per aid station. Override per race later."
+
+        Spanish ->
+            "Tiempo por defecto en cada avituallamiento. Ajústalo por carrera más tarde."
+
+
+hrSectionIntro : Language -> String
+hrSectionIntro language =
+    case language of
+        English ->
+            "Optional — used by future HR-based calibration. Leave empty if you don't have the numbers."
+
+        Spanish ->
+            "Opcional — para una futura calibración por FC. Déjalo vacío si no tienes los datos."
+
+
+fieldLthr : Language -> String
+fieldLthr language =
+    case language of
+        English ->
+            "Lactate threshold HR"
+
+        Spanish ->
+            "FC umbral de lactato"
+
+
+fieldLthrHint : Language -> String
+fieldLthrHint language =
+    case language of
+        English ->
+            "Approx 95% of max HR for trained runners."
+
+        Spanish ->
+            "Aprox. 95% de la FC máxima en corredores entrenados."
+
+
+fieldMaxHr : Language -> String
+fieldMaxHr language =
+    case language of
+        English ->
+            "Max HR"
+
+        Spanish ->
+            "FC máxima"
+
+
+fieldMaxHrHint : Language -> String
+fieldMaxHrHint language =
+    case language of
+        English ->
+            "Highest sustained beat-rate you've actually hit."
+
+        Spanish ->
+            "La frecuencia más alta que realmente has sostenido."
+
+
+unitHours : Language -> String
+unitHours language =
+    case language of
+        English ->
+            "hours"
+
+        Spanish ->
+            "horas"
+
+
+
+-- CALIBRATION PANEL
+
+
+calibrateTitle : Language -> String
+calibrateTitle language =
+    case language of
+        English ->
+            "Calibrate from your runs"
+
+        Spanish ->
+            "Calibra desde tus actividades"
+
+
+calibrateEmpty : Language -> String
+calibrateEmpty language =
+    case language of
+        English ->
+            "Link an actual run to a race (via Strava or a GPX upload) to calibrate your climb rate and flat pace from real data."
+
+        Spanish ->
+            "Vincula una actividad real a una carrera (por Strava o subiendo un GPX) para calibrar tu ritmo de ascenso y tu ritmo en llano con datos reales."
+
+
+calibClimbRate : Language -> String
+calibClimbRate language =
+    case language of
+        English ->
+            "Climb rate "
+
+        Spanish ->
+            "Ritmo de ascenso "
+
+
+calibFlatPace : Language -> String
+calibFlatPace language =
+    case language of
+        English ->
+            "Flat pace "
+
+        Spanish ->
+            "Ritmo en llano "
+
+
+{-| " — from N climb km · current " (the value + unit follow).
+-}
+calibClimbFrom : Language -> Int -> String
+calibClimbFrom language n =
+    case language of
+        English ->
+            " — from " ++ String.fromInt n ++ " climb km · current "
+
+        Spanish ->
+            " — de " ++ String.fromInt n ++ " km de subida · actual "
+
+
+{-| " — from N runnable km · current " (the value + unit follow).
+-}
+calibFlatFrom : Language -> Int -> String
+calibFlatFrom language n =
+    case language of
+        English ->
+            " — from " ++ String.fromInt n ++ " runnable km · current "
+
+        Spanish ->
+            " — de " ++ String.fromInt n ++ " km corribles · actual "
+
+
+calibContributors : Language -> String
+calibContributors language =
+    case language of
+        English ->
+            "From your linked runs: "
+
+        Spanish ->
+            "De tus actividades vinculadas: "
+
+
+apply : Language -> String
+apply language =
+    case language of
+        English ->
+            "Apply"
+
+        Spanish ->
+            "Aplicar"
+
+
+
+-- IDENTITY CARD
+
+
+identityCardTitle : Language -> String
+identityCardTitle language =
+    case language of
+        English ->
+            "Your name (for sharing)"
+
+        Spanish ->
+            "Tu nombre (para compartir)"
+
+
+identityCardHelp : Language -> String
+identityCardHelp language =
+    case language of
+        English ->
+            "How collaborators see your changes when you share a plan. Separate from the performance settings below — renaming relabels every plan you own."
+
+        Spanish ->
+            "Cómo ven tus cambios los colaboradores cuando compartes un plan. Es independiente de los ajustes de rendimiento de abajo — renombrar reetiqueta cada plan que posees."
+
+
+{-| "You are <name>." — split so the name renders bold between the two parts.
+-}
+youArePrefix : Language -> String
+youArePrefix language =
+    case language of
+        English ->
+            "You are "
+
+        Spanish ->
+            "Eres "
+
+
+newNamePlaceholder : Language -> String
+newNamePlaceholder language =
+    case language of
+        English ->
+            "New name"
+
+        Spanish ->
+            "Nombre nuevo"
+
+
+rename : Language -> String
+rename language =
+    case language of
+        English ->
+            "Rename"
+
+        Spanish ->
+            "Renombrar"
+
+
+{-| Pre-identity hint: split around the ".trail" span. Prefix + suffix.
+-}
+identityDeferredPrefix : Language -> String
+identityDeferredPrefix language =
+    case language of
+        English ->
+            "We'll ask for your name the first time you share a plan (export a "
+
+        Spanish ->
+            "Te pediremos tu nombre la primera vez que compartas un plan (al exportar un "
+
+
+identityDeferredSuffix : Language -> String
+identityDeferredSuffix language =
+    case language of
+        English ->
+            " file)."
+
+        Spanish ->
+            ")."
+
+
+
+-- STRAVA
+
+
+stravaTitle : Language -> String
+stravaTitle language =
+    case language of
+        English ->
+            "Strava integration"
+
+        Spanish ->
+            "Integración con Strava"
+
+
+stravaHelp : Language -> String
+stravaHelp language =
+    case language of
+        English ->
+            "Optional. Lets you link a completed race directly from Strava and (later) calibrate the profile from past activities. App works fully offline without it."
+
+        Spanish ->
+            "Opcional. Te permite vincular una carrera terminada directamente desde Strava y (más adelante) calibrar el perfil con actividades pasadas. La app funciona sin conexión sin ella."
+
+
+connected : Language -> String
+connected language =
+    case language of
+        English ->
+            "Connected"
+
+        Spanish ->
+            "Conectado"
+
+
+disconnect : Language -> String
+disconnect language =
+    case language of
+        English ->
+            "Disconnect"
+
+        Spanish ->
+            "Desconectar"
+
+
+connectStrava : Language -> String
+connectStrava language =
+    case language of
+        English ->
+            "Connect Strava"
+
+        Spanish ->
+            "Conectar Strava"
+
+
+backendPrefix : Language -> String
+backendPrefix language =
+    case language of
+        English ->
+            "Backend: "
+
+        Spanish ->
+            "Backend: "
+
+
+
+-- STRAVA ACTIVITY PICKER (deferred from TASK-065)
+
+
+stravaSearchHeading : Language -> String
+stravaSearchHeading language =
+    case language of
+        English ->
+            "Search Strava activities"
+
+        Spanish ->
+            "Buscar actividades de Strava"
+
+
+stravaRecentHeading : Language -> String
+stravaRecentHeading language =
+    case language of
+        English ->
+            "Recent Strava activities (60 days)"
+
+        Spanish ->
+            "Actividades recientes de Strava (60 días)"
+
+
+stravaSearching : Language -> String
+stravaSearching language =
+    case language of
+        English ->
+            "Searching…"
+
+        Spanish ->
+            "Buscando…"
+
+
+stravaLoadingRecent : Language -> String
+stravaLoadingRecent language =
+    case language of
+        English ->
+            "Loading recent activities…"
+
+        Spanish ->
+            "Cargando actividades recientes…"
+
+
+stravaFetchingStreams : Language -> Int -> String
+stravaFetchingStreams language actId =
+    case language of
+        English ->
+            "Fetching streams for activity " ++ String.fromInt actId ++ "…"
+
+        Spanish ->
+            "Obteniendo datos de la actividad " ++ String.fromInt actId ++ "…"
+
+
+stravaError : Language -> String
+stravaError language =
+    case language of
+        English ->
+            "Strava error"
+
+        Spanish ->
+            "Error de Strava"
+
+
+close : Language -> String
+close language =
+    case language of
+        English ->
+            "Close"
+
+        Spanish ->
+            "Cerrar"
+
+
+stravaNoMatch : Language -> String
+stravaNoMatch language =
+    case language of
+        English ->
+            "No activities match this search."
+
+        Spanish ->
+            "Ninguna actividad coincide con esta búsqueda."
+
+
+stravaNoneRecent : Language -> String
+stravaNoneRecent language =
+    case language of
+        English ->
+            "No activities found in the past 60 days. Try searching."
+
+        Spanish ->
+            "No se encontraron actividades en los últimos 60 días. Prueba a buscar."
+
+
+stravaSearchPlaceholder : Language -> String
+stravaSearchPlaceholder language =
+    case language of
+        English ->
+            "Search activity names · full history"
+
+        Spanish ->
+            "Buscar por nombre de actividad · historial completo"
+
+
+
+-- ELEVATION TOOLBAR (Profile.elm)
+
+
+fitWidth : Language -> String
+fitWidth language =
+    case language of
+        English ->
+            "Fit width"
+
+        Spanish ->
+            "Ajustar al ancho"
+
+
+trueScale : Language -> String
+trueScale language =
+    case language of
+        English ->
+            "True scale"
+
+        Spanish ->
+            "Escala real"
+
+
+{-| Elevation legend: "1 px = <mpp> m (both axes · 1:1)". `mpp` is preformatted.
+-}
+elevationLegend : Language -> String -> String
+elevationLegend language mpp =
+    case language of
+        English ->
+            "1 px = " ++ mpp ++ " m (both axes · 1:1)"
+
+        Spanish ->
+            "1 px = " ++ mpp ++ " m (ambos ejes · 1:1)"
+
+
+
+-- ATHLETE-PROFILE display labels (localized; the English `AthleteProfile.*Label`
+-- stays the canonical value/selection key — see the profile <select> round-trip).
+
+
+preset : Language -> Preset -> String
+preset language p =
+    case language of
+        English ->
+            AthleteProfile.presetLabel p
+
+        Spanish ->
+            case p of
+                Beginner ->
+                    "Principiante"
+
+                MidPack ->
+                    "Intermedio"
+
+                StrongMidPack ->
+                    "Intermedio avanzado"
+
+                SubElite ->
+                    "Subélite"
+
+
+descentSkill : Language -> DescentSkill -> String
+descentSkill language d =
+    case language of
+        English ->
+            AthleteProfile.descentSkillLabel d
+
+        Spanish ->
+            case d of
+                DescCautious ->
+                    "Cauteloso"
+
+                DescAverage ->
+                    "Normal"
+
+                DescConfident ->
+                    "Seguro"
+
+                DescExpert ->
+                    "Experto"
+
+
+techSkill : Language -> TechSkill -> String
+techSkill language t =
+    case language of
+        English ->
+            AthleteProfile.techSkillLabel t
+
+        Spanish ->
+            case t of
+                TechNovice ->
+                    "Principiante"
+
+                TechAverage ->
+                    "Normal"
+
+                TechExperienced ->
+                    "Con experiencia"
+
+                TechExpert ->
+                    "Experto"
+
+
+aidStyle : Language -> AidStyle -> String
+aidStyle language a =
+    case language of
+        English ->
+            AthleteProfile.aidStyleLabel a
+
+        Spanish ->
+            case a of
+                AidElite ->
+                    "Élite (1 min)"
+
+                AidLean ->
+                    "Ágil (3 min)"
+
+                AidStandard ->
+                    "Estándar (7-8 min)"
+
+                AidRelaxed ->
+                    "Relajado (15 min)"
