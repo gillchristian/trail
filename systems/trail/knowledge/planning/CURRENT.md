@@ -14,26 +14,25 @@
 **Notes:** scope cuts, links, anything decided while planning.
 ```
 
-### MONO-004 — Workspace + parallelism wiring (PR 4, final)
+### (no active task) — monorepo migration COMPLETE ✅
 
-**Source:** BACKLOG — Monorepo migration epic (spec `reference/specs/monorepo-migration-spec.md`, MONO-004)
-**Branch:** `mono/mono-004-parallelism-wiring`
-**Preconditions:** MONO-001 & MONO-002 merged. ✓ (Both on master.)
-**Goal:** document the parallel-agent operating model. **No root workspace** — each system stays
-self-contained (Locked decision 13). Mostly root-manifest additions + confirming CI path-filtering;
-the last migration PR.
+The **monorepo migration epic (MONO-000 → MONO-004) is COMPLETE** (2026-06-24). Trail is now one
+system in a five-system monorepo (`systems/{trail,cadence,gateway,track,reflect}`) on a two-tier
+federated knowledge base (shared root `framework/` + root manifest; per-system v3 instances).
 
-**Acceptance criteria:**
-- [ ] **No root `package.json`/`node_modules`** — confirm none exists; each system installs/builds from its own dir (no root install step).
-- [ ] Root manifest documents: the **worktree-per-agent** flow (one git worktree per active agent/system; shared object store + branch namespace); the branch-prefix + id-ns table (already present — confirm); cross-system status as a **read-time projection** over per-system `progress/` (already present — confirm); the **shared-tier-edits-only-via-`MONO-`** discipline (already present — confirm). Add what's missing (the worktree flow + CI-filtering note).
-- [ ] **CI path-filtered per system:** the fly workflow is gateway-only (`systems/gateway/**`, done MONO-002); the Vercel projects skip on no-change-to-their-root (trail + cadence). Documented in the root manifest.
-- [ ] Each system builds standalone from its own dir (re-confirm trail + gateway + cadence; no root install step).
-- [ ] **Two-worktree no-collision:** reason through / demonstrate two agents on two worktrees (e.g. `trail/…` + `gateway/…`) branch + edit their own planning/progress + open PRs with zero file-write or branch-namespace collision (disjoint dirs + disjoint branch prefixes + per-system planning).
-- [ ] Both Vercel projects build green rooted at their own system dir, **no** "include files outside the Root Directory" needed (self-contained). Note: trail's "include files outside root" toggle is currently ON — flag as optional user cleanup (OFF is the self-contained target).
+- **MONO-000** framework v2→v3 path indirection · **MONO-001** trail → `systems/trail/` ·
+  **MONO-002** cadence import → `systems/cadence` + `systems/gateway` (bootstrap FF merge; deployed) ·
+  **MONO-003** track + reflect knowledge stubs · **MONO-004** parallelism & workspace wiring.
+  All merged; full record in `DONE.md` + the journal. Contract: `reference/specs/monorepo-migration-spec.md`.
+- **Deploys live + confirmed:** gateway on fly (app `cadence`, `data` volume/`tokens.db` intact);
+  trail + cadence on Vercel, each rooted at its own `systems/<s>/` dir.
+- **Optional cleanup (non-blocking):** trail's Vercel "include files outside the Root Directory"
+  toggle is ON — it can be turned OFF (trail is self-contained); a dashboard step, no rush.
 
-**Notes:** Much of the root-manifest parallelism content (system index, shared-tier discipline,
-no-shared-status) already landed in MONO-001 — MONO-004 adds the **worktree-per-agent flow** + the
-**CI-filtering** doc + the parallelism verification, then **closes the migration epic**.
+**No active task.** New work is **per-system**: pull it into that system's own `CURRENT.md` under its
+branch prefix (`trail/`/`TRAIL-`, `cadence/`/`CAD-`, `gateway/`/`GW-`, `track/`/`TRACK-`,
+`reflect/`/`REFLECT-`); shared/structural work is a `MONO-` task. **Pull the next item only on a fresh
+user steer.** Open follow-ups: reflect's scope (its BLOCKER-001), and trail's own parked items below.
 
 ---
 

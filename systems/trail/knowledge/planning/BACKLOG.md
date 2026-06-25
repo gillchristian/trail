@@ -135,12 +135,12 @@ never done autonomously.
   sequence + `.trace`/`.trail` contract pointers; reflect brief records
   scope-not-yet-defined + an Unknowns list. May land any time after MONO-001. Spec
   MONO-003. — (S/M) — ✓ PR #156, merged `89d4215`
-- [ ] MONO-004 — **PR 4: workspace + parallelism wiring.** No root workspace (each
+- [x] MONO-004 — **PR 4: workspace + parallelism wiring.** No root workspace (each
   system self-contained, Locked decision 13). Root manifest documents the
   worktree-per-agent flow, the branch-prefix/id-namespace table, cross-system
   status as a read-time projection, and the shared-tier-edits-only-via-`MONO-`
   discipline. CI path-filtered per system. Preconditions: MONO-001 & MONO-002.
-  Spec MONO-004. — (M)
+  Spec MONO-004. — (M) — ✓ PR #158, merged `f8dbf4a` — **monorepo migration epic COMPLETE**
 
 ## Parking lot
 
