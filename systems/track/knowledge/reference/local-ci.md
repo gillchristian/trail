@@ -1,53 +1,45 @@
 # Local CI / build commands — track
 
-Verification commands for track, run **from the system's own dir** (`systems/track/`). This file
-grows as the toolchain lands (TRACK-000 → 001+). Mark each command **verified** (run, output quoted)
-vs **pending**.
+Verification commands for track. The Xcode project lives at `systems/track/Track/` — run the
+`xcodebuild`/`simctl` commands from there. Mark each **verified** (run, output quoted) vs **pending**.
 
-## Toolchain
+## Toolchain (verified 2026-06-25)
 
 - **Platform:** macOS 14.3 (Sonoma), Apple Silicon.
-- **Swift (language):** 5.10 via Command Line Tools (`swift --version`). **✅ verified.**
-- **Xcode (app):** _not yet installed_ — only Command Line Tools today, so no `xcodebuild` / iOS SDK
-  / Simulator. **⏳ pending** (TRACK-000 Phase B). **macOS 14.3 caps Xcode at 15.3** (bundles the
-  **iOS 17.4 SDK** — covers our iOS 17 target); Xcode 15.4 / 16.x require macOS 14.5+ and the App
-  Store only offers the newest (26.x → macOS 26.2). Install 15.3 via `xcodes install 15.3` or Apple
-  Developer Downloads, then record `xcodebuild -version` here.
+- **Swift (language):** 5.10 via Command Line Tools. **✅**
+- **Xcode:** **15.3 (15E204a)** — `xcode-select -p` → `/Applications/Xcode.app/Contents/Developer`;
+  **iOS 17.4 SDK** + **iOS 17.4 simulator runtime** (21E213). *macOS 14.3 caps Xcode at 15.3* (15.4 /
+  16.x need 14.5+; the App Store only offers the newest, 26.x → macOS 26.2), so 15.3 came from Apple
+  Developer Downloads; the simulator runtime is a separate ~7 GB `xcodebuild -downloadPlatform iOS`.
+- **Project:** standard Xcode project (ADR-0001) at `Track/Track.xcodeproj`; scheme **`Track`**;
+  bundle id **`com.gillchristian.Track`**. Deployment target = wizard default **17.4**; **TRACK-001
+  pins it** per ADR-0001.
 
-## ✅ Verified now (CLT Swift, no Xcode)
+## ✅ Verified — Swift language smoke (no Xcode)
 
-- **Language smoke** — value types + enum-with-associated-values + `Codable` round-trip (the
-  event-log spine): `swift <file>.swift`. Confirmed on 2026-06-25:
-  ```
-  encoded 2 events → 191 bytes JSON
-  decoded 2 events; first kind = raceStarted
-  Swift language toolchain OK ✓ (enum-with-associated-values Codable synthesis works)
-  ```
+Value types + enum-with-associated-values + `Codable` round-trip (the event-log spine):
+`swift <file>.swift` → `encoded 2 events → 191 bytes JSON` / `decoded 2 events` (2026-06-25).
 
-## ⏳ Pending Xcode (TRACK-000 Phase B — verify + fill the real names)
+## ✅ Verified — build + run in the iOS Simulator
 
-Once Xcode is installed and the project exists, run these from `systems/track/` and replace
-`<App>` / `<bundle-id>` with the real scheme/bundle id (`xcodebuild -list` shows the scheme;
-`xcrun simctl list devices available` shows simulator names — `iPhone 15` assumed below):
+Run from `systems/track/Track/`. Exact flow used for TRACK-000 (screenshot:
+`../knowledge/reference/design/track-000-hello-simulator.png`):
 
 ```sh
-# record the version
-xcodebuild -version
+# build for the Simulator (universal arm64+x86_64; no signing needed for the simulator)
+xcodebuild build -project Track.xcodeproj -scheme Track \
+  -sdk iphonesimulator -configuration Debug -derivedDataPath build CODE_SIGNING_ALLOWED=NO
+# → ** BUILD SUCCEEDED **   (product: build/Build/Products/Debug-iphonesimulator/Track.app)
 
-# build for the Simulator
-xcodebuild build -project <App>.xcodeproj -scheme <App> \
-  -destination 'platform=iOS Simulator,name=iPhone 15' -derivedDataPath build
+# boot a simulator (the default device set is created with the runtime; name or UDID both work)
+xcrun simctl bootstatus "iPhone 15" -b && open -a Simulator
 
-# run it in the Simulator + capture a screenshot (the WI-acceptance proof)
-xcrun simctl boot "iPhone 15" 2>/dev/null; open -a Simulator
-xcrun simctl install booted build/Build/Products/Debug-iphonesimulator/<App>.app
-xcrun simctl launch booted <bundle-id>
-xcrun simctl io booted screenshot knowledge/reference/design/track-001-skeleton.png
-
-# tests (once they exist — WI-2+)
-xcodebuild test -project <App>.xcodeproj -scheme <App> \
-  -destination 'platform=iOS Simulator,name=iPhone 15'
+# install + launch + screenshot
+xcrun simctl install booted build/Build/Products/Debug-iphonesimulator/Track.app
+xcrun simctl launch booted com.gillchristian.Track
+xcrun simctl io booted screenshot shot.png
 ```
 
-> The Simulator needs **no Apple ID / paid account** (unsigned runs are fine). A free Apple ID for
-> personal on-device signing only matters when testing on a real iPhone (later).
+> `build/` + Xcode per-user state are gitignored (`systems/track/.gitignore`). The Simulator needs
+> no Apple ID. Tests run with the first real suite (WI-2):
+> `xcodebuild test -project Track.xcodeproj -scheme Track -destination 'platform=iOS Simulator,name=iPhone 15'`.
