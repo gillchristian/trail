@@ -2903,3 +2903,43 @@ deliberate descope), TASK-071 (`section.label` split). Intentional English-by-de
 exports, dynamic error detail, format hints, unit suffixes, compact Δ headers, S/M/L/XL
 letters, proper nouns.
 **Next:** **no active task.** Await a fresh user steer (CURRENT updated).
+
+---
+## 2026-06-24 — MONO-000: framework v2→v3 path indirection (PR 0)
+
+**Task:** MONO-000 — PR 0 of the monorepo migration (spec `reference/monorepo-migration-spec.md`).
+**What I did:** Ingested the migration spec as the `MONO-` epic (MONO-000..004) in BACKLOG +
+parked the contract under `reference/`. Then the framework v2→v3 change (Strategy B / path
+indirection): replaced every `../{planning,progress,decisions,reference,whiteboard}/`
+path-literal in `knowledge/framework/` with **role names** ("the planning area", "the
+journal", "the manifest"); documented the role/Locations mechanism + a no-hardcoded-paths
+rule in `framework/README.md`; added the **Locations block** to `SETUP.md`'s manifest
+skeleton, generalized the install guard, and deferred the CLAUDE skeleton to Locations;
+stamped **Framework v3 (2026-06-24)** with a changelog. Updated trail's manifest
+(`knowledge/README.md` — Locations block with current pre-move paths + Framework copy v3)
+and `CLAUDE.md` (reading line cites Locations; instance-area non-negotiables defer to it).
+No file moves, no new systems.
+**What I verified (quoted):**
+- AC#1 `grep -rnE '\.\./(planning|progress|decisions|reference|whiteboard)/' knowledge/framework/` → empty.
+- AC#2 `grep -riE '\btrail\b|\belm\b|batman|gillchristian|coros|samples/' knowledge/framework/` → empty.
+- Gate 1 `npx elm make src/Main.elm --output=/dev/null` → `Success!`
+- Gate 2 `npm run build` → `✓ built in 1.06s` (dist/ index.html + hashed JS/CSS).
+- Gate 3 `npm run smoke` → `SMOKE PASSED · v5 schema…`
+- Gate 4 `npm run smoke:aidcsv` → `PASS — all aid-csv checks green`
+- Cold-read dry-run: a fresh agent reads `CLAUDE.md` (hardcodes manifest + framework paths) →
+  the manifest's Locations resolves all six roles (framework/planning/progress/decisions/
+  reference/whiteboard → `knowledge/*`) → `framework/README.md` refers to areas by role names
+  that exactly match the Locations keys, so every area resolves with zero prior context. ✓
+**What changed:** 10 files (framework ×6, manifest, CLAUDE, BACKLOG, CURRENT) + new
+`reference/monorepo-migration-spec.md`. PR #152, merged `f2b0bd9` (squash). Close PR carries
+this entry + DONE + BACKLOG tick + CURRENT→MONO-001.
+**What I learned:** The "one hardcoded hop" is really two bootstrap anchors — `CLAUDE.md`
+must hardcode BOTH the manifest path AND the framework path (you can't read the manifest's
+Locations until you've found the manifest, and you can't follow the framework's reading
+order without its path). What Locations resolves is the *five instance areas*; framework +
+manifest are the fixed anchors. Kept conventional filenames (`CURRENT.md`/`BACKLOG.md`/
+`journal.md`) as-is — the indirection is about *area location*, not filenames, so prose
+stays readable and the acceptance grep (which targets `../area/`) stays the real bar.
+**Next:** MONO-001 — restructure trail into `systems/trail/` (history-preserving `git mv` +
+knowledge-tier split + manifest split). Pulled into CURRENT. Flag its Vercel Root-Directory
+user-action when the PR is ready.
