@@ -1,12 +1,12 @@
 # Delivery
 
 How verified work leaves my working tree. This is the framework's pluggable
-piece: every project declares exactly **one delivery mode** in its manifest
-(`knowledge/README.md`), and only that profile's rules below apply to me.
+piece: every project declares exactly **one delivery mode** in its manifest,
+and only that profile's rules below apply to me.
 
 > **If the manifest declares no delivery mode, the mode is `none`.** I never
 > assume version-control liberties that were not declared. If the declaration
-> is missing, I flag it in `progress/blockers.md` and work under `none`.
+> is missing, I flag it in the blockers log and work under `none`.
 
 ## Reading rules
 
@@ -34,7 +34,7 @@ The user can grant delivery liberties beyond the enabled mode for a single
 task ("you may make several commits for this one"). The contract:
 
 1. **Written down before acted on.** An override is in effect only once it is
-   recorded in the task's entry in `planning/CURRENT.md`:
+   recorded in the task's entry in the planning area's `CURRENT.md`:
    `**Delivery override:** <granted behavior> — user, YYYY-MM-DD`.
    A grant that lives only in conversation does not survive a session restart
    or context compaction. If it isn't written down, it isn't in effect.
@@ -69,8 +69,8 @@ I own the full cycle: branch, commit, open the PR, merge it.
    changelog — usually one `CURRENT.md` task.
 3. **Branch off the latest default branch.** Fetch/pull before branching.
 4. **Iterate freely on the branch.** Commit early and often. Local CI (the
-   project's recorded commands — see `reference/local-ci.md`) must pass
-   before the PR opens.
+   project's recorded commands — see the reference area's `local-ci.md`) must
+   pass before the PR opens.
 5. **Merge my own PRs** once CI is green and the description is complete —
    this profile assumes a repo where I'm authorized to (solo repos, usually).
    Merge strategy: whatever the manifest declares; default `--squash`.
@@ -83,11 +83,11 @@ Examples: `feat/task-007-user-auth`, `fix/task-012-trailing-slash-redirect`.
 
 ### The full cycle for one PR
 
-1. **Pull the task** into `planning/CURRENT.md`. Write acceptance criteria.
+1. **Pull the task** into the planning area's `CURRENT.md`. Write acceptance criteria.
 2. **Branch** from the up-to-date default branch.
 3. **Implement, committing as I go.** Each commit leaves the branch in a sane state.
-4. **Run local CI** (the commands in `reference/local-ci.md`), plus a manual
-   smoke test where applicable (the `verification.md` gates still apply).
+4. **Run local CI** (the commands in the reference area's `local-ci.md`), plus a
+   manual smoke test where applicable (the `verification.md` gates still apply).
 5. **If CI fails, fix on the branch.** Don't open a red PR.
 6. **Open the PR** (e.g. `gh pr create`): title imperative ≤ 72 chars
    mirroring the task; body from the template below; identity/attribution per
@@ -187,7 +187,7 @@ This profile is also the usual target of a per-task override granted inside a
 ## Profile: `none` — I never mutate version control
 
 The user owns version control entirely. "Deliver" means: the verified change
-sits in the working tree, and the planning/journal files say exactly what
+sits in the working tree, and the planning and journal files say exactly what
 changed and how it was verified — the user can commit without asking me what
 happened.
 

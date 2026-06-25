@@ -6,19 +6,19 @@ The user is not available. I cannot ask. This document is what I do instead.
 
 Walk down this ladder when blocked. Don't skip rungs.
 
-1. **Re-read the task.** Open `planning/CURRENT.md`. Did I drift from the acceptance criteria? Often the answer is "yes, I'm solving a problem the task didn't ask me to solve."
-2. **Re-read recent journal entries.** `progress/journal.md` (last ~5 entries). Did past-me leave a hint? Did I already try this and learn something?
+1. **Re-read the task.** Open the planning area's `CURRENT.md`. Did I drift from the acceptance criteria? Often the answer is "yes, I'm solving a problem the task didn't ask me to solve."
+2. **Re-read recent journal entries.** The journal (last ~5 entries). Did past-me leave a hint? Did I already try this and learn something?
 3. **Read the code.** Not the code I'm writing — the code around it. Most "I don't know how X works" questions are answered by reading 50 more lines of existing code.
 4. **Read the docs.** For external libraries/APIs, fetch fresh documentation with whatever docs tooling the environment provides (e.g. a context7 MCP server, or the published docs themselves). Training data is stale; published docs are not.
 5. **Reduce the problem.** Build the smallest possible reproduction. If I can't reproduce the bug in isolation, my mental model is wrong somewhere.
 6. **Try the boring option.** When choosing between a clever path and an obvious path, pick obvious. The boring option is reversible; the clever one usually isn't.
-7. **Time-box and pivot.** If 30 minutes of focused effort hasn't moved the needle, stop. Write down (a) what I tried, (b) what I observed, (c) what I currently believe, (d) what would unblock me. Move that to `progress/blockers.md` and pick a different task from the backlog.
+7. **Time-box and pivot.** If 30 minutes of focused effort hasn't moved the needle, stop. Write down (a) what I tried, (b) what I observed, (c) what I currently believe, (d) what would unblock me. Move that to the blockers log (the progress area's `blockers.md`) and pick a different task from the backlog.
 
 ## Classes of "stuck" and the right response
 
 | Symptom | Response |
 |---|---|
-| Ambiguous requirement | Make a reasonable interpretation, log it as an ADR in `decisions/`, continue. Note in `blockers.md` only if the interpretation might be wrong in a way that wastes a lot of work. |
+| Ambiguous requirement | Make a reasonable interpretation, log it as an ADR in the decisions area, continue. Note in the blockers log only if the interpretation might be wrong in a way that wastes a lot of work. |
 | Missing technical info (API key, exact data shape, library choice) | If a sane default exists, take it and log the decision. If no sane default, this is a real blocker — `blockers.md`. |
 | Test failing for unclear reasons | Reduce. Print actual vs expected at the failure point. Don't tweak the test until it passes — find the bug. |
 | Cannot reproduce locally | Don't proceed on faith. Log it as a blocker and work on something else. |
@@ -36,4 +36,4 @@ Walk down this ladder when blocked. Don't skip rungs.
 
 ## The escape hatch
 
-If everything is blocked and I cannot make forward progress on anything: write a clear status summary at the top of `progress/blockers.md` (what's blocked, what I tried, what I need), then stop. Stopping with clear blockers is strictly better than fabricating progress.
+If everything is blocked and I cannot make forward progress on anything: write a clear status summary at the top of the blockers log (what's blocked, what I tried, what I need), then stop. Stopping with clear blockers is strictly better than fabricating progress.

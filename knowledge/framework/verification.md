@@ -10,9 +10,9 @@ For every task, before marking it complete:
 2. **It runs.** The code executes without crashing on the happy path. For libraries: an example import + call works. For CLIs: invoke it. For services: start it and hit it.
 3. **It does the thing.** Demonstrate the behavior end-to-end with a real input and observe a real output. Type-checking is not behavior verification. A passing unit test on a mocked dependency is not behavior verification. Run the actual thing.
 4. **Tests where they earn their keep.** If the logic has branches, edge cases, or is likely to regress, add a test. Don't write tests for trivial getters.
-5. **Type/lint/format clean.** Run the project's checkers — the commands recorded in `reference/local-ci.md`, whichever of these the project actually has; that file is the authority, not this list. Fix what they flag; don't suppress without a reason logged in the journal entry.
+5. **Type/lint/format clean.** Run the project's checkers — the commands recorded in the reference area's `local-ci.md`, whichever of these the project actually has; that file is the authority, not this list. Fix what they flag; don't suppress without a reason logged in the journal entry.
 6. **No new TODOs left behind.** If a TODO is necessary, it goes in `BACKLOG.md` as a real task, not as a comment buried in code.
-7. **Delivered per the project's delivery mode.** Apply the enabled profile's delivery gates (D1, D2, …) in `delivery.md` — the mode is declared in the project manifest (`knowledge/README.md`). This gate cannot be ticked without opening that profile's checklist.
+7. **Delivered per the project's delivery mode.** Apply the enabled profile's delivery gates (D1, D2, …) in `delivery.md` — the mode is declared in the project manifest. This gate cannot be ticked without opening that profile's checklist.
 
 ## How to verify without me lying to myself
 
@@ -28,6 +28,6 @@ The trap: writing code, running it once, seeing no error, declaring victory. Ant
 Before stopping (or at long natural breaks):
 
 - The enabled delivery profile's end-of-session sweep passes? (See `delivery.md` — e.g. tree clean under `pr`, every modified file accounted for under `none`.)
-- `progress/journal.md` has an entry for every task touched this session?
-- `planning/CURRENT.md` reflects reality?
-- Any silent assumptions that should be ADRs in `decisions/`?
+- The journal has an entry for every task touched this session?
+- The planning area's `CURRENT.md` reflects reality?
+- Any silent assumptions that should be ADRs in the decisions area?

@@ -1,10 +1,12 @@
 # Adopting the framework in a new project
 
-> **Guard: is it already installed?** If `knowledge/planning/CURRENT.md`
-> exists in this project, the framework is installed — **stop**. This guide is
-> for first-time adoption only; running it against a live project clobbers
-> real state. Every copy step below is copy-if-absent: never overwrite an
-> existing file.
+> **Guard: is it already installed?** If a `CURRENT.md` already exists for this
+> instance's planning area — for a standalone project that's
+> `knowledge/planning/CURRENT.md`; in general, wherever the manifest's Locations
+> block points — the framework is installed: **stop**. This guide is for
+> first-time adoption only; running it against a live project clobbers real
+> state. Every copy step below is copy-if-absent: never overwrite an existing
+> file.
 
 ## Steps
 
@@ -13,7 +15,7 @@
    framework" in `README.md`).
 2. **Create the instance areas** from the skeletons below:
    `knowledge/{planning,progress,decisions,reference,whiteboard}/`.
-3. **Write the manifest** (`knowledge/README.md`) from its skeleton. The two
+3. **Write the manifest** (`knowledge/README.md`) from its skeleton. The
    decisions that matter:
    - **Delivery mode** (`pr` / `commits` / `none` — see `delivery.md`).
      If unsure, or if the user hasn't said the agent may touch version
@@ -21,16 +23,22 @@
    - **Identity/attribution rules.** Whose name goes on commits/PRs, and
      whether agent attribution is allowed. If unstated: no agent attribution
      (the framework default).
+   - **Locations.** The role → path map (`framework`, `planning`, `progress`,
+     `decisions`, `reference`, `whiteboard`) the framework dereferences. For a
+     standalone project these are the default `knowledge/…` paths created in
+     step 2; declare them explicitly so the framework resolves areas by role
+     rather than assuming a layout.
 4. **Write the project's `CLAUDE.md`** (or extend an existing one) from its
    skeleton: the explicit reading chain plus inlined non-negotiables,
    including the delivery-mode-specific line.
-5. **Fill `reference/project-brief.md`** from the user's description, derive
-   an initial `BACKLOG.md`, pull the first task into `CURRENT.md`. If the
+5. **Fill the brief** (the reference area's `project-brief.md`) from the user's
+   description, derive an initial `BACKLOG.md`, pull the first task into
+   `CURRENT.md`. If the
    user hasn't described the product yet, record what *is* known plus an
    explicit Unknowns list in the brief, log a blocker, and stop after setup —
    don't invent a backlog.
-6. **Record the local CI commands** in `reference/local-ci.md` as soon as
-   they exist; until then leave the stub saying they're undefined.
+6. **Record the local CI commands** in the reference area's `local-ci.md` as
+   soon as they exist; until then leave the stub saying they're undefined.
 7. In the manifest, **record the framework version and upstream**: the
    version is the `Framework vN` line atop `framework/README.md`; the
    upstream is the repo + path this directory was copied from, named so a
@@ -61,6 +69,22 @@ delivery: <pr | commits | none>
 version control — e.g. "never run VCS-mutating commands; the user handles
 git" for `none`>.
 
+## Locations
+
+The role → path map the framework dereferences. It refers to areas by role
+("the planning area", "the journal"); this block says where they live. Paths
+are repo-root-relative. For a standalone project these are the defaults below;
+when one framework copy serves several instances (e.g. a monorepo), each
+instance's manifest points its roles at that instance's own areas while
+`framework` points at the shared copy.
+
+framework:  knowledge/framework
+planning:   knowledge/planning
+progress:   knowledge/progress
+decisions:  knowledge/decisions
+reference:  knowledge/reference
+whiteboard: knowledge/whiteboard
+
 ## Project rules
 
 - **Identity/attribution:** <whose name on commits/PRs; agent attribution
@@ -89,16 +113,16 @@ this project's delivery mode — keep it crisp enough to follow verbatim>
 # CLAUDE.md — <project>
 
 **Read these, in order, before doing anything else:** `knowledge/README.md`
-(the manifest: delivery mode + project rules), `knowledge/framework/README.md`
-(the working system), then the enabled profile in
-`knowledge/framework/delivery.md`. The summary below is just the headline
+(the manifest: delivery mode + Locations + project rules),
+`knowledge/framework/README.md` (the working system), then the enabled profile
+in `knowledge/framework/delivery.md`. The summary below is just the headline
 rules so you can't accidentally violate them while still loading the rest.
 
 ## Non-negotiables
 
-1. **One task at a time.** Pull from `knowledge/planning/CURRENT.md`; if
-   empty, promote the top unchecked item of `knowledge/planning/BACKLOG.md`.
-   Acceptance criteria before code.
+1. **One task at a time.** Pull from the planning area's `CURRENT.md` (the
+   manifest's Locations block says where that is); if empty, promote the top
+   unchecked item of `BACKLOG.md`. Acceptance criteria before code.
 2. **Delivery: <mode>.** <the mode's operative one-liner, verbatim from the
    manifest — e.g. "NEVER run VCS-mutating commands; the user handles git.">
 3. **Attribution:** <the identity rule — e.g. "commits/PRs carry the user's
@@ -106,10 +130,9 @@ rules so you can't accidentally violate them while still loading the rest.
 4. **Verify before declaring done.** Gates in
    `knowledge/framework/verification.md`. Run the program, quote actual
    output, don't confuse "compiles" with "works."
-5. **Journal everything.** Append to `knowledge/progress/journal.md` after
-   every task.
-6. **When stuck, follow `knowledge/framework/when-stuck.md`.** Don't ask the
-   user; log real blockers to `knowledge/progress/blockers.md`, then pivot.
+5. **Journal everything.** Append to the journal after every task.
+6. **When stuck, follow `framework/when-stuck.md`.** Don't ask the user; log
+   real blockers to the blockers log, then pivot.
 ```
 
 ### `planning/CURRENT.md`
