@@ -19,20 +19,12 @@ If this file has entries, **the user needs to see them** as soon as they're back
 
 ## Open
 
-## BLOCKER-001 — Deploy gateway to fly.io (MONO-002) — opened 2026-06-24
-**Task affected:** MONO-002
-**What I need:** run `fly deploy systems/gateway` (fly app `cadence`, unchanged) and confirm `/` health is OK and the `data` volume + `tokens.db` are **intact** (NOT recreated — losing the volume drops live Strava tokens). The image builds locally from the `systems/gateway` context (`docker build` green), so it's a straight cutover.
-**What I observed:** Dockerfile + fly.toml de-`server/`-ed; `dockerfile = 'Dockerfile'`, app stays `cadence` (renaming would orphan the volume — Locked decision 7).
-**Why it's yours:** deploys are manual by decision (Locked decision 15); I don't deploy autonomously.
-**Workaround in place:** none needed — the repo work is landed on `master`; this is the live cutover.
-
-## BLOCKER-002 — Re-point cadence's Vercel project (MONO-002) — opened 2026-06-24
-**Task affected:** MONO-002
-**What I need:** in the **cadence** Vercel project, re-point the Git connection → this monorepo (`gillchristian/trail`) and set Root Directory → `systems/cadence`. Confirm the build goes green and the Strava redirect URL + custom domain + env vars (esp. `VITE_API_URL` → gateway) survive the re-point.
-**What I observed:** cadence's frontend is landed at `systems/cadence/` and builds locally (`npm run build` green, 720 modules). The old cadence repo is now superseded.
-**Why it's yours:** a Vercel dashboard / Git-connection step I can't perform.
-**Workaround in place:** none — purely the deploy re-point.
+_(none)_
 
 ## Resolved
 
-_(none)_
+## BLOCKER-001 — Deploy gateway to fly.io (MONO-002) — opened 2026-06-24 · resolved 2026-06-24
+**Resolution:** user ran `fly deploy systems/gateway` — deploy succeeded, `/` healthy, the `data` volume / `tokens.db` intact (not recreated), and the cadence frontend kept working against the newly deployed server. The flattened-gateway Dockerfile/fly.toml cutover (app stays `cadence`) is live.
+
+## BLOCKER-002 — Re-point cadence's Vercel project (MONO-002) — opened 2026-06-24 · resolved 2026-06-24
+**Resolution:** user re-pointed the cadence Vercel project's Git connection → `gillchristian/trail`, Root Directory `systems/cadence/`. (Worth a glance that the Vercel build is green + the Strava redirect/domain/env survived — local `npm run build` is green, so it should follow.)

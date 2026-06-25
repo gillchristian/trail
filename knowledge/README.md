@@ -25,9 +25,10 @@ and a federated knowledge base:
 | reflect   | `systems/reflect`   | `reflect/`    | `REFLECT-` | — (none yet)         |
 | (shared)  | `knowledge/`        | `mono/`       | `MONO-`    | —                    |
 
-As of MONO-002, **trail**, **cadence**, and **gateway** are populated; the
-track/reflect stubs arrive in MONO-003, parallelism wiring in MONO-004. The
-migration contract is `knowledge/reference/specs/monorepo-migration-spec.md`.
+As of MONO-003, all five systems are present: **trail**, **cadence**, **gateway**
+(built + deployed) and **track**, **reflect** (v3 knowledge stubs, no code yet).
+Parallelism wiring lands in MONO-004. The migration contract is
+`knowledge/reference/specs/monorepo-migration-spec.md`.
 
 ## Delivery posture (repo-wide ceiling)
 
