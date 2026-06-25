@@ -9,7 +9,10 @@ vs **pending**.
 - **Platform:** macOS 14.3 (Sonoma), Apple Silicon.
 - **Swift (language):** 5.10 via Command Line Tools (`swift --version`). **✅ verified.**
 - **Xcode (app):** _not yet installed_ — only Command Line Tools today, so no `xcodebuild` / iOS SDK
-  / Simulator. **⏳ pending** (TRACK-000 Phase B). Record `xcodebuild -version` here once installed.
+  / Simulator. **⏳ pending** (TRACK-000 Phase B). **macOS 14.3 caps Xcode at 15.3** (bundles the
+  **iOS 17.4 SDK** — covers our iOS 17 target); Xcode 15.4 / 16.x require macOS 14.5+ and the App
+  Store only offers the newest (26.x → macOS 26.2). Install 15.3 via `xcodes install 15.3` or Apple
+  Developer Downloads, then record `xcodebuild -version` here.
 
 ## ✅ Verified now (CLT Swift, no Xcode)
 
