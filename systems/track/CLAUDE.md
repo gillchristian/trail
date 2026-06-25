@@ -1,8 +1,9 @@
-# CLAUDE.md — track (system entry · STUB)
+# CLAUDE.md — track (system entry · pre-code)
 
 **track** is the **Execute** system in the product arc Plan (**trail**) → Execute (**track**) →
-Reflect (**reflect**): a race-day execution/tracking companion. **This is a knowledge-only stub** —
-no code yet. When code arrives, build from this directory (`systems/track/`).
+Reflect (**reflect**): a race-day execution/tracking companion. **Code pending** — the MVP is
+designed + backlogged (specs in `knowledge/reference/`); **TRACK-000** (Swift/iOS bootstrap) is next.
+When code arrives, build from this directory (`systems/track/`).
 
 **Read these, in order, before doing anything else:**
 1. the repo-root manifest `/knowledge/README.md` (repo-wide rules track inherits),
@@ -19,14 +20,19 @@ no code yet. When code arrives, build from this directory (`systems/track/`).
 5. **Journal everything** in `systems/track/knowledge/progress/journal.md`.
 6. **When stuck, follow `knowledge/framework/when-stuck.md`.** Log blockers to `systems/track/knowledge/progress/blockers.md`, then pivot.
 
-## Status: STUB
+## Status: pre-code (speced + backlogged)
 
-Knowledge only — no code/build target yet. The MVP work-item sequence + the `.trace`/`.trail`
-integration contracts are in `systems/track/knowledge/reference/project-brief.md`. Start there.
+No code/build target yet. The MVP is designed and seeded into `knowledge/planning/BACKLOG.md` (epic
+"Tracker MVP") as `TRACK-000…010`; the canonical specs are `knowledge/reference/mvp-plan.md` +
+`knowledge/reference/tracking-view-spec.md` (wireframes in `knowledge/reference/design/`), with
+`knowledge/reference/project-brief.md` as orientation. **Next: TRACK-000** — Swift/iOS toolchain
+bootstrap (prerequisite). Start at the brief.
 
 ## Quick map (track)
 
 - `systems/track/knowledge/README.md` — system manifest (Locations, `track/`, `TRACK-`).
-- `systems/track/knowledge/reference/project-brief.md` — what track is + the MVP sequence.
+- `systems/track/knowledge/planning/BACKLOG.md` — the seeded work items (`TRACK-000…010`); what's next.
+- `systems/track/knowledge/reference/project-brief.md` — what track is + the MVP sequence (orientation).
+- `systems/track/knowledge/reference/mvp-plan.md` + `tracking-view-spec.md` (+ `design/`) — canonical MVP specs.
 - `knowledge/framework/` (repo root) — shared working system (changes = `MONO-` tasks).
 - Repo-wide rules + system index: the root manifest (`/knowledge/README.md`).

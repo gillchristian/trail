@@ -1,8 +1,9 @@
-# systems/track/knowledge/ — track system manifest (STUB)
+# systems/track/knowledge/ — track system manifest (pre-code)
 
 **track** is the **Execute** system (Plan → Execute → Reflect): a race-day execution/tracking app,
-not yet built. This is a **v3 stub instance** (knowledge only). **Read the repo-root manifest first**
-(`/knowledge/README.md`) for the repo-wide rules this system inherits.
+not yet built — **code pending**. The MVP is designed + backlogged (specs in `reference/`; work
+queued as `TRACK-000…010`). **Read the repo-root manifest first** (`/knowledge/README.md`) for the
+repo-wide rules this system inherits.
 
 Reading chain: root `CLAUDE.md` → root manifest → **this file** → `knowledge/framework/` (the shared
 copy at the repo root) → the `pr` profile in `framework/delivery.md`.
@@ -31,12 +32,14 @@ The standard framework loop (see `framework/README.md`): orient from the plannin
 acceptance criteria before code, branch `track/<task-id>-<slug>`, verify from `systems/track/` once code
 exists, PR + squash-merge, journal, advance. Stuck? `framework/when-stuck.md` — not asking the user.
 
-## Status: STUB (knowledge only)
+## Status: speced + backlogged — no code yet
 
-No code yet. The product brief + the designed MVP work-item sequence are in
-`reference/project-brief.md`. When track is picked up: promote the first item from `BACKLOG.md` (the
-brief seeds it), write acceptance criteria, branch `track/track-001-…`. Record local-CI commands in a
-`reference/local-ci.md` as the toolchain appears.
+The MVP is designed and seeded into `planning/BACKLOG.md` (epic "Tracker MVP", 2026-06-25): the
+canonical specs are in `reference/` (`mvp-plan.md`, `tracking-view-spec.md`, `design/` wireframes),
+and the work items are queued as **TRACK-000…TRACK-010**. **Next: TRACK-000** — the Swift/iOS
+toolchain bootstrap (prerequisite; the build owner is new to Swift/iOS). When started: promote it
+into `CURRENT.md` (copy the acceptance criteria from its BACKLOG line), branch `track/track-000-…`,
+and record build/run/test commands in a new `reference/local-ci.md` as the toolchain appears.
 
 ## Layout (track instance)
 

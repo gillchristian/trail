@@ -4,8 +4,11 @@
 
 ## Active
 
-_(none — **stub**. No code yet. The designed MVP sequence in `reference/project-brief.md` seeds the
-first `BACKLOG.md` item (Skeleton) when track is picked up; write acceptance criteria before code.)_
+_(none active yet. The MVP is designed + backlogged — see `BACKLOG.md` (epic "Tracker MVP") and the
+canonical specs in `reference/` (`mvp-plan.md`, `tracking-view-spec.md`, `design/`). **Next up:
+TRACK-000** — the Swift/iOS toolchain bootstrap (prerequisite; the build owner is new to Swift/iOS).
+When started, copy its acceptance criteria from the BACKLOG line into the template below and branch
+`track/track-000-…`.)_
 
 ## Entry template
 
