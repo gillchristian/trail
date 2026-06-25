@@ -9,11 +9,14 @@
 
 name: Fly Deploy (gateway)
 on:
-  push:
-    branches:
-      - master
-    paths:
-      - 'systems/gateway/**'
+  # Deploys are MANUAL today, so this is dispatch-only — run it from the Actions tab
+  # when you want a CI deploy. It will not auto-run (no failing tokenless runs on every
+  # gateway push). When you wire auto-deploy: set the FLY_API_TOKEN repo secret and
+  # switch to the push trigger below (server-only path filter):
+  #   push:
+  #     branches: [master]
+  #     paths: ['systems/gateway/**']
+  workflow_dispatch:
 jobs:
   deploy:
     name: Deploy gateway
