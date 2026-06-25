@@ -14,39 +14,37 @@
 **Notes:** scope cuts, links, anything decided while planning.
 ```
 
-### MONO-002 — Import cadence: systems/cadence + systems/gateway (PR 2, bootstrap exception)
+### MONO-003 — Scaffold track + reflect stubs (PR 3)
 
-**Source:** BACKLOG — Monorepo migration epic (spec `reference/specs/monorepo-migration-spec.md`, MONO-002)
-**Branch:** `mono/mono-002-import-cadence` (create off master)
-**Preconditions:** MONO-001 merged (PR #154, `9c24ab5`). ✓ Cadence repo expected at `/Users/bb8/dev/cadence`.
-**Goal:** fold cadence `client/` → `systems/cadence/` and `server/` → `systems/gateway/`
-(flattened), import cadence's history via the one sanctioned non-squash merge, upgrade its
-v1 knowledge into two v3 instances (unified history → gateway under a tombstone; cadence
-starts fresh), and re-point both deploy targets.
-
-**⚠ Delivery exception (sanctioned, recorded):** `git subtree add --allow-unrelated-histories`
-brings cadence's history in inline → **exactly one merge commit on `master`**, the only
-non-squash merge permitted for this task. Record it in the root manifest's *Bootstrap
-exceptions* note. No other non-squash merge.
+**Source:** BACKLOG — Monorepo migration epic (spec `reference/specs/monorepo-migration-spec.md`, MONO-003)
+**Branch:** `mono/mono-003-track-reflect-stubs`
+**Preconditions:** MONO-001 merged (PR #154). ✓ Independent of MONO-002 — may land any time after PR 1.
+**Goal:** two empty v3 knowledge instances under `systems/track/` and `systems/reflect/` so agents
+can pick those systems up later. **Knowledge only, no code; `framework/` not duplicated** (point at
+the root copy via Locations).
 
 **Acceptance criteria:**
-_Code/knowledge landed on `master` via fast-forward (`ae80a5e`..`e0f60a0`); criteria 1–7 verified on the branch. Criteria 8–9 are the user deploy actions (BLOCKER-001/002) — MONO-002 stays active until they confirm._
-- [x] `systems/gateway`: `go build ./...` + `go test ./...` pass from the new root; Docker image builds from the `systems/gateway` context (verified twice — incl. the final knowledge-dockerignored context).
-- [x] Gateway flatten edits: `fly.toml` `dockerfile = 'Dockerfile'` (app stays `cadence`); Dockerfile `COPY server/… → COPY …`; image verified to build from the new context before any live deploy.
-- [x] `systems/cadence`: `npm install && npm run build` (tsc + vite, 720 modules) passes from `systems/cadence`.
-- [x] Exactly **one** non-squash merge commit on `master` (`ae80a5e`, the `git subtree` import), recorded in the root manifest's bootstrap-exceptions note.
-- [x] `tokens.db`/`tokens.json` absent from the tree + gitignored; `server/.env.example` → `systems/gateway/.env.example` present.
-- [x] Knowledge routed: gateway inherits cadence ADRs 0001–0004 + `caching.md`/`glossary.md` + planning + journal/blockers + a backend brief (v1 `philosophy/` discarded; v1→v3 + inherited-history tombstones in the gateway README); `trail-integration.md` → shared `reference/specs/`; cadence is a fresh v3 instance (branch `cadence/`, id-ns `CAD-`, empty planning, fresh journal/blockers, client brief). Both read cold.
-- [x] `.github/workflows/fly-deploy.yml` → root, path-filtered `systems/gateway/**`, `working-directory: systems/gateway`, marked inactive; `FLY_API_TOKEN` noted as a "when you wire CI" prereq.
-- [ ] ⏳ **fly (gateway) — user action (BLOCKER-001):** run `fly deploy systems/gateway` + confirm `/` health and the `data` volume / `tokens.db` intact (not recreated). Image builds locally ✓.
-- [ ] ⏳ **Vercel (cadence) — user action (BLOCKER-002):** re-point the cadence project's git connection → monorepo; Root Directory `systems/cadence`; build green; Strava redirect URL + domain + env vars intact.
+- [ ] For each of `systems/track/`, `systems/reflect/`: a v3 manifest (`knowledge/README.md` — delivery inherits the root ceiling; branch prefix + id-ns per §3; Locations at the system's own areas + root framework; brief pointer) + a system `CLAUDE.md` entry.
+- [ ] Each has skeleton `planning/{CURRENT,BACKLOG,DONE}.md`, `progress/{journal,blockers}.md`, `decisions/INDEX.md`, `reference/project-brief.md`, `whiteboard/README.md`.
+- [ ] **Track brief** carries the designed MVP work-item sequence (skeleton → domain/persistence → library/race-config → CSV import → *paused for the tracking-view design* → tracking view → post-race view; deferred: `.trace` export, `.trail` ingestion, Live Activity) + records the `.trace`/`.trail` contracts as pointers into shared `knowledge/reference/specs/`.
+- [ ] **Reflect brief** records scope-not-yet-defined + an explicit Unknowns list (log a blocker if a setup input is missing; do **not** invent a backlog).
+- [ ] Both read cold via the chain (root `CLAUDE.md` → root manifest → system manifest → root `framework/`); `framework/` **not** duplicated into either; no code / no build target introduced.
+- [ ] Root manifest system index notes track + reflect are now scaffolded (stubs).
 
-**Notes:** Locked decision 7 — fly app stays `cadence` (renaming orphans the `data` volume);
-the *dir* is `gateway`, the *app* independent. Drop cadence's root `package.json`/lock
-(workspace orchestration superseded). Merge cadence's `.claude/` at root. Subtree mechanics:
-resolve the one-merge-commit constraint at execution (subtree add, then flatten/route as
-further commits, landing exactly one merge commit on master). Two user deploy actions at the
-end (fly, cadence Vercel) — prepare + surface, never autonomous.
+**Notes:** SETUP adoption flow (copy-if-absent). `track/`/`TRACK-`, `reflect/`/`REFLECT-` (§3). `.trace`
+doesn't exist yet (track is a stub) — its contract is a forward pointer; `.trail` is trail's existing
+format. No `product-vision.md` authored here (out of MONO-003 scope) — referenced as a pointer if needed.
+
+---
+
+### MONO-002 — merged; deploys confirmed ✅ → closing
+
+Code + knowledge **merged to `master`** (`ae80a5e`..`cfc6aef`, the sanctioned `git subtree` FF; bootstrap
+exception recorded in the root manifest). All criteria met:
+- ✅ **BLOCKER-001 — fly:** `fly deploy systems/gateway` succeeded (user, 2026-06-24) — `/` healthy, `data` volume / `tokens.db` intact, cadence frontend kept working against the new server.
+- ✅ **BLOCKER-002 — Vercel (cadence):** user re-pointed the cadence project → `gillchristian/trail`, Root Directory `systems/cadence/` (2026-06-24).
+
+Moves to DONE in the close PR (with MONO-003).
 
 ---
 
