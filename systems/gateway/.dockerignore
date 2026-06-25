@@ -1,7 +1,9 @@
 /.git
 node_modules
-client
 .dockerignore
 .env
+.env.example
 Dockerfile
 fly.toml
+knowledge
+*.md

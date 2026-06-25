@@ -7,7 +7,7 @@ app = 'cadence'
 primary_region = 'sjc'
 
 [build]
-  dockerfile = 'server/Dockerfile'
+  dockerfile = 'Dockerfile'
 
 [env]
   DB_PATH = '/data/tokens.db'
