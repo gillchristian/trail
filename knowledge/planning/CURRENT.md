@@ -14,7 +14,33 @@
 **Notes:** scope cuts, links, anything decided while planning.
 ```
 
-### (no active task)
+### MONO-000 — Framework v2→v3: path indirection (PR 0)
+
+**Source:** BACKLOG — Monorepo migration epic (spec `reference/monorepo-migration-spec.md`, MONO-000)
+**Branch:** `mono/mono-000-framework-v3-path-indirection`
+**Goal:** the framework resolves instance-area locations by *role* from the manifest's
+Locations block instead of hardcoded `../` siblings. Pure framework change — **no file
+moves, no new systems**. Trail keeps working because its manifest declares the same
+locations it already had. De-risks PRs 1–3 (they all instantiate v3 instances and must
+point at a working v3 framework).
+
+**Acceptance criteria:**
+- [ ] Grep over `knowledge/framework/` returns **no** `\.\./(planning|progress|decisions|reference|whiteboard)/` path-literals — role names only. (verify: grep returns empty)
+- [ ] Instance-free guard still clean: `grep -riE '\btrail\b|\belm\b|batman|gillchristian|coros|samples/' knowledge/framework/` returns nothing (the `context7`-in-"e.g." carve-out still applies).
+- [ ] Manifest skeleton in `SETUP.md` gains the **Locations block** convention (framework/planning/progress/decisions/reference/whiteboard → paths); framework refers to areas by role, the manifest maps roles→paths; the one remaining hardcoded hop is `CLAUDE.md` → manifest.
+- [ ] Trail's manifest (`knowledge/README.md`) + `CLAUDE.md` updated to the v3 convention, declaring the **current (pre-move)** trail paths; trail behaves identically.
+- [ ] `framework/README.md` stamped **Framework v3 (2026-06-24)** with a one-line changelog (path indirection; manifest Locations block). This repo stays the canonical upstream.
+- [ ] Fresh-agent cold read: `CLAUDE.md → manifest → framework` resolves every area with zero prior context (dry-run reasoning recorded in the journal).
+- [ ] Trail's loop unchanged — gates green, output quoted in the journal: `npx elm make src/Main.elm --output=/dev/null` · `npm run build` · `npm run smoke` · `npm run smoke:aidcsv`.
+
+**Notes:** First of the 5-PR monorepo migration. The spec is the contract; locked
+decisions are settled (don't reopen). `MONO-` is its own id namespace (not the global
+`TASK-` counter). Ingestion (backlog epic + spec parked in `reference/`) rides on this
+branch as the orientation step.
+
+---
+
+### Trail feature work — parked (no active *trail* task)
 
 The **i18n epic is COMPLETE** (2026-06-18): TASK-058–069 all shipped + verified.
 English + Spanish, hand-rolled and type-driven (ADR-0014); default from

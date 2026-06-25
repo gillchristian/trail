@@ -91,6 +91,57 @@ on an explicit user steer (2026-06-18).
 - [x] TASK-068 — **Translate: modals + toasts.** Delete-confirm, identity flows (name / ownership / link), merge-review surface (person-named, counts + plurals), storage-error toast. Highest interpolation/plural density; the merge-review person-named copy aligns with WI-5. Deps: 061. — (M/L). — ✓ PR #148 (`conflict.label` → 069)
 - [x] TASK-069 — **i18n QA sweep + exhaustiveness check + `<html lang>`.** grep for stray hardcoded UI strings missed by 061–068; run the spec's DoD exhaustiveness check (temporarily add a third `Language` constructor → confirm the compiler enumerates every untranslated site → revert, documented in the PR); confirm `<html lang>` tracks the toggle; final read-through in both languages. Closes the epic. Deps: 061–068. — (S/M). — ✓ PR #150 (304 sites flagged; also localized `conflict.label`; `section.label` → TASK-071). **i18n epic COMPLETE.**
 
+### Monorepo migration (epic, 2026-06-24)
+
+Transform trail into a monorepo housing five systems (`trail`, `cadence`,
+`gateway`, `track`, `reflect`) under `systems/`, fold in the external **cadence**
+repo, and stand up a two-tier federated knowledge base (shared root tier +
+per-system instances) so one agent per system can work in parallel. Full
+contract — locked decisions, target structure, per-PR operations, acceptance
+criteria — in **`reference/monorepo-migration-spec.md`**. Five squash-merged PRs,
+strictly ordered 0→1→2→4 (PR 3 may land any time after PR 1); the tree builds
+green after every PR; exactly one sanctioned non-squash merge (cadence history
+import, PR 2). **Namespace note:** these use the `MONO-` id namespace and `mono/`
+branch prefix (repo-structural / shared-tier work, spec §3) — *not* the global
+`TASK-` counter; per-system work after the migration gets its own namespace
+(`TRAIL-`/`CAD-`/`GW-`/`TRACK-`/`REFLECT-`). Two steps need the user (manual
+`fly deploy`; re-point cadence's Vercel git connection) — prepared and surfaced,
+never done autonomously.
+
+- [ ] MONO-000 — **PR 0: framework v2→v3 — path indirection.** The framework
+  resolves instance-area locations by *role* from the manifest's Locations block
+  instead of hardcoded `../` siblings. Pure framework change (no file moves, no
+  new systems); trail keeps working because its manifest declares the same
+  locations it already had. De-risks PRs 1–3, which all instantiate v3 instances.
+  Spec MONO-000. — (M)
+- [ ] MONO-001 — **PR 1: restructure trail in place.** `git mv` trail's code into
+  `systems/trail/`; split knowledge into the shared tier (root `framework/` + root
+  manifest + `reference/specs/`) and a trail v3 instance under
+  `systems/trail/knowledge/`; split the manifest into root + system; root
+  `CLAUDE.md` becomes dispatch. Trail still builds/deploys from the new path
+  (Vercel Root Directory → `systems/trail`). Preconditions: MONO-000. Spec
+  MONO-001. — (L)
+- [ ] MONO-002 — **PR 2: import cadence (bootstrap exception).** Fold cadence
+  `client/`→`systems/cadence/` and `server/`→`systems/gateway/` (flattened); one
+  sanctioned `--allow-unrelated-histories` merge (recorded in the root manifest);
+  fix `fly.toml`/Dockerfile paths for the flattened gateway and verify the image
+  builds locally; route cadence's v1 knowledge into gateway+cadence v3 instances
+  (unified history → gateway under a tombstone). `tokens.db` does not migrate.
+  **Asks the user** to run the live `fly deploy` and re-point cadence's Vercel git
+  connection. Preconditions: MONO-001. Spec MONO-002. — (L)
+- [ ] MONO-003 — **PR 3: scaffold track + reflect stubs.** Two empty v3 knowledge
+  instances (knowledge only, no code; `framework/` not duplicated — pointed at the
+  root copy via Locations). Track brief carries the designed MVP work-item
+  sequence + `.trace`/`.trail` contract pointers; reflect brief records
+  scope-not-yet-defined + an Unknowns list. May land any time after MONO-001. Spec
+  MONO-003. — (S/M)
+- [ ] MONO-004 — **PR 4: workspace + parallelism wiring.** No root workspace (each
+  system self-contained, Locked decision 13). Root manifest documents the
+  worktree-per-agent flow, the branch-prefix/id-namespace table, cross-system
+  status as a read-time projection, and the shared-tier-edits-only-via-`MONO-`
+  discipline. CI path-filtered per system. Preconditions: MONO-001 & MONO-002.
+  Spec MONO-004. — (M)
+
 ## Parking lot
 
 - ~~**Section-overlap bug.** `Planning.sectionsForRace` double-counts a km that straddles an aid distance (placed in *both* adjacent sections).~~ **→ shipped as TASK-039 (2026-06-15, ✓ PR #72; ADR-0004).** ~~Still parked: the section-card **Δ vs plan** has a moving-vs-clock apples-to-oranges bug at the section level; it needed a correct section partition underneath it, which TASK-039 now provides.~~ **→ shipped as TASK-045 (2026-06-15, ✓ PR #86; ADR-0008)** — section Time/Cum/Δ + section-mode CSV are now clock time (moving + the section's aid rest), so the section Δ-vs-plan is clock-vs-clock.

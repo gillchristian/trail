@@ -13,6 +13,22 @@ merge my own PRs (`framework/delivery.md`, profile `pr`). `master` is sacred:
 after the initial `Batman` root commit, nothing lands on it directly — not
 even bookkeeping (that's what the close PR is for).
 
+## Locations
+
+The role → path map the framework dereferences (framework v3 / MONO-000). The
+framework refers to instance areas by role ("the planning area", "the
+journal"); this block says where they live. Paths are repo-root-relative.
+These are trail's **current, pre-monorepo-move** paths — MONO-001 will update
+them when trail's instance areas move under `systems/trail/`; `framework` will
+stay at the repo root as the monorepo's single shared copy.
+
+framework:  knowledge/framework
+planning:   knowledge/planning
+progress:   knowledge/progress
+decisions:  knowledge/decisions
+reference:  knowledge/reference
+whiteboard: knowledge/whiteboard
+
 ## Project rules
 
 - **Identity/attribution:** commits and PRs are authored by the user only
@@ -22,9 +38,12 @@ even bookkeeping (that's what the close PR is for).
 - **Squash-only.** A hard constraint from the brief; `--merge` is not an option.
 - **Root commit:** the initial `Batman` commit (subject "Batman", no parents)
   is the only direct commit to `master`, ever.
-- **Framework copy:** v2 — and this repo is the **canonical upstream**
-  (`gillchristian/trail` → `knowledge/framework/`). Framework files stay
-  instance-free: before merging any framework-touching PR, run
+- **Framework copy:** v3 — and this repo is the **canonical upstream**
+  (`gillchristian/trail` → `knowledge/framework/`). v3 adds path indirection
+  (MONO-000): the framework names instance areas by role and resolves them
+  through the **Locations** block above, so the one shared copy can serve the
+  monorepo's per-system instances. Framework files stay instance-free: before
+  merging any framework-touching PR, run
   `grep -riE '\btrail\b|\belm\b|batman|gillchristian|coros|samples/' knowledge/framework/`
   — it must return nothing (`context7` may appear only inside an "e.g." clause;
   word boundaries keep English words like "trailing" out of the net).
