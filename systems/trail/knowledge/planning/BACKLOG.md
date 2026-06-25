@@ -114,13 +114,13 @@ never done autonomously.
   new systems); trail keeps working because its manifest declares the same
   locations it already had. De-risks PRs 1–3, which all instantiate v3 instances.
   Spec MONO-000. — (M) — ✓ PR #152, merged `f2b0bd9`
-- [ ] MONO-001 — **PR 1: restructure trail in place.** `git mv` trail's code into
+- [x] MONO-001 — **PR 1: restructure trail in place.** `git mv` trail's code into
   `systems/trail/`; split knowledge into the shared tier (root `framework/` + root
   manifest + `reference/specs/`) and a trail v3 instance under
   `systems/trail/knowledge/`; split the manifest into root + system; root
   `CLAUDE.md` becomes dispatch. Trail still builds/deploys from the new path
   (Vercel Root Directory → `systems/trail`). Preconditions: MONO-000. Spec
-  MONO-001. — (L)
+  MONO-001. — (L) — ✓ PR #154, merged `9c24ab5`
 - [ ] MONO-002 — **PR 2: import cadence (bootstrap exception).** Fold cadence
   `client/`→`systems/cadence/` and `server/`→`systems/gateway/` (flattened); one
   sanctioned `--allow-unrelated-histories` merge (recorded in the root manifest);

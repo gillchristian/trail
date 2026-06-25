@@ -14,34 +14,38 @@
 **Notes:** scope cuts, links, anything decided while planning.
 ```
 
-### MONO-001 — Restructure trail in place (PR 1)
+### MONO-002 — Import cadence: systems/cadence + systems/gateway (PR 2, bootstrap exception)
 
-**Source:** BACKLOG — Monorepo migration epic (spec `reference/monorepo-migration-spec.md`, MONO-001)
-**Branch:** `mono/mono-001-restructure-trail` (create off master)
-**Preconditions:** MONO-000 merged (PR #152, `f2b0bd9`). ✓
-**Goal:** move trail's code into `systems/trail/` (history-preserving `git mv`), split its
-knowledge into the **shared tier** (root `framework/` + a new **root manifest** +
-`reference/specs/`) and a **trail v3 instance** under `systems/trail/knowledge/`, and split
-the manifest + `CLAUDE.md` into root (dispatch + repo-wide rules) and system (trail-local
-rules + Locations). Trail still builds and deploys from the new path.
+**Source:** BACKLOG — Monorepo migration epic (spec `reference/specs/monorepo-migration-spec.md`, MONO-002)
+**Branch:** `mono/mono-002-import-cadence` (create off master)
+**Preconditions:** MONO-001 merged (PR #154, `9c24ab5`). ✓ Cadence repo expected at `/Users/bb8/dev/cadence`.
+**Goal:** fold cadence `client/` → `systems/cadence/` and `server/` → `systems/gateway/`
+(flattened), import cadence's history via the one sanctioned non-squash merge, upgrade its
+v1 knowledge into two v3 instances (unified history → gateway under a tombstone; cadence
+starts fresh), and re-point both deploy targets.
+
+**⚠ Delivery exception (sanctioned, recorded):** `git subtree add --allow-unrelated-histories`
+brings cadence's history in inline → **exactly one merge commit on `master`**, the only
+non-squash merge permitted for this task. Record it in the root manifest's *Bootstrap
+exceptions* note. No other non-squash merge.
 
 **Acceptance criteria:**
-- [ ] Code moved to `systems/trail/` via `git mv` (`src/ public/ samples/ scripts/ index.html elm.json vite.config.js package.json package-lock.json .envrc .nvmrc MORNING.md`). `git log --follow systems/trail/src/Main.elm` shows pre-move history.
-- [ ] All gates pass **run from `systems/trail/`**: `npx elm make src/Main.elm --output=/dev/null`, `npm run build`, `npm run smoke`, `npm run smoke:aidcsv` (+ the other smokes). Output quoted in the journal.
-- [ ] Knowledge split: `framework/` stays at root (single shared copy); `{planning,progress,decisions,reference,whiteboard}/` → `systems/trail/knowledge/`; the migration spec → shared `knowledge/reference/specs/`.
-- [ ] Manifest split: root `knowledge/README.md` (ROOT MANIFEST — repo-wide delivery/identity/VCS rules + bootstrap-exceptions note + system index) + `systems/trail/knowledge/README.md` (trail-local: branch prefix `trail/`, id-ns `TRAIL-`, Locations pointing at trail's new paths + root framework, local-ci, brief pointer). **No rule duplicated across tiers.**
-- [ ] Dispatch: root `CLAUDE.md` → "which system? read that system's `CLAUDE.md`" + reading chain + repo non-negotiables; `systems/trail/CLAUDE.md` = trail's entry (→ root manifest → system manifest).
-- [ ] Cold-read chain resolves: root `CLAUDE.md` → root manifest → `systems/trail/knowledge/README.md` (Locations) → root `knowledge/framework/`.
-- [ ] Path-dependent config fixed (`vite.config.js` base/root/publicDir; `package.json` scripts; any `scripts/*` assuming repo-root cwd). `.gitignore` consolidated at root; `.claude/` merged at root.
-- [ ] **Vercel (trail) — user action:** Root Directory → `systems/trail`. Surfaced to the user; Vercel build succeeds after they set it (manual confirm, like other deploy steps). Likely logged as a blocker / coordinated at merge time.
+- [ ] `systems/gateway`: `go build ./...` + `go test ./...` pass from the new root; Docker image builds from the `systems/gateway` context (`docker build -f systems/gateway/Dockerfile systems/gateway`).
+- [ ] Gateway flatten edits: `fly.toml` `dockerfile = 'Dockerfile'` (app stays `cadence` — Locked decision 7); Dockerfile COPY/WORKDIR paths de-`server/`-ed; image verified to build from the new context **before** any live deploy.
+- [ ] `systems/cadence`: `npm install && npm run build` (tsc + vite) passes from `systems/cadence`.
+- [ ] Exactly **one** non-squash merge commit on `master` from this PR, recorded in the root manifest's bootstrap-exceptions note.
+- [ ] `tokens.db`/`tokens.json` absent from the tree + present in `.gitignore`; `server/.env.example` → `systems/gateway/.env.example` present.
+- [ ] Knowledge routed (spec table): gateway gets cadence ADRs 0001–0004 + `caching.md` + project-brief server slice + planning + journal/blockers (tombstoned "covers pre-monorepo cadence client+server"); `trail-integration.md` → shared `reference/specs/`; v1 `philosophy/` discarded with a one-line gateway-README tombstone. Cadence starts a fresh v3 instance (manifest branch `cadence/`, id-ns `CAD-`, empty planning, fresh journal/blockers, client-slice brief). Both read cold; no orphaned `philosophy/` refs in live pointers.
+- [ ] `.github/workflows/fly-deploy.yml` → root `.github/workflows/`, path-filtered `systems/gateway/**`, deploy step pointed at the new dir. `FLY_API_TOKEN` noted as a "when you wire CI" prereq (not a migration blocker — manual deploys).
+- [ ] **fly (gateway) — user action:** image builds locally; then **ask the user** to run `fly deploy systems/gateway` + confirm `/` health and the `data` volume / `tokens.db` intact (not recreated). Do not deploy autonomously.
+- [ ] **Vercel (cadence) — user action:** re-point the cadence project's git connection → monorepo; Root Directory `systems/cadence`; build green; Strava redirect URL + domain + env vars intact.
 
-**Notes:** Don't move `dist/ elm-stuff/ node_modules/` (regenerate). Append-only history
-(journal/DONE/old ADRs) referencing old paths: **leave untouched** (tombstone convention) —
-fix only *live* pointers (CLAUDE quick-map, local-ci, manifest cross-links). The MONO epic's
-planning rides with trail (origin system) for now; `MONO-` stays the shared-tier namespace.
-**Namespaces:** trail's own feature backlog stays `TASK-` (history); new trail work
-post-split uses `TRAIL-`. The `section.label`/units parking-lot items (TASK-070/071) move
-with trail's planning.
+**Notes:** Locked decision 7 — fly app stays `cadence` (renaming orphans the `data` volume);
+the *dir* is `gateway`, the *app* independent. Drop cadence's root `package.json`/lock
+(workspace orchestration superseded). Merge cadence's `.claude/` at root. Subtree mechanics:
+resolve the one-merge-commit constraint at execution (subtree add, then flatten/route as
+further commits, landing exactly one merge commit on master). Two user deploy actions at the
+end (fly, cadence Vercel) — prepare + surface, never autonomous.
 
 ---
 
