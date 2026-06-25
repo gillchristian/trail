@@ -3045,3 +3045,29 @@ sanctioned the merge; the user ran `git push origin master` themselves. Correct 
 **Next:** MONO-004 — workspace + parallelism wiring (the **final** migration PR): no root workspace;
 root-manifest worktree-per-agent flow + CI-filtering doc; verify standalone builds + two-worktree
 no-collision. Pulled into CURRENT.
+
+---
+## 2026-06-24 — MONO-004 merged; monorepo migration epic COMPLETE ✅
+
+**Task:** MONO-004 (final PR) + epic wrap-up.
+**MONO-004:** documented the parallel-agent operating model in the root manifest (**Parallelism &
+workspace**): no root workspace; worktree-per-agent (disjoint files / branches / state); CI-deploy
+isolation. Verified no root workspace + **two-worktree no-collision demonstrated** (`trail/` + `gateway/`
+worktrees each committed to disjoint files on disjoint branches, shared object store, clean teardown).
+PR #158, `f8dbf4a` → DONE.
+**EPIC COMPLETE (MONO-000 → MONO-004):** trail is now one system in a five-system monorepo. Framework v3
+(path indirection — areas by role via the manifest Locations block); two-tier knowledge base (shared
+root `framework/` + root manifest; per-system v3 instances); trail → `systems/trail`; cadence →
+`systems/cadence` + `gateway` (one sanctioned `git subtree` FF merge — the bootstrap exception, user-run);
+track + reflect knowledge stubs; parallelism wired. **Deploys live + user-confirmed:** gateway on fly
+(volume intact), trail + cadence on Vercel (per-system roots). PRs #152–#158 + the FF push + close PRs.
+**Verified across the epic:** trail build + all 9 smokes green from `systems/trail`; gateway
+`go build`/`go test`/`docker build` green; cadence `npm build` green; cold-read chains resolve for every
+system; instance-free framework guard clean; no token files tracked.
+**What I learned:** the permission system gates **direct pushes to `master`** specifically (not pulls or
+PR merges) — the FF bootstrap-exception push needed explicit user authorization even though the spec
+sanctioned the merge (the user ran it). `git subtree add` imports the whole repo at one prefix
+(flatten-to-two-destinations is a follow-up). `fly deploy` uses the remote depot builder by default.
+**Next:** **no active task.** New work is per-system (pull into that system's `CURRENT.md` under its
+prefix); shared/structural work is a `MONO-` task. Open follow-up: reflect's scope (BLOCKER-001 in its
+instance). Await a fresh steer.
