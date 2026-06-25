@@ -2943,3 +2943,44 @@ stays readable and the acceptance grep (which targets `../area/`) stays the real
 **Next:** MONO-001 — restructure trail into `systems/trail/` (history-preserving `git mv` +
 knowledge-tier split + manifest split). Pulled into CURRENT. Flag its Vercel Root-Directory
 user-action when the PR is ready.
+
+---
+## 2026-06-24 — MONO-001: restructure trail into systems/trail/ (PR 1)
+
+**Task:** MONO-001 — PR 1 of the monorepo migration.
+**What I did:** Relocated trail's code (`git mv` of src/ public/ samples/ scripts/ index.html
+elm.json vite.config.js package.json package-lock.json .envrc .nvmrc MORNING.md) into
+`systems/trail/`, and its instance knowledge areas (planning/ progress/ decisions/ reference/
+whiteboard/ philosophy/) into `systems/trail/knowledge/` — 107 history-preserving renames.
+`framework/` stays at the repo root as the single shared copy; the migration spec lifted to
+the shared `knowledge/reference/specs/`. Reused node_modules/elm-stuff at the new location
+(plain mv) to avoid a reinstall. Split the manifest + CLAUDE into two tiers: root
+`knowledge/README.md` (ROOT MANIFEST — repo-wide delivery/identity/VCS rules, system index,
+bootstrap-exceptions note, the shared framework, shared-tier discipline) + new
+`systems/trail/knowledge/README.md` (trail v3 instance — Locations at trail's new paths +
+root framework, branch prefix `trail/`, id-ns `TRAIL-`, the loop); root `CLAUDE.md` → dispatch
+("which system?" + reading chain + repo-wide non-negotiables) + new `systems/trail/CLAUDE.md`
+→ trail's system entry.
+**What I verified (quoted), all run from `systems/trail/`:**
+- `git log --follow systems/trail/src/Main.elm` traces pre-move history (TASK-069/068/067…) — rename preserved.
+- type-check `npx elm make src/Main.elm --output=/dev/null` → `Success! Compiled 28 modules.`
+- `npm run build` → `✓ built in 1.11s` (`dist/assets/index-*.js` 411.39 kB — byte-identical to pre-move).
+- all 9 smokes → PASS (`smoke`, `smoke:aidcsv`, `smoke:sections`, `smoke:calibration`, `smoke:trailsync`, `smoke:merge`, `smoke:changelog`, `smoke:identity`, `smoke:i18n`).
+- tree shape: `framework/` only at root (not duplicated under trail); root knowledge/ = README + framework + reference/specs.
+- **Vercel production deploy: `success`** on the merge commit (`gh api …/commits/9c24ab5/status` → state `success`) — trail builds green from `systems/trail/` after the user set Root Directory → `systems/trail`.
+**What changed:** 107 renames + 4 tier docs (root manifest rewrite, trail system manifest,
+root dispatch CLAUDE, trail system CLAUDE). PR #154, merged `9c24ab5` (squash). Close PR:
+this entry + DONE + BACKLOG tick + CURRENT→MONO-002.
+**What I learned:** (1) **No build-config changes were needed** — Vite defaults `root` to cwd
+and every smoke harness computes `repoRoot = resolve(here, '..')` relative to its own file,
+so moving `src`/`scripts`/`samples` *together* keeps every path resolving; the spec's
+"inspect and update path-dependent config" came up empty, confirmed empirically. (2) Vercel
+**settings** changes don't redeploy production, and a *failed* build is never promoted over
+the current one — so the Root-Directory cutover is zero-downtime regardless of timing; the
+real verification is the post-merge production build status. (3) `--follow` only resolves a
+rename from *committed* history — it reads empty pre-commit, which is expected, not a failure.
+**Next:** MONO-002 — import cadence (`client/`→`systems/cadence`, `server/`→`systems/gateway`
+flattened) via the one sanctioned `git subtree` non-squash merge; fix fly.toml/Dockerfile for
+the flattened gateway + verify the image builds locally; route v1 knowledge → gateway+cadence
+v3 instances. Pulled into CURRENT. Two user deploy actions at the end (fly deploy, cadence
+Vercel re-point).
