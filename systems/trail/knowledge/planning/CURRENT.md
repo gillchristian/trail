@@ -14,37 +14,26 @@
 **Notes:** scope cuts, links, anything decided while planning.
 ```
 
-### MONO-003 — Scaffold track + reflect stubs (PR 3)
+### MONO-004 — Workspace + parallelism wiring (PR 4, final)
 
-**Source:** BACKLOG — Monorepo migration epic (spec `reference/specs/monorepo-migration-spec.md`, MONO-003)
-**Branch:** `mono/mono-003-track-reflect-stubs`
-**Preconditions:** MONO-001 merged (PR #154). ✓ Independent of MONO-002 — may land any time after PR 1.
-**Goal:** two empty v3 knowledge instances under `systems/track/` and `systems/reflect/` so agents
-can pick those systems up later. **Knowledge only, no code; `framework/` not duplicated** (point at
-the root copy via Locations).
+**Source:** BACKLOG — Monorepo migration epic (spec `reference/specs/monorepo-migration-spec.md`, MONO-004)
+**Branch:** `mono/mono-004-parallelism-wiring`
+**Preconditions:** MONO-001 & MONO-002 merged. ✓ (Both on master.)
+**Goal:** document the parallel-agent operating model. **No root workspace** — each system stays
+self-contained (Locked decision 13). Mostly root-manifest additions + confirming CI path-filtering;
+the last migration PR.
 
 **Acceptance criteria:**
-- [ ] For each of `systems/track/`, `systems/reflect/`: a v3 manifest (`knowledge/README.md` — delivery inherits the root ceiling; branch prefix + id-ns per §3; Locations at the system's own areas + root framework; brief pointer) + a system `CLAUDE.md` entry.
-- [ ] Each has skeleton `planning/{CURRENT,BACKLOG,DONE}.md`, `progress/{journal,blockers}.md`, `decisions/INDEX.md`, `reference/project-brief.md`, `whiteboard/README.md`.
-- [ ] **Track brief** carries the designed MVP work-item sequence (skeleton → domain/persistence → library/race-config → CSV import → *paused for the tracking-view design* → tracking view → post-race view; deferred: `.trace` export, `.trail` ingestion, Live Activity) + records the `.trace`/`.trail` contracts as pointers into shared `knowledge/reference/specs/`.
-- [ ] **Reflect brief** records scope-not-yet-defined + an explicit Unknowns list (log a blocker if a setup input is missing; do **not** invent a backlog).
-- [ ] Both read cold via the chain (root `CLAUDE.md` → root manifest → system manifest → root `framework/`); `framework/` **not** duplicated into either; no code / no build target introduced.
-- [ ] Root manifest system index notes track + reflect are now scaffolded (stubs).
+- [ ] **No root `package.json`/`node_modules`** — confirm none exists; each system installs/builds from its own dir (no root install step).
+- [ ] Root manifest documents: the **worktree-per-agent** flow (one git worktree per active agent/system; shared object store + branch namespace); the branch-prefix + id-ns table (already present — confirm); cross-system status as a **read-time projection** over per-system `progress/` (already present — confirm); the **shared-tier-edits-only-via-`MONO-`** discipline (already present — confirm). Add what's missing (the worktree flow + CI-filtering note).
+- [ ] **CI path-filtered per system:** the fly workflow is gateway-only (`systems/gateway/**`, done MONO-002); the Vercel projects skip on no-change-to-their-root (trail + cadence). Documented in the root manifest.
+- [ ] Each system builds standalone from its own dir (re-confirm trail + gateway + cadence; no root install step).
+- [ ] **Two-worktree no-collision:** reason through / demonstrate two agents on two worktrees (e.g. `trail/…` + `gateway/…`) branch + edit their own planning/progress + open PRs with zero file-write or branch-namespace collision (disjoint dirs + disjoint branch prefixes + per-system planning).
+- [ ] Both Vercel projects build green rooted at their own system dir, **no** "include files outside the Root Directory" needed (self-contained). Note: trail's "include files outside root" toggle is currently ON — flag as optional user cleanup (OFF is the self-contained target).
 
-**Notes:** SETUP adoption flow (copy-if-absent). `track/`/`TRACK-`, `reflect/`/`REFLECT-` (§3). `.trace`
-doesn't exist yet (track is a stub) — its contract is a forward pointer; `.trail` is trail's existing
-format. No `product-vision.md` authored here (out of MONO-003 scope) — referenced as a pointer if needed.
-
----
-
-### MONO-002 — merged; deploys confirmed ✅ → closing
-
-Code + knowledge **merged to `master`** (`ae80a5e`..`cfc6aef`, the sanctioned `git subtree` FF; bootstrap
-exception recorded in the root manifest). All criteria met:
-- ✅ **BLOCKER-001 — fly:** `fly deploy systems/gateway` succeeded (user, 2026-06-24) — `/` healthy, `data` volume / `tokens.db` intact, cadence frontend kept working against the new server.
-- ✅ **BLOCKER-002 — Vercel (cadence):** user re-pointed the cadence project → `gillchristian/trail`, Root Directory `systems/cadence/` (2026-06-24).
-
-Moves to DONE in the close PR (with MONO-003).
+**Notes:** Much of the root-manifest parallelism content (system index, shared-tier discipline,
+no-shared-status) already landed in MONO-001 — MONO-004 adds the **worktree-per-agent flow** + the
+**CI-filtering** doc + the parallelism verification, then **closes the migration epic**.
 
 ---
 

@@ -121,20 +121,20 @@ never done autonomously.
   `CLAUDE.md` becomes dispatch. Trail still builds/deploys from the new path
   (Vercel Root Directory → `systems/trail`). Preconditions: MONO-000. Spec
   MONO-001. — (L) — ✓ PR #154, merged `9c24ab5`
-- [ ] MONO-002 — **PR 2: import cadence (bootstrap exception).** Fold cadence
+- [x] MONO-002 — **PR 2: import cadence (bootstrap exception).** Fold cadence
   `client/`→`systems/cadence/` and `server/`→`systems/gateway/` (flattened); one
   sanctioned `--allow-unrelated-histories` merge (recorded in the root manifest);
   fix `fly.toml`/Dockerfile paths for the flattened gateway and verify the image
   builds locally; route cadence's v1 knowledge into gateway+cadence v3 instances
   (unified history → gateway under a tombstone). `tokens.db` does not migrate.
   **Asks the user** to run the live `fly deploy` and re-point cadence's Vercel git
-  connection. Preconditions: MONO-001. Spec MONO-002. — (L)
-- [ ] MONO-003 — **PR 3: scaffold track + reflect stubs.** Two empty v3 knowledge
+  connection. Preconditions: MONO-001. Spec MONO-002. — (L) — ✓ FF `ae80a5e`..`cfc6aef` on master (sanctioned bootstrap merge); deploys confirmed
+- [x] MONO-003 — **PR 3: scaffold track + reflect stubs.** Two empty v3 knowledge
   instances (knowledge only, no code; `framework/` not duplicated — pointed at the
   root copy via Locations). Track brief carries the designed MVP work-item
   sequence + `.trace`/`.trail` contract pointers; reflect brief records
   scope-not-yet-defined + an Unknowns list. May land any time after MONO-001. Spec
-  MONO-003. — (S/M)
+  MONO-003. — (S/M) — ✓ PR #156, merged `89d4215`
 - [ ] MONO-004 — **PR 4: workspace + parallelism wiring.** No root workspace (each
   system self-contained, Locked decision 13). Root manifest documents the
   worktree-per-agent flow, the branch-prefix/id-namespace table, cross-system

@@ -3024,3 +3024,24 @@ nested copy slipped through; broadened to `**/.claude/settings.local.json`.
 (→ monorepo, Root Directory `systems/cadence`). MONO-002 stays in CURRENT until confirmed.
 **Next:** await the two deploys; then close MONO-002 → DONE and start MONO-003 (track/reflect
 stubs). MONO-003 may proceed in parallel (it only needs PR 1, already merged).
+
+---
+## 2026-06-24 — MONO-002 + MONO-003 closed; deploys confirmed
+
+**Task:** close MONO-002 (deploys confirmed) + MONO-003 (stubs merged).
+**MONO-002 — deploys confirmed by the user:** `fly deploy systems/gateway` succeeded — `/` healthy,
+the `data` volume / `tokens.db` intact (not recreated), and the cadence frontend kept working against
+the newly deployed server (BLOCKER-001 resolved). Cadence's Vercel project re-pointed → `gillchristian/trail`
+with Root Directory `systems/cadence/` (BLOCKER-002 resolved). All 9 criteria met → DONE. (Code had
+landed via FF `ae80a5e`..`cfc6aef`; deploys are the user's, confirmed 2026-06-24. `fly deploy` builds on
+Fly's remote depot builder by default — that's expected, not a local-build hang.)
+**MONO-003 — merged:** track + reflect v3 knowledge stubs (PR #156, `89d4215`) → DONE. Knowledge-only,
+`framework/` not duplicated, both read cold; track carries the MVP sequence + `.trace`/`.trail` pointers,
+reflect carries Unknowns + a scope blocker (no invented backlog).
+**What changed:** DONE += MONO-003, MONO-002; BACKLOG ticked; BLOCKER-001/002 resolved; CURRENT → MONO-004.
+**What I learned:** the permission system gates *direct pushes to `master`* specifically (not pulls or
+PR merges) — the FF bootstrap-exception push needed explicit user authorization even though the spec
+sanctioned the merge; the user ran `git push origin master` themselves. Correct boundary.
+**Next:** MONO-004 — workspace + parallelism wiring (the **final** migration PR): no root workspace;
+root-manifest worktree-per-agent flow + CI-filtering doc; verify standalone builds + two-worktree
+no-collision. Pulled into CURRENT.
