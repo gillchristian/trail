@@ -1,0 +1,21 @@
+# Xcode / Swift — track system.
+# (The repo-root .gitignore already covers `build/` and `.DS_Store`.)
+
+## Xcode per-user state (never shared)
+xcuserdata/
+*.xcuserstate
+*.xcscmblueprint
+*.xccheckout
+
+## Derived data / build output
+build/
+DerivedData/
+*.moved-aside
+*.hmap
+*.dSYM
+*.dSYM.zip
+*.ipa
+
+## Swift Package Manager (when track adds packages)
+.build/
+.swiftpm/

@@ -57,3 +57,63 @@ AID tab) — TRACK-006 is unblocked on that point.
 **Next:** TRACK-000 — install Xcode, get a SwiftUI hello-world running in the Simulator from
 `systems/track/`, decide Xcode-project-vs-SPM + the iOS deployment target (ADR), seed
 `reference/local-ci.md`. Then TRACK-001 (WI-1 skeleton).
+
+---
+## 2026-06-25 — TRACK-000 started: Swift/iOS bootstrap (Phase A done; Phase B blocked on Xcode)
+
+**Task:** TRACK-000 — Swift/iOS toolchain bootstrap + orientation (`CURRENT.md`). Branch
+`track/track-000-swift-ios-bootstrap`.
+
+**Environment probe:** macOS 14.3, Apple Silicon. **Only Command Line Tools installed** — `swift`
+5.10 is present, but **no full Xcode** → no `xcodebuild`, no iOS SDK, no Simulator (`simctl` missing).
+`brew` present; no xcodegen/xcodes/tuist.
+
+**Decision (user · ADR-0001):** standard checked-in Xcode project (created via the New-Project
+wizard), not XcodeGen/SPM — chosen for learnability (the build owner is new to iOS). Deployment
+target **iOS 17.0** (revisitable; loosening to 16 costs `@Observable`).
+
+**Phase A — done on the branch (no Xcode needed):**
+- Verified the Swift *language* toolchain: compiled + ran a domain-model smoke (value types, enum
+  with associated values, `Codable` round-trip) with CLT `swift` → passes (output quoted in
+  `reference/local-ci.md`).
+- Wrote ADR-0001 (+ INDEX), `reference/swift-orientation.md` (an Elm/Go → Swift primer anchored to
+  track's domain), seeded `reference/local-ci.md`, and promoted TRACK-000 into `CURRENT.md` with
+  phased acceptance criteria.
+
+**Phase B — blocked on the user:** install Xcode (large App Store download), then create the project
+via the wizard into `systems/track/`. Then I scaffold a minimal SwiftUI screen, build via
+`xcodebuild`, run in the Simulator + screenshot, finalize `local-ci.md`, journal, and PR +
+squash-merge the **complete** TRACK-000. **Not merging until the Simulator run is verified.**
+
+**Next:** await "Xcode installed + project created," then Phase B (exact install + wizard steps
+handed to the user).
+
+---
+## 2026-06-25 — TRACK-000 COMPLETE: Swift/iOS toolchain bootstrapped + first app runs in the Simulator
+
+**Task:** TRACK-000 (Phase B). Branch `track/track-000-swift-ios-bootstrap` → PR #161 (squash-merged).
+
+**Install reality (recorded for future-me — these were the time-sinks):** the App Store only offers
+the newest Xcode (26.x → needs macOS 26.2); on **macOS 14.3** the ceiling is **Xcode 15.3** (iOS 17.4
+SDK). `xcodes` via brew won't build on a CLT-only machine (needs `xcbuild` from full Xcode — a
+catch-22), so 15.3 came from Apple Developer Downloads. It expanded/ran from `~/Downloads`, so
+`xcode-select` failed until it was moved to `/Applications`. The iOS 17.4 **simulator runtime** is a
+*separate* ~7 GB download (`xcodebuild -downloadPlatform iOS`) — the SDK alone gives compile +
+Previews but no bootable simulator.
+
+**What landed:**
+- Standard Xcode project (ADR-0001) at `systems/track/Track/`; scheme `Track`, bundle
+  `com.gillchristian.Track`. Removed the wizard's nested git repo; added `systems/track/.gitignore`.
+- `ContentView` = a Trail-themed smoke screen (`#020617` ground, `#fbbf24` runner, "Track").
+- **Verified:** `xcodebuild … -sdk iphonesimulator` → **BUILD SUCCEEDED**; booted iPhone 15 (iOS
+  17.4), installed + launched, **simctl screenshot** at
+  `reference/design/track-000-hello-simulator.png` — the app renders in the Simulator. The Swift
+  *language* smoke (Codable event-log round-trip) was verified earlier on CLT swift.
+- Docs: `reference/local-ci.md` finalized with the verified build/run/screenshot flow; ADR-0001 +
+  `reference/swift-orientation.md` from Phase A.
+
+**Deferred (correct scoping):** the wizard set the deployment target to **17.4**; **TRACK-001 pins
+it** (WI-1 explicitly owns "pin iOS deployment target") — to 17.0 per ADR-0001.
+
+**Next:** TRACK-001 (WI-1) — `NavigationStack` + empty Races-list root + persistence root dir + pin
+the deployment target. The orientation note's Part 4 sketches the skeleton.

@@ -20,4 +20,4 @@ interpreting an ambiguous requirement; anything a teammate should understand lat
 
 ## Index
 
-_(none yet — **stub**.)_
+- [0001](0001-ios-project-tooling-and-deployment-target.md) — iOS project tooling (standard Xcode project) & deployment target (iOS 17.0). *accepted, 2026-06-25 · TRACK-000.*
