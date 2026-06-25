@@ -14,29 +14,34 @@
 **Notes:** scope cuts, links, anything decided while planning.
 ```
 
-### MONO-000 — Framework v2→v3: path indirection (PR 0)
+### MONO-001 — Restructure trail in place (PR 1)
 
-**Source:** BACKLOG — Monorepo migration epic (spec `reference/monorepo-migration-spec.md`, MONO-000)
-**Branch:** `mono/mono-000-framework-v3-path-indirection`
-**Goal:** the framework resolves instance-area locations by *role* from the manifest's
-Locations block instead of hardcoded `../` siblings. Pure framework change — **no file
-moves, no new systems**. Trail keeps working because its manifest declares the same
-locations it already had. De-risks PRs 1–3 (they all instantiate v3 instances and must
-point at a working v3 framework).
+**Source:** BACKLOG — Monorepo migration epic (spec `reference/monorepo-migration-spec.md`, MONO-001)
+**Branch:** `mono/mono-001-restructure-trail` (create off master)
+**Preconditions:** MONO-000 merged (PR #152, `f2b0bd9`). ✓
+**Goal:** move trail's code into `systems/trail/` (history-preserving `git mv`), split its
+knowledge into the **shared tier** (root `framework/` + a new **root manifest** +
+`reference/specs/`) and a **trail v3 instance** under `systems/trail/knowledge/`, and split
+the manifest + `CLAUDE.md` into root (dispatch + repo-wide rules) and system (trail-local
+rules + Locations). Trail still builds and deploys from the new path.
 
 **Acceptance criteria:**
-- [ ] Grep over `knowledge/framework/` returns **no** `\.\./(planning|progress|decisions|reference|whiteboard)/` path-literals — role names only. (verify: grep returns empty)
-- [ ] Instance-free guard still clean: `grep -riE '\btrail\b|\belm\b|batman|gillchristian|coros|samples/' knowledge/framework/` returns nothing (the `context7`-in-"e.g." carve-out still applies).
-- [ ] Manifest skeleton in `SETUP.md` gains the **Locations block** convention (framework/planning/progress/decisions/reference/whiteboard → paths); framework refers to areas by role, the manifest maps roles→paths; the one remaining hardcoded hop is `CLAUDE.md` → manifest.
-- [ ] Trail's manifest (`knowledge/README.md`) + `CLAUDE.md` updated to the v3 convention, declaring the **current (pre-move)** trail paths; trail behaves identically.
-- [ ] `framework/README.md` stamped **Framework v3 (2026-06-24)** with a one-line changelog (path indirection; manifest Locations block). This repo stays the canonical upstream.
-- [ ] Fresh-agent cold read: `CLAUDE.md → manifest → framework` resolves every area with zero prior context (dry-run reasoning recorded in the journal).
-- [ ] Trail's loop unchanged — gates green, output quoted in the journal: `npx elm make src/Main.elm --output=/dev/null` · `npm run build` · `npm run smoke` · `npm run smoke:aidcsv`.
+- [ ] Code moved to `systems/trail/` via `git mv` (`src/ public/ samples/ scripts/ index.html elm.json vite.config.js package.json package-lock.json .envrc .nvmrc MORNING.md`). `git log --follow systems/trail/src/Main.elm` shows pre-move history.
+- [ ] All gates pass **run from `systems/trail/`**: `npx elm make src/Main.elm --output=/dev/null`, `npm run build`, `npm run smoke`, `npm run smoke:aidcsv` (+ the other smokes). Output quoted in the journal.
+- [ ] Knowledge split: `framework/` stays at root (single shared copy); `{planning,progress,decisions,reference,whiteboard}/` → `systems/trail/knowledge/`; the migration spec → shared `knowledge/reference/specs/`.
+- [ ] Manifest split: root `knowledge/README.md` (ROOT MANIFEST — repo-wide delivery/identity/VCS rules + bootstrap-exceptions note + system index) + `systems/trail/knowledge/README.md` (trail-local: branch prefix `trail/`, id-ns `TRAIL-`, Locations pointing at trail's new paths + root framework, local-ci, brief pointer). **No rule duplicated across tiers.**
+- [ ] Dispatch: root `CLAUDE.md` → "which system? read that system's `CLAUDE.md`" + reading chain + repo non-negotiables; `systems/trail/CLAUDE.md` = trail's entry (→ root manifest → system manifest).
+- [ ] Cold-read chain resolves: root `CLAUDE.md` → root manifest → `systems/trail/knowledge/README.md` (Locations) → root `knowledge/framework/`.
+- [ ] Path-dependent config fixed (`vite.config.js` base/root/publicDir; `package.json` scripts; any `scripts/*` assuming repo-root cwd). `.gitignore` consolidated at root; `.claude/` merged at root.
+- [ ] **Vercel (trail) — user action:** Root Directory → `systems/trail`. Surfaced to the user; Vercel build succeeds after they set it (manual confirm, like other deploy steps). Likely logged as a blocker / coordinated at merge time.
 
-**Notes:** First of the 5-PR monorepo migration. The spec is the contract; locked
-decisions are settled (don't reopen). `MONO-` is its own id namespace (not the global
-`TASK-` counter). Ingestion (backlog epic + spec parked in `reference/`) rides on this
-branch as the orientation step.
+**Notes:** Don't move `dist/ elm-stuff/ node_modules/` (regenerate). Append-only history
+(journal/DONE/old ADRs) referencing old paths: **leave untouched** (tombstone convention) —
+fix only *live* pointers (CLAUDE quick-map, local-ci, manifest cross-links). The MONO epic's
+planning rides with trail (origin system) for now; `MONO-` stays the shared-tier namespace.
+**Namespaces:** trail's own feature backlog stays `TASK-` (history); new trail work
+post-split uses `TRAIL-`. The `section.label`/units parking-lot items (TASK-070/071) move
+with trail's planning.
 
 ---
 

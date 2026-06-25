@@ -108,12 +108,12 @@ branch prefix (repo-structural / shared-tier work, spec §3) — *not* the globa
 `fly deploy`; re-point cadence's Vercel git connection) — prepared and surfaced,
 never done autonomously.
 
-- [ ] MONO-000 — **PR 0: framework v2→v3 — path indirection.** The framework
+- [x] MONO-000 — **PR 0: framework v2→v3 — path indirection.** The framework
   resolves instance-area locations by *role* from the manifest's Locations block
   instead of hardcoded `../` siblings. Pure framework change (no file moves, no
   new systems); trail keeps working because its manifest declares the same
   locations it already had. De-risks PRs 1–3, which all instantiate v3 instances.
-  Spec MONO-000. — (M)
+  Spec MONO-000. — (M) — ✓ PR #152, merged `f2b0bd9`
 - [ ] MONO-001 — **PR 1: restructure trail in place.** `git mv` trail's code into
   `systems/trail/`; split knowledge into the shared tier (root `framework/` + root
   manifest + `reference/specs/`) and a trail v3 instance under
