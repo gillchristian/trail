@@ -25,10 +25,10 @@ and a federated knowledge base:
 | reflect   | `systems/reflect`   | `reflect/`    | `REFLECT-` | — (none yet)         |
 | (shared)  | `knowledge/`        | `mono/`       | `MONO-`    | —                    |
 
-As of MONO-003, all five systems are present: **trail**, **cadence**, **gateway**
-(built + deployed) and **track**, **reflect** (v3 knowledge stubs, no code yet).
-Parallelism wiring lands in MONO-004. The migration contract is
-`knowledge/reference/specs/monorepo-migration-spec.md`.
+As of MONO-004, all five systems are present and the migration is complete: **trail**,
+**cadence**, **gateway** (built + deployed) and **track**, **reflect** (v3 knowledge
+stubs, no code yet). The parallel-agent operating model is in **Parallelism & workspace**
+below. The migration contract is `knowledge/reference/specs/monorepo-migration-spec.md`.
 
 ## Delivery posture (repo-wide ceiling)
 
@@ -84,8 +84,38 @@ Outside this list, squash-only / `master`-sacred admit no exceptions.
 - **Where `MONO-` work is tracked:** during the migration the `MONO-` epic rides in
   **trail's** instance (`systems/trail/knowledge/planning` + `progress`) — trail is
   the origin system the monorepo was born from. A `MONO-` task is pulled into
-  trail's planning, branched `mono/…`, journaled in trail's progress. MONO-004
-  revisits the parallelism model.
+  trail's planning, branched `mono/…`, journaled in trail's progress. (The
+  parallel-agent operating model is documented under **Parallelism & workspace** below.)
+
+## Parallelism & workspace
+
+The monorepo is built for **one agent per system, in parallel**. No root workspace —
+each system is self-contained, and the structure keeps concurrent agents from colliding.
+
+- **No root `package.json`/`node_modules`** (Locked decision 13). Each system owns its
+  install (`systems/<s>/package.json` + `node_modules`, or `go.mod` for gateway) and
+  **builds/tests from its own dir**. No hoisting, no workspace declaration, no root install
+  step. (A root manifest appears only if a genuinely global dev dependency ever emerges —
+  avoided otherwise.)
+- **One git worktree per active agent** (isolated working tree, shared object store + branch
+  namespace): `git worktree add ../trail-wt trail/<task>`. Disjointness on three axes makes two
+  agents collision-free:
+  - **Files** — each system lives under its own `systems/<s>/` subtree; an agent edits only its
+    system's code + its own `knowledge/` instance.
+  - **Branches** — the per-system prefixes in the index table (`trail/`, `cadence/`, `gateway/`,
+    `track/`, `reflect/`; `mono/` for shared) keep branch namespaces disjoint — no two agents
+    contend for a branch name.
+  - **State** — planning/progress are per-system; there is no shared mutable planning/status file
+    (see Shared-tier discipline), so two agents never write the same file. Cross-system status is
+    a read-time projection over each system's `progress/`.
+- **CI / deploy isolation (path-filtered per system)** — a one-system commit must not rebuild the
+  others:
+  - **fly (gateway):** `.github/workflows/fly-deploy.yml` is path-filtered to `systems/gateway/**`
+    (and `workflow_dispatch`-only today — manual deploys).
+  - **Vercel (trail, cadence):** each project is rooted at its own system dir (`systems/trail`,
+    `systems/cadence`) with **Skip deployments when there are no changes to the root directory**
+    enabled, so a commit touching only the other system is skipped. Self-contained installs mean
+    **no** "include files outside the Root Directory" is needed.
 
 ## Layout (shared tier)
 
