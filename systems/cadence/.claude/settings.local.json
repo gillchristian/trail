@@ -1,0 +1,41 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npx vite build:*)",
+      "Bash(npx tsx:*)",
+      "Bash(lsof:*)",
+      "Bash(kill:*)",
+      "Bash(npm run lint:*)",
+      "Bash(head:*)",
+      "Bash(git mv:*)",
+      "Bash(git rm:*)",
+      "Bash(npm --prefix /Users/bb8/dev/cadence/client run build)",
+      "Bash(npm --prefix /Users/bb8/dev/cadence/client run lint)",
+      "Bash(npm run build:*)",
+      "Bash(git -C /Users/bb8/dev/cadence status)",
+      "Bash(git log:*)",
+      "Bash(go version:*)",
+      "Bash(go mod init:*)",
+      "Bash(go mod tidy:*)",
+      "Bash(go build:*)",
+      "WebSearch",
+      "WebFetch(domain:fly.io)",
+      "Bash(find /Users/bb8/dev/cadence -type f -name \"*.ts\" -o -name \"*.tsx\" -o -name \"*.go\" -o -name \"*.json\" | grep -E \"\\\\.\\(ts|tsx|go|json\\)$\" | head -50)",
+      "WebFetch(domain:developers.strava.com)",
+      "mcp__context7__resolve-library-id",
+      "mcp__context7__query-docs",
+      "WebFetch(domain:communityhub.strava.com)",
+      "WebFetch(domain:stackoverflow.com)",
+      "WebFetch(domain:groups.google.com)",
+      "Bash(curl:*)",
+      "Bash(node -e \":*)",
+      "Bash(npm:*)",
+      "Bash(grep -r \":*)"
+    ]
+  },
+  "disabledMcpjsonServers": [
+    "strava"
+  ]
+}
