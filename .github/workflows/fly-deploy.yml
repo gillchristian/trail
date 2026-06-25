@@ -1,0 +1,28 @@
+# Fly deploy for the **gateway** system (fly app `cadence`).
+#
+# NOTE: deploys are MANUAL today (no active auto-deploy). This workflow is moved into
+# the monorepo for completeness and kept correct for if/when CI deploy is wired. To
+# enable it, set the `FLY_API_TOKEN` repo secret (a "when you wire CI" prerequisite,
+# not a migration blocker). See systems/gateway/knowledge/README.md → Deploy.
+#
+# See https://fly.io/docs/app-guides/continuous-deployment-with-github-actions/
+
+name: Fly Deploy (gateway)
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - 'systems/gateway/**'
+jobs:
+  deploy:
+    name: Deploy gateway
+    runs-on: ubuntu-latest
+    concurrency: deploy-group    # ensure only one deploy runs at a time
+    steps:
+      - uses: actions/checkout@v4
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+      - run: flyctl deploy --local-only
+        working-directory: systems/gateway
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}

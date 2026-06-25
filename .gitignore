@@ -16,10 +16,20 @@ Thumbs.db
 .env.local
 .env.*.local
 
-# Claude Code (per-user, not shared)
-.claude/settings.local.json
+# Claude Code (per-user, not shared) — any system
+**/.claude/settings.local.json
 
 # Build
 node_modules/
 dist/
+dist-ssr/
 elm-stuff/
+
+# Cadence/gateway: secrets, SQLite, Go build output (never tracked — live on the fly volume)
+tokens.json
+tokens.db
+*.db
+cadence-server
+
+# Vite local env files (any system)
+*.local

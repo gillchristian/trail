@@ -1,54 +1,69 @@
-# knowledge/
+# systems/cadence/knowledge/ — cadence system manifest
 
-The source of truth for autonomous work on this project. Everything I need to keep working without supervision lives here.
+Cadence's instance of the knowledge framework. Cadence is the **frontend** (React 19 +
+Vite + Tailwind v4 + Recharts) that visualizes a runner's Strava trends; it talks to
+the **gateway** backend for OAuth + data. **Read the repo-root manifest first**
+(`/knowledge/README.md`) for the repo-wide rules this system inherits; this file adds
+only cadence-local truth.
 
-## Layout
+Reading chain: root `CLAUDE.md` → root manifest → **this file** →
+`knowledge/framework/` (the shared copy at the repo root) → the `pr` profile in
+`framework/delivery.md`.
 
-- **philosophy/** — Stable principles. The "why" and the "how we work." Read first, change rarely.
-- **planning/** — The active plan: backlog, current focus, next steps. This is where work is chosen.
-- **progress/** — A running log of what was done, what was verified, what broke. Append-only.
-- **decisions/** — One file per non-trivial decision (an ADR). Captures *why* a path was chosen.
-- **reference/** — Project facts: domain glossary, external APIs, fixed constraints, integration specs. Things I look up.
+## A fresh v3 instance
 
-## The loop
+This instance starts **fresh** (empty planning, fresh journal). The pre-monorepo
+cadence repo's unified knowledge — its history, ADRs, journal, and the
+trail-integration arc — went to **gateway** (`systems/gateway/knowledge/`), the primary
+inheritor, because it covered both deployables and doesn't bisect cleanly between
+frontend and backend. New cadence-frontend work is logged here as `CAD-`.
 
-Every working session follows the same shape:
+## Delivery
 
-1. **Orient** — Read `planning/CURRENT.md` to find the next task. If empty, refill from `planning/BACKLOG.md`.
-2. **Plan the task** — Write the acceptance criteria into `planning/CURRENT.md` before touching code.
-3. **Branch** — `git checkout master && git pull --ff-only && git checkout -b <kind>/task-NNN-slug` (see `philosophy/pr-workflow.md` for naming).
-4. **Execute** — Implement, committing as I go. Commits authored by the user only — no Claude credit.
-5. **Verify** — Run the gates defined in `philosophy/verification.md`. Local CI (build + vet + lint) plus the project-specific manual smoke. If any fail, fix before moving on.
-6. **PR** — `gh pr create` with the template in `pr-workflow.md`. Merge it (`gh pr merge --squash --delete-branch`).
-7. **Log** — Append a one-paragraph entry to `progress/journal.md` with timestamp, PR number, merge sha, what was verified, and what's next.
-8. **Advance** — Move task to `DONE.md`, sync `master`, pull the next task into `CURRENT.md`.
+Inherits the repo-wide ceiling defined in the root manifest (**pr**; squash-only;
+`master` sacred; user-only attribution). Cadence does not narrow it.
 
-If I ever feel stuck or unsure, the answer is in `philosophy/when-stuck.md` — not in asking the user.
+- **Branch prefix:** `cadence/` (e.g. `cadence/cad-001-…`).
+- **Task-id namespace:** `CAD-`, starting at `CAD-001`.
 
-## Where the current work comes from
+## Locations
 
-Cadence is currently being extended to also serve as the OAuth + Strava-proxy backend for **trail** (`~/dev/trail/`), a separate Elm app. The full spec is at:
+framework:  knowledge/framework
+planning:   systems/cadence/knowledge/planning
+progress:   systems/cadence/knowledge/progress
+decisions:  systems/cadence/knowledge/decisions
+reference:  systems/cadence/knowledge/reference
+whiteboard: systems/cadence/knowledge/whiteboard
 
-**`/Users/bb8/dev/trail/knowledge/reference/cadence-backend-spec.md`**
+(`framework` is the shared copy at the repo root; the rest are cadence's. Paths
+repo-root-relative.)
 
-The initial backlog (`planning/BACKLOG.md`) is seeded with the five PRs that spec calls for. trail remains the *driver* of this initiative: requirements live there, not here. Cadence's job is to implement what the spec asks for without growing trail-specific domain state on the server.
+## The loop, instantiated for cadence
 
-`reference/trail-integration.md` summarises the integration and links to the canonical spec.
+1. **Orient** — read the planning area's `CURRENT.md`; if empty, promote the top of `BACKLOG.md`.
+2. **Plan** — acceptance criteria into `CURRENT.md` before code.
+3. **Branch** — `git checkout master && git pull --ff-only && git checkout -b cadence/<task-id>-<slug>`.
+4. **Execute** — implement from `systems/cadence/`, committing as I go.
+5. **Verify** — gates in `framework/verification.md`; **run from `systems/cadence/`**:
+   `npm run build` (tsc + vite), `npm run lint`.
+6. **PR** — `gh pr create`, then `gh pr merge --squash --delete-branch`.
+7. **Log** — journal entry with PR number, merge sha, quoted verification.
+8. **Advance** — close PR; move task to `DONE.md`; sync `master`.
 
-## Index of key documents
+Stuck? `framework/when-stuck.md` — not asking the user.
 
-- `philosophy/principles.md` — Core values, what to prioritize.
-- `philosophy/verification.md` — How to know a task is actually done.
-- `philosophy/when-stuck.md` — Decision tree for ambiguity, errors, dead-ends.
-- `philosophy/working-style.md` — Cadence, scope discipline, anti-patterns.
-- `philosophy/pr-workflow.md` — Branching, commit conventions, PR open/merge flow, author identity.
-- `planning/CURRENT.md` — Active task with acceptance criteria. One task at a time.
-- `planning/BACKLOG.md` — Ordered list of upcoming work.
-- `planning/DONE.md` — Completed tasks (moved here from CURRENT).
-- `progress/journal.md` — Chronological log, append-only.
-- `progress/blockers.md` — Things that genuinely require user input — surface at session end.
-- `decisions/INDEX.md` — Pointers to ADRs.
-- `reference/project-brief.md` — What cadence is and what's in scope.
-- `reference/trail-integration.md` — Summary of the trail integration (shipped 2026-05-15) and pointer to the upstream spec at `~/dev/trail/knowledge/reference/cadence-backend-spec.md`.
-- `reference/caching.md` — Three-layer caching strategy (activity list, activity detail, client-side).
-- `reference/glossary.md` — Project-specific terms.
+## Deploy (Vercel)
+
+Vercel project re-pointed to this monorepo, Root Directory `systems/cadence`. Set
+`VITE_API_URL` to the gateway URL. The Strava redirect URL, domain, and env vars
+survive the re-point.
+
+## Layout (cadence instance)
+
+- **planning/** — `CURRENT.md`, `BACKLOG.md`, `DONE.md`.
+- **progress/** — `journal.md` (append-only), `blockers.md`.
+- **decisions/** — ADRs + `INDEX.md` (none yet).
+- **reference/** — `project-brief.md` (the frontend brief).
+- **whiteboard/** — discussions in flight; index in its README.
+
+If the brief and `CURRENT.md` disagree, the brief wins and `CURRENT.md` is updated.

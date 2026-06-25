@@ -25,10 +25,9 @@ and a federated knowledge base:
 | reflect   | `systems/reflect`   | `reflect/`    | `REFLECT-` | — (none yet)         |
 | (shared)  | `knowledge/`        | `mono/`       | `MONO-`    | —                    |
 
-As of MONO-001 only **trail** is populated (`systems/trail/`); cadence + gateway
-arrive in MONO-002, the track/reflect stubs in MONO-003, parallelism wiring in
-MONO-004. The migration contract is
-`knowledge/reference/specs/monorepo-migration-spec.md`.
+As of MONO-002, **trail**, **cadence**, and **gateway** are populated; the
+track/reflect stubs arrive in MONO-003, parallelism wiring in MONO-004. The
+migration contract is `knowledge/reference/specs/monorepo-migration-spec.md`.
 
 ## Delivery posture (repo-wide ceiling)
 
@@ -52,9 +51,11 @@ PR). A system manifest may *narrow* this ceiling, never widen it.
 
 1. **The `Batman` root commit** (subject "Batman", no parents) — the only direct
    commit to `master`, ever. Predates the framework.
-2. *(reserved for MONO-002)* the single `git subtree add --allow-unrelated-histories`
-   merge that imports cadence's history inline — one merge commit on `master`, the
-   only sanctioned non-squash merge. Recorded here when it lands.
+2. **The cadence-import merge** — MONO-002 (2026-06-24): `git subtree add
+   --prefix=systems/cadence <cadence> master` brought the cadence repo's full history
+   inline as commit `ae80a5e` (parents: monorepo + cadence `b103457`) — the single
+   sanctioned non-squash merge, landed on `master` by fast-forward so it stays exactly
+   one merge commit. Sets no precedent.
 
 Outside this list, squash-only / `master`-sacred admit no exceptions.
 
