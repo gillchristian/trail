@@ -30,15 +30,16 @@ non-squash merge permitted for this task. Record it in the root manifest's *Boot
 exceptions* note. No other non-squash merge.
 
 **Acceptance criteria:**
-- [ ] `systems/gateway`: `go build ./...` + `go test ./...` pass from the new root; Docker image builds from the `systems/gateway` context (`docker build -f systems/gateway/Dockerfile systems/gateway`).
-- [ ] Gateway flatten edits: `fly.toml` `dockerfile = 'Dockerfile'` (app stays `cadence` — Locked decision 7); Dockerfile COPY/WORKDIR paths de-`server/`-ed; image verified to build from the new context **before** any live deploy.
-- [ ] `systems/cadence`: `npm install && npm run build` (tsc + vite) passes from `systems/cadence`.
-- [ ] Exactly **one** non-squash merge commit on `master` from this PR, recorded in the root manifest's bootstrap-exceptions note.
-- [ ] `tokens.db`/`tokens.json` absent from the tree + present in `.gitignore`; `server/.env.example` → `systems/gateway/.env.example` present.
-- [ ] Knowledge routed (spec table): gateway gets cadence ADRs 0001–0004 + `caching.md` + project-brief server slice + planning + journal/blockers (tombstoned "covers pre-monorepo cadence client+server"); `trail-integration.md` → shared `reference/specs/`; v1 `philosophy/` discarded with a one-line gateway-README tombstone. Cadence starts a fresh v3 instance (manifest branch `cadence/`, id-ns `CAD-`, empty planning, fresh journal/blockers, client-slice brief). Both read cold; no orphaned `philosophy/` refs in live pointers.
-- [ ] `.github/workflows/fly-deploy.yml` → root `.github/workflows/`, path-filtered `systems/gateway/**`, deploy step pointed at the new dir. `FLY_API_TOKEN` noted as a "when you wire CI" prereq (not a migration blocker — manual deploys).
-- [ ] **fly (gateway) — user action:** image builds locally; then **ask the user** to run `fly deploy systems/gateway` + confirm `/` health and the `data` volume / `tokens.db` intact (not recreated). Do not deploy autonomously.
-- [ ] **Vercel (cadence) — user action:** re-point the cadence project's git connection → monorepo; Root Directory `systems/cadence`; build green; Strava redirect URL + domain + env vars intact.
+_Code/knowledge landed on `master` via fast-forward (`ae80a5e`..`e0f60a0`); criteria 1–7 verified on the branch. Criteria 8–9 are the user deploy actions (BLOCKER-001/002) — MONO-002 stays active until they confirm._
+- [x] `systems/gateway`: `go build ./...` + `go test ./...` pass from the new root; Docker image builds from the `systems/gateway` context (verified twice — incl. the final knowledge-dockerignored context).
+- [x] Gateway flatten edits: `fly.toml` `dockerfile = 'Dockerfile'` (app stays `cadence`); Dockerfile `COPY server/… → COPY …`; image verified to build from the new context before any live deploy.
+- [x] `systems/cadence`: `npm install && npm run build` (tsc + vite, 720 modules) passes from `systems/cadence`.
+- [x] Exactly **one** non-squash merge commit on `master` (`ae80a5e`, the `git subtree` import), recorded in the root manifest's bootstrap-exceptions note.
+- [x] `tokens.db`/`tokens.json` absent from the tree + gitignored; `server/.env.example` → `systems/gateway/.env.example` present.
+- [x] Knowledge routed: gateway inherits cadence ADRs 0001–0004 + `caching.md`/`glossary.md` + planning + journal/blockers + a backend brief (v1 `philosophy/` discarded; v1→v3 + inherited-history tombstones in the gateway README); `trail-integration.md` → shared `reference/specs/`; cadence is a fresh v3 instance (branch `cadence/`, id-ns `CAD-`, empty planning, fresh journal/blockers, client brief). Both read cold.
+- [x] `.github/workflows/fly-deploy.yml` → root, path-filtered `systems/gateway/**`, `working-directory: systems/gateway`, marked inactive; `FLY_API_TOKEN` noted as a "when you wire CI" prereq.
+- [ ] ⏳ **fly (gateway) — user action (BLOCKER-001):** run `fly deploy systems/gateway` + confirm `/` health and the `data` volume / `tokens.db` intact (not recreated). Image builds locally ✓.
+- [ ] ⏳ **Vercel (cadence) — user action (BLOCKER-002):** re-point the cadence project's git connection → monorepo; Root Directory `systems/cadence`; build green; Strava redirect URL + domain + env vars intact.
 
 **Notes:** Locked decision 7 — fly app stays `cadence` (renaming orphans the `data` volume);
 the *dir* is `gateway`, the *app* independent. Drop cadence's root `package.json`/lock

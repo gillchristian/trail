@@ -2984,3 +2984,43 @@ flattened) via the one sanctioned `git subtree` non-squash merge; fix fly.toml/D
 the flattened gateway + verify the image builds locally; route v1 knowledge → gateway+cadence
 v3 instances. Pulled into CURRENT. Two user deploy actions at the end (fly deploy, cadence
 Vercel re-point).
+
+---
+## 2026-06-24 — MONO-002: import cadence (PR 2) — code landed, deploys pending
+
+**Task:** MONO-002 — PR 2 of the monorepo migration (the bootstrap-exception PR).
+**What I did:** Imported the external cadence repo via `git subtree add --prefix=systems/cadence
+/Users/bb8/dev/cadence master` → one merge commit `ae80a5e` (parents: monorepo `3133c21` +
+cadence `b103457`), history preserved, no `tokens.db`/`tokens.json` (untracked in cadence).
+Flattened `server/`→`systems/gateway/` (Go backend) and `client/`→`systems/cadence/` (TS/Vite
+frontend); dropped cadence's root workspace `package.json`; de-`server/`'d the Dockerfile
+(`COPY go.mod go.sum ./`; `COPY . .`) + pointed `fly.toml` at `dockerfile = 'Dockerfile'`
+(app stays `cadence` — Locked decision 7); tidied `.dockerignore`. Routed cadence's v1
+knowledge: gateway is the primary inheritor (planning/journal/blockers, ADRs 0001–0004,
+caching/glossary, a backend brief) under a v1→v3 + inherited-history tombstone; `philosophy/`
+discarded; `trail-integration.md` → shared `reference/specs/`; cadence got a fresh v3 instance.
+Moved `fly-deploy.yml` → root (path-filtered `systems/gateway/**`, inactive); consolidated
+`.gitignore` (tokens/db/cadence-server + nested `.claude/settings.local.json`); untracked
+cadence's stray `.claude/settings.local.json`. Recorded the bootstrap exception in the root
+manifest. **Landed on `master` by fast-forward** (`ae80a5e`..`e0f60a0`) — exactly one merge
+commit, no GitHub PR (squash/rebase would destroy the merge; the FF preserves it — the
+sanctioned `master`-sacred exception, like `Batman`).
+**What I verified (quoted), on the branch before the FF-push:**
+- gateway `go build ./...` → `BUILD OK`; `go test ./...` → `ok cadence-server/handlers`, `ok cadence-server/strava`.
+- **`docker build -f systems/gateway/Dockerfile systems/gateway`** → image written (verified twice — incl. the final knowledge-dockerignored context). `docker build OK`.
+- cadence `npm install` + `npm run build` (tsc + vite) → `✓ 720 modules transformed` / `✓ built`.
+- `git ls-files | grep tokens.(db|json)` → empty; `git check-ignore tokens.db tokens.json systems/gateway/tokens.db` → all ignored; `systems/gateway/.env.example` present.
+- gateway + cadence knowledge instances read cold via the chain.
+**What changed:** subtree merge `ae80a5e` + flatten `4d5d21f` + knowledge/config `e0f60a0`,
+fast-forwarded onto `master`. Branch `mono/mono-002-import-cadence` (deleted post-FF).
+**What I learned:** (1) `git subtree add` brings the whole repo at one prefix — flattening to
+two destinations (gateway + cadence) is a *follow-up* restructure, not part of the import.
+(2) "Exactly one merge commit on master" forces a **fast-forward push**, not a GitHub PR merge
+(squash/rebase linearize away the merge; "create a merge commit" adds a second). (3) Cadence
+had a stray tracked `.claude/settings.local.json` — the root ignore was root-anchored, so the
+nested copy slipped through; broadened to `**/.claude/settings.local.json`.
+**Blocked on (BLOCKER-001/002):** the two user deploy actions — `fly deploy systems/gateway`
+(confirm health + `data` volume/`tokens.db` intact) and re-pointing cadence's Vercel project
+(→ monorepo, Root Directory `systems/cadence`). MONO-002 stays in CURRENT until confirmed.
+**Next:** await the two deploys; then close MONO-002 → DONE and start MONO-003 (track/reflect
+stubs). MONO-003 may proceed in parallel (it only needs PR 1, already merged).
