@@ -411,10 +411,8 @@ private struct FeedRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            Image(systemName: icon).font(.subheadline).foregroundStyle(.white)
-                .frame(width: 34, height: 34)
-                .background(tint, in: RoundedRectangle(cornerRadius: 9))
-            Text(label).font(.subheadline)
+            FeedIcon(kind: entry.kind)
+            Text(entry.kind.title).font(.subheadline)
             Spacer()
             Text(entry.at.formatted(date: .omitted, time: .standard))
                 .font(.caption).foregroundStyle(.secondary).monospacedDigit()
@@ -422,20 +420,36 @@ private struct FeedRow: View {
         .padding(.vertical, 2)
         .accessibilityElement(children: .combine)
     }
+}
 
-    private var label: String {
-        switch entry.kind {
-        case .raceStarted:            return "Race started"
-        case .raceEnded:              return "Race finished"
-        case let .intake(label):      return label
-        case let .aidArrived(label):  return "\(label) — arrived"
-        case let .aidLeft(label):     return "\(label) — left"
-        case let .voiceNote(seconds): return "Voice note (\(Int(seconds.rounded()))s)"
+/// The square tinted glyph that leads an event row — shared by the in-race Feed and the post-race timeline.
+private struct FeedIcon: View {
+    let kind: FeedEntry.Kind
+
+    var body: some View {
+        Image(systemName: kind.icon).font(.subheadline).foregroundStyle(.white)
+            .frame(width: 34, height: 34)
+            .background(kind.tint, in: RoundedRectangle(cornerRadius: 9))
+    }
+}
+
+/// Shared visual vocabulary for an event row — used by the in-race Feed (`FeedRow`) and the post-race
+/// timeline (`TimelineRow`). Icon + tint are identical in both; `title` is the row text (the post-race
+/// voice-note row replaces it with an inline play control + duration).
+private extension FeedEntry.Kind {
+    var title: String {
+        switch self {
+        case .raceStarted:               return "Race started"
+        case .raceEnded:                 return "Race finished"
+        case let .intake(label):         return label
+        case let .aidArrived(label):     return "\(label) — arrived"
+        case let .aidLeft(label):        return "\(label) — left"
+        case let .voiceNote(_, seconds): return "Voice note (\(Int(seconds.rounded()))s)"
         }
     }
 
-    private var icon: String {
-        switch entry.kind {
+    var icon: String {
+        switch self {
         case .raceStarted:  return "flag.fill"
         case .raceEnded:    return "flag.checkered"
         case .intake:       return "fork.knife"
@@ -445,8 +459,8 @@ private struct FeedRow: View {
         }
     }
 
-    private var tint: Color {
-        switch entry.kind {
+    var tint: Color {
+        switch self {
         case .raceStarted, .raceEnded:   return Theme.green
         case .intake:                    return Theme.amber
         case .aidArrived, .aidLeft:      return Color(red: 47/255, green: 111/255, blue: 176/255)
@@ -556,34 +570,262 @@ private struct UndoToast: View {
     }
 }
 
-// MARK: - Finished (minimal read placeholder; full post-race view is WI-7)
+// MARK: - Finished (post-race race view; WI-7)
 
-/// A Finished race opens to a minimal read surface: the resolved summary header + the event Feed. The
-/// full post-race view — inline clip playback, edit-finish-time, per-visit summary — is WI-7 (TRACK-007).
+/// The post-race surface (mvp-plan.md §6.4): a resolved **summary** (counts + per-visit dwell + per-item
+/// intake totals), an **editable finish time** (`endTimeCorrected`, never a mutation), and the chronological
+/// event **timeline** with **inline clip playback** — the one place audio plays (tracking-view-spec.md §4
+/// keeps it out of the in-race Feed). Replaces WI-6's minimal placeholder.
 private struct FinishedRaceView: View {
     let tracker: RaceTracker
+    @State private var player = AudioPlayer()
+    @State private var editingFinish = false
 
     var body: some View {
-        VStack(spacing: 0) {
-            VStack(spacing: 6) {
+        let summary = tracker.summary
+        List {
+            Section { SummaryHeader(summary: summary) }
+
+            if !summary.visits.isEmpty {
+                Section("Aid stations") {
+                    ForEach(summary.visits) { VisitDurationRow(visit: $0) }
+                }
+            }
+            if !summary.intakeTotals.isEmpty {
+                Section("Intake") {
+                    ForEach(summary.intakeTotals) { IntakeTotalRow(total: $0) }
+                }
+            }
+
+            Section("Timeline") {
+                if tracker.feed.isEmpty {
+                    Text("No events were recorded.").font(.subheadline).foregroundStyle(.secondary)
+                } else {
+                    // Oldest → newest: the race read as a story start→finish ("chronological", §6.4) —
+                    // intentionally unlike the in-race Feed's newest-first (OQ-4).
+                    ForEach(tracker.feed) { entry in
+                        TimelineRow(entry: entry, effectiveEnd: tracker.effectiveEnd,
+                                    player: player, clipURL: tracker.clipURL)
+                    }
+                }
+            }
+        }
+        .navigationTitle(tracker.race.name).navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button { editingFinish = true } label: { Label("Edit finish", systemImage: "pencil") }
+                    .accessibilityIdentifier("editFinish")
+            }
+        }
+        .sheet(isPresented: $editingFinish) {
+            EditFinishView(start: tracker.startedAt, current: tracker.effectiveEnd) {
+                tracker.correctEndTime(to: $0)
+            }
+        }
+        .onDisappear { player.stop() }
+    }
+}
+
+/// The summary section's header: the big total duration, the start→end span, and the headline counts.
+private struct SummaryHeader: View {
+    let summary: RaceSummary
+
+    var body: some View {
+        VStack(spacing: 10) {
+            VStack(spacing: 4) {
                 Label("Finished", systemImage: "flag.checkered")
-                    .font(.headline).foregroundStyle(Theme.green)
-                if let start = tracker.startedAt, let end = tracker.effectiveEnd {
-                    Text(RaceFormat.duration(end.timeIntervalSince(start)))
-                        .font(.largeTitle.weight(.bold)).monospacedDigit()
+                    .font(.subheadline.weight(.semibold)).foregroundStyle(Theme.green)
+                if let total = summary.totalDuration {
+                    Text(RaceFormat.duration(total))
+                        .font(.system(size: 44, weight: .bold)).monospacedDigit()
+                        .accessibilityIdentifier("totalDuration")
+                }
+                if let start = summary.startedAt, let end = summary.effectiveEnd {
                     Text("\(start.formatted(date: .abbreviated, time: .shortened)) → \(end.formatted(date: .omitted, time: .shortened))")
                         .font(.caption).foregroundStyle(.secondary)
                 }
-                Text("Full post-race review (clip playback, edit finish time, summary) arrives in WI-7.")
-                    .font(.caption2).foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center).padding(.top, 4)
             }
-            .frame(maxWidth: .infinity).padding()
-            .background(Color(.secondarySystemBackground))
+            .frame(maxWidth: .infinity)
 
-            FeedTabView(entries: tracker.feed)
+            HStack(spacing: 0) {
+                CountCell(value: summary.aidVisitCount, caption: "aid visits")
+                Divider().frame(height: 32)
+                CountCell(value: summary.intakeCount, caption: "intakes")
+                Divider().frame(height: 32)
+                CountCell(value: summary.voiceNoteCount, caption: "notes")
+            }
         }
-        .navigationTitle(tracker.race.name).navigationBarTitleDisplayMode(.inline)
+        .padding(.vertical, 6)
+    }
+}
+
+private struct CountCell: View {
+    let value: Int
+    let caption: String
+
+    var body: some View {
+        VStack(spacing: 2) {
+            Text("\(value)").font(.title2.weight(.bold)).monospacedDigit()
+            Text(caption).font(.caption2).foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity)
+    }
+}
+
+private struct VisitDurationRow: View {
+    let visit: RaceSummary.VisitDuration
+
+    var body: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(visit.label).font(.subheadline.weight(.medium))
+                Text("Arrived \(visit.enteredAt.formatted(date: .omitted, time: .shortened))")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            Spacer()
+            // dwell = exit − entry; "—" when the exit was never marked (GPS reconstructs it later, app 3).
+            Text(visit.dwell.map(RaceFormat.duration) ?? "—")
+                .font(.subheadline).monospacedDigit()
+                .foregroundStyle(visit.dwell == nil ? .secondary : .primary)
+        }
+    }
+}
+
+private struct IntakeTotalRow: View {
+    let total: RaceSummary.IntakeTotal
+
+    var body: some View {
+        HStack {
+            Text(total.label).font(.subheadline)
+            Spacer()
+            Text("×\(total.count)").font(.subheadline).foregroundStyle(.secondary).monospacedDigit()
+        }
+    }
+}
+
+/// One post-race timeline row. Mirrors the Feed's icon + tint; the finished milestone shows the *effective*
+/// end (a correction is applied here, not as its own row), and a voice note becomes an inline play control.
+private struct TimelineRow: View {
+    let entry: FeedEntry
+    let effectiveEnd: Date?
+    let player: AudioPlayer
+    let clipURL: (String) -> URL
+
+    var body: some View {
+        HStack(spacing: 12) {
+            FeedIcon(kind: entry.kind)
+            if case let .voiceNote(filename, seconds) = entry.kind {
+                Button {
+                    player.toggle(id: entry.id, url: clipURL(filename))
+                } label: {
+                    Label("Voice note · \(Int(seconds.rounded()))s",
+                          systemImage: player.playingID == entry.id ? "stop.circle.fill" : "play.circle.fill")
+                        .font(.subheadline)
+                }
+                .buttonStyle(.plain).foregroundStyle(Theme.amber)
+                .accessibilityIdentifier("playClip")
+                .accessibilityValue(player.playingID == entry.id ? "playing" : "stopped")
+            } else {
+                Text(entry.kind.title).font(.subheadline)
+            }
+            Spacer()
+            Text(displayTime.formatted(date: .omitted, time: .standard))
+                .font(.caption).foregroundStyle(.secondary).monospacedDigit()
+        }
+        .padding(.vertical, 2)
+    }
+
+    // The finished row reads the effective end (the correction), not the raw raceEnded timestamp (§6.4).
+    private var displayTime: Date {
+        if case .raceEnded = entry.kind, let effectiveEnd { return effectiveEnd }
+        return entry.at
+    }
+}
+
+// MARK: - Edit finish time (§6.4)
+
+/// The finish-time correction sheet: a date+time picker (never earlier than the start) whose Save appends an
+/// `endTimeCorrected`. A live duration row shows the effect before committing.
+private struct EditFinishView: View {
+    let start: Date?
+    let onSave: (Date) -> Void
+    @Environment(\.dismiss) private var dismiss
+    @State private var finish: Date
+
+    init(start: Date?, current: Date?, onSave: @escaping (Date) -> Void) {
+        self.start = start
+        self.onSave = onSave
+        _finish = State(initialValue: current ?? Date())
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    DatePicker("Finish time", selection: $finish,
+                               in: (start ?? .distantPast)...,
+                               displayedComponents: [.date, .hourAndMinute])
+                        .accessibilityIdentifier("finishPicker")
+                } footer: {
+                    Text("Appends a correction — the original finish stays in the log. Use it when the recorded finish is off (e.g. the phone died and powered on late).")
+                }
+                if let start {
+                    Section {
+                        LabeledContent("Duration", value: RaceFormat.duration(finish.timeIntervalSince(start)))
+                            .monospacedDigit()
+                    }
+                }
+            }
+            .navigationTitle("Edit finish time").navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") { onSave(finish); dismiss() }.accessibilityIdentifier("saveFinish")
+                }
+            }
+        }
+        .presentationDetents([.medium])
+    }
+}
+
+// MARK: - Clip playback (post-race; §6.4)
+
+/// Inline voice-clip playback for the post-race view — the only place audio plays (capture-now-review-later).
+/// One clip at a time: `playingID` drives the active row's play/stop glyph and resets when playback finishes.
+@Observable final class AudioPlayer: NSObject, AVAudioPlayerDelegate {
+    private(set) var playingID: EventID?
+    @ObservationIgnored private var player: AVAudioPlayer?
+
+    /// Toggle the clip for `id`: tapping the playing row stops it; tapping another switches to it.
+    func toggle(id: EventID, url: URL) {
+        if playingID == id { stop() } else { play(id: id, url: url) }
+    }
+
+    private func play(id: EventID, url: URL) {
+        stop()
+        do {
+            try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default)
+            try AVAudioSession.sharedInstance().setActive(true)
+            let player = try AVAudioPlayer(contentsOf: url)
+            player.delegate = self
+            guard player.play() else { return }
+            self.player = player
+            playingID = id
+        } catch {
+            print("Track: could not play clip \(url.lastPathComponent): \(error)")
+        }
+    }
+
+    func stop() {
+        player?.stop()
+        player = nil
+        playingID = nil
+        try? AVAudioSession.sharedInstance().setActive(false)
+    }
+
+    func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
+        self.player = nil
+        playingID = nil
     }
 }
 
@@ -603,4 +845,24 @@ private struct FinishedRaceView: View {
     let tracker = RaceTracker(race: race)
     tracker.start()
     return NavigationStack { TrackingView(tracker: tracker) }
+}
+
+#Preview("Finished") {
+    let race = Race(
+        name: "Sunset 50K",
+        aidStations: [PlannedAidStation(ordinal: 1, name: "Ridge", services: ["water", "food"], distanceKm: 8.3)],
+        palette: [TrackableElement(label: "Gel", category: .nutrition),
+                  TrackableElement(label: "Water", category: .hydration)]
+    )
+    let tracker = RaceTracker(race: race)
+    tracker.start()
+    tracker.track(race.palette[0])
+    tracker.track(race.palette[1])
+    tracker.track(race.palette[0])
+    if let upcoming = tracker.board.upcoming {
+        tracker.arrive(at: upcoming)
+        if let current = tracker.board.current { tracker.finishAid(current) }
+    }
+    tracker.finishRace()
+    return NavigationStack { FinishedRaceView(tracker: tracker) }
 }
