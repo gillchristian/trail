@@ -4,21 +4,20 @@
 
 ## Active
 
-_(none active. **TRACK-001 complete** (✓ PR #162): WI-1 project skeleton — `RacesView`
-(`NavigationStack` + empty state + `+`/swipe-delete) over a durable race bundle
-(`Documents/Races/<id>/race.json`, atomic write, scan-on-load); stub `Race` model + `@Observable
-RaceStore`; Trail `Theme` tokens + amber `AccentColor`; **iOS deployment target pinned 17.0**
-(ADR-0001); **scheme promoted to a committed shared scheme**. Verified: BUILD + TEST SUCCEEDED
-(4 unit + 1 UI relaunch-persistence test), screenshots in `reference/design/`._
+_(none active. **TRACK-002 complete** (✓ PR #164): WI-2 domain model + durable persistence —
+`TrackCore.swift` (Foundation-only) carries the full §4 model, the `status`/`effectiveEnd`/
+`aidStationVisits` projections with retraction pre-filtering, and `RaceStorage` (append-only
+`events.log` with **fsync per append**, atomic `race.json`, crash-tolerant load, write-audio-then-append
+voice-note ordering). Lifted the WI-1 stub out of `ContentView.swift`. Verified: BUILD + TEST SUCCEEDED
+(**17 unit tests** + the UI relaunch-persistence test)._
 
-_**Next up: TRACK-002 (WI-2)** — domain model + durable persistence: the full `mvp-plan.md` §4
-types, append-only `events.log` with **fsync per append**, atomic `race.json`,
-write-audio-then-append ordering, and the `status`/`effectiveEnd`/`aidStationVisits` projections
-with retraction pre-filtering (the L-sized durability spine). **AC** (§7 WI-2): create race, append
-events programmatically, force-quit/relaunch with zero loss; status/effective-end/visit-pairing
-correct; a retraction hides its target everywhere; orphan-audio (not dangling-ref) the only crash
-artifact. Also: lift the WI-1 stub types out of `ContentView.swift` into their own files. Copy its
-AC from the BACKLOG line into the template below and branch `track/track-002-…`.)_
+_**Next up: TRACK-003 (WI-3)** — trackable library: CRUD UI + storage for `TrackableElement` (label +
+category); the source for race palettes (`mvp-plan.md` §6.5, §7 WI-3). **AC** (§7 WI-3): create / edit /
+delete trackables; persist; reload. The first UI-bearing feature on top of the WI-2 core — needs a
+`TrackableElement` store (mirror `RaceStore`) + a List/edit screen, persisted under the persistence
+root (a `trackables.json`, sibling to `Races/`). Deps: TRACK-002 (done). Copy its AC into the template
+below and branch `track/track-003-…`. (TRACK-004 — create/configure race — is the other unblocked
+critical-path item.)_
 
 ## Entry template
 
