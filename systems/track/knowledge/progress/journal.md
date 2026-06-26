@@ -456,3 +456,46 @@ of a plan-less ad-hoc visit) **· TrackUITests 3** (the durability test now also
 affordance renders on the current station). Refreshed `reference/design/track-006-aid-tab.png` to show the
 Cancel control. Note: this tightens the spec's OQ-6 resolution (toast-only) — per-station cancel is now in
 for the in-progress station; broader per-row Feed retraction stays deferred.
+
+---
+## 2026-06-26 — TRACK-007 COMPLETE: WI-7 race view (post-race)
+
+WI-7 (`mvp-plan.md` §6.4, §7), the **last MVP-critical** item. Branch `track/track-007-race-view` →
+**PR #171** (squash-merged). Replaces the WI-6 minimal finished placeholder with the full post-race surface.
+
+**What.** A finished race now opens to: a **summary** — big total duration, start→effective-end span, and
+counts (aid visits / intakes / notes); an **Aid stations** section with per-visit **dwell** (exit − entry,
+"—" when the exit was never marked — GPS reconstructs it later, app 3); **Intake totals** (per item, a count
+of intake events, most-consumed first); the **chronological timeline** (oldest→newest, retractions applied,
+the finished row showing the *effective* end); **inline clip playback** (the one place audio plays — kept out
+of the in-race Feed); and **Edit finish time** → `endTimeCorrected`.
+
+**Domain (`TrackCore.swift`), all pure folds over the resolved log:** `RaceSummary` + `summary` projection;
+`FeedEntry.Kind.voiceNote` now carries the `audioFilename` (so the post-race view can play it; the in-race
+Feed ignores it); `RaceTracker.correctEndTime(to:)` appends `endTimeCorrected` (never a mutation — `effectiveEnd`
+already prefers the latest correction), plus `summary` + a `clipURL(filename:)` accessor. **No `mvp-plan.md` §4
+change** — every event kind it needs (`endTimeCorrected`, `voiceNote`, `retraction`) landed in WI-2.
+
+**View (`TrackingView.swift`):** `FinishedRaceView` as a sectioned `List`; a small `AVAudioPlayer` wrapper
+(`AudioPlayer`, one clip at a time, the row glyph + a11y value reflect play state); an `EditFinishView` sheet
+with a live duration preview and a finish-never-before-start bound. Refactor: `FeedEntry.Kind` icon/tint/title
+are now shared by the in-race `FeedRow` and the post-race `TimelineRow` (via a `FeedIcon` + a private extension).
+
+**Decisions.** Timeline is **oldest→newest** — "chronological" (§6.4), deliberately unlike the in-race Feed's
+newest-first (OQ-4); it reads as the race's story start→finish. Corrections are **not** their own timeline rows
+(the effective end is applied where the finish renders). Per-item intake totals included (cheap; in §6.4).
+`.trace` export stays deferred (WI-8).
+
+**Verified** (from `systems/track/Track/`, iPhone 15 / iOS 17.4): **BUILD SUCCEEDED** (no warnings);
+**TrackTests 54→59** (+5: summary counts/dwell incl. unrecorded-exit → nil; intake-total ranking + 1-count
+tie-break by label; retraction + correction honoured; `correctEndTime` preserves the original `raceEnded` and
+survives relaunch; feed carries the clip filename + `clipURL` resolves it) **· TrackUITests 3→4** (+1:
+`testFinishedRaceShowsSummaryTimelineAndEditFinish` — finish end-to-end → summary + timeline render →
+edit-finish flow commits). **Clip playback verified manually** in the Simulator (record → finish → play; the
+control flips to "playing" — a temporary recording-based UI test, mic pre-granted via `simctl privacy grant`,
+confirmed it, then removed): audio in an XCUITest is unreliable, so the committed suite stays recording-free,
+matching WI-6's choice. Screenshots: `reference/design/track-007-{summary,timeline}.png`.
+
+**Next:** WI-8 (`.trace` export) and WI-9 (`.trail` ingestion) are **deferred** (§7–8): `.trace` waits until
+≥2–3 real races settle the event vocabulary. With WI-7 done, the MVP is feature-complete — the first real test
+is running an actual ultra on the WI-6/WI-7 build (the hand-off brief's definition of "done").

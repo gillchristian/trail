@@ -4,30 +4,23 @@
 
 ## Active
 
-### TRACK-007 — WI-7 race view (post-race)
-**Source:** BACKLOG (WI-7) / promoted from CURRENT "Next up"
-**Branch:** track/track-007-race-view
-**Acceptance criteria** (`mvp-plan.md` §6.4, §7 WI-7):
-- [ ] **View a finished race:** a resolved summary header — name, start, effective end, total duration —
-      plus counts (aid-station visits / intakes / notes), per-visit time (exit − entry from the visit fold),
-      and per-item intake totals (counts of intake events). _(unit test on the summary projection + UI test)_
-- [ ] **Chronological event timeline** — a fold of `events.log`, resolved (retractions applied; the
-      finished row honours the effective end). Oldest→newest. _(UI test asserts the timeline renders)_
-- [ ] **Play a voice clip inline** — the one place audio plays (not the in-race Feed). _(manual sim: record →
-      finish → play; unit test confirms the feed projection now carries the clip filename)_
-- [ ] **Correct the finish** via an `endTimeCorrected` event (append, never a mutation); the summary +
-      duration + list-row duration reflect the effective end afterward; the original `raceEnded` stays in the
-      log. _(unit test: `correctEndTime` → effectiveEnd/totalDuration; UI test drives the edit-finish flow)_
-- [ ] **Replaces** the WI-6 minimal finished placeholder.
-**Notes:** Timeline is oldest→newest ("chronological", §6.4) — intentionally unlike the in-race Feed's
-newest-first (OQ-4); reads as the race's story start→finish. Per-item intake totals included (cheap; in §6.4).
-Reuse the existing pure projections (`effectiveEnd`, `aidStationVisits`, `startedAt`, `feedEntries`, `RaceFormat`);
-add a `summary` projection + `RaceTracker.correctEndTime`. `.trace` export stays deferred (WI-8). Clip-playback
-correctness is verified manually (audio in an XCUITest is unreliable); the UI test covers the deterministic surface.
+_(none active. **TRACK-007 complete** (✓ PR #171): WI-7 post-race race view — replaced the WI-6 minimal
+finished placeholder with `FinishedRaceView` (`TrackingView.swift`): a sectioned summary (big total duration +
+start→effective-end span + counts) + an **Aid stations** per-visit **dwell** section (exit − entry; "—" when the
+exit was never marked) + **Intake totals** (per item, most-consumed first) + the **chronological timeline**
+(oldest→newest, retractions applied, the finished row showing the effective end) + **inline clip playback**
+(`AVAudioPlayer`, one clip at a time — the only place audio plays) + an **Edit finish time** sheet →
+`endTimeCorrected`. Domain (`TrackCore.swift`, pure folds): `RaceSummary` + `summary`; `FeedEntry.voiceNote`
+now carries the clip filename; `RaceTracker.correctEndTime` (append, never a mutation) + `summary` + `clipURL`.
+**No `mvp-plan.md` §4 change** — the event kinds landed in WI-2. All 5 AC met: view a finished race ✓ ·
+chronological timeline ✓ · play a clip inline ✓ · correct the finish via a correction event ✓ · replaces the
+placeholder ✓. Verified from `systems/track/Track/`: **BUILD SUCCEEDED** (no warnings); **TrackTests 54→59 ·
+TrackUITests 3→4** + clip playback confirmed manually (XCUITest audio is unreliable, so the suite stays
+recording-free). Screenshots: `reference/design/track-007-{summary,timeline}.png`.)_
 
-_**Next up:** WI-8 (`.trace` export) and WI-9 (`.trail` ingestion) are **deferred** (`mvp-plan.md` §7–8): `.trace`
-waits until ≥2–3 real races settle the event vocabulary. WI-7 is the last MVP-critical item — after it, the first
-real test is running an actual race on the WI-6/WI-7 build._
+_**MVP feature-complete.** Next up: WI-8 (`.trace` export) and WI-9 (`.trail` ingestion) are **deferred**
+(`mvp-plan.md` §7–8): `.trace` waits until ≥2–3 real races settle the event vocabulary. The intended next step
+is the first **real test** — running an actual ultra on the WI-6/WI-7 build (the hand-off brief's "done")._
 
 ## Entry template
 
