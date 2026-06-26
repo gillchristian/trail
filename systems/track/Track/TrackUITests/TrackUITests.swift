@@ -26,6 +26,7 @@ final class TrackUITests: XCTestCase {
         app.buttons["addRace"].tap()
         let nameField = app.textFields["raceName"]
         XCTAssertTrue(nameField.waitForExistence(timeout: 10), "the create/configure form opens")
+        XCTAssertTrue(app.buttons["importAidCsv"].exists, "the form offers Trail-CSV aid-station import (WI-5)")
         // Wait out the sheet's presentation animation so the tap reliably focuses the field.
         expectation(for: NSPredicate(format: "isHittable == true"), evaluatedWith: nameField)
         waitForExpectations(timeout: 10)

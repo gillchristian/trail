@@ -83,3 +83,12 @@ stub test became `testConfiguredRacePersistsAcrossRelaunch` (tap `+` → fill th
 row appears with a **Configured** badge → `terminate()`/relaunch → persists). Full run from
 `systems/track/Track/`: **TEST SUCCEEDED — TrackTests 28 · TrackUITests 2** (iPhone 15 / iOS 17.4).
 Screenshot of the Configured list: `reference/design/track-004-races-configured.png`.
+
+TRACK-005 (2026-06-26): `TrackTests` → **40** (+12 WI-5: `AidStationCSV.parse` over a canonical Trail
+export, services `|`/`/`/`;` separators, RFC-4180 quoted name with embedded comma + doubled quote,
+miles→km header, malformed-row skipping, headerless positional fallback, `;`-delimiter + EU decimal,
+CRLF+BOM, empty input; `[PlannedAidStation].distanceToNextKm`; `RaceDraft.replaceAidStations`
+renumber; CSV→draft→`Race`→bundle round-trip). `TrackUITests` → **2** (create-form test also asserts
+the `importAidCsv` affordance). **TEST SUCCEEDED — TrackTests 40 · TrackUITests 2** (iPhone 15 /
+iOS 17.4). Note: the `.fileImporter` Files-app picker is system UI (not XCUITest-automatable), so the
+import is verified by the parser + integration unit tests and the in-form affordance assertion.
