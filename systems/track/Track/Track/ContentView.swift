@@ -32,6 +32,7 @@ enum Theme {
 @Observable final class RaceStore {
     private(set) var races: [Race] = []
     private var statuses: [RaceID: RaceStatus] = [:]
+    private var durations: [RaceID: TimeInterval] = [:]
     private let storage: RaceStorage
 
     init(storage: RaceStorage = RaceStorage()) {
@@ -40,9 +41,12 @@ enum Theme {
     }
 
     /// Projected status of a race (mvp-plan.md §6.1): a fold of its `events.log`, never a stored
-    /// flag. A freshly configured race has no events → `.configured`; In-progress / Finished arrive
-    /// once WI-6 starts appending events.
+    /// flag. Configured (no events) → In-progress (`raceStarted`) → Finished (`raceEnded`) as WI-6
+    /// appends events.
     func status(for race: Race) -> RaceStatus { statuses[race.id] ?? .configured }
+
+    /// Elapsed duration of a finished race (effective end − start); nil otherwise. Also a projection.
+    func duration(for race: Race) -> TimeInterval? { durations[race.id] }
 
     /// Persist a fully-configured race (WI-4) and show it at the top — newest first, matching
     /// `loadAllRaces()`'s order. The race enters Configured (no events yet).
@@ -61,6 +65,7 @@ enum Theme {
             try storage.deleteRace(id: race.id)
             races.removeAll { $0.id == race.id }
             statuses.removeValue(forKey: race.id)
+            durations.removeValue(forKey: race.id)
         } catch {
             print("Track: failed to delete race \(race.id): \(error)")
         }
@@ -70,10 +75,26 @@ enum Theme {
         offsets.map { races[$0] }.forEach(delete)
     }
 
+    /// Re-fold every race's log to refresh the projected status + finished-duration badges. Called
+    /// when the list reappears (e.g. after starting/finishing a race in the detail view, WI-6), since
+    /// status/duration are projections, never stored flags.
+    func refreshStatuses() {
+        for race in races { project(race) }
+    }
+
     private func load() {
         races = storage.loadAllRaces()
-        statuses = Dictionary(uniqueKeysWithValues:
-            races.map { ($0.id, storage.loadEvents(for: $0.id).status) })
+        for race in races { project(race) }
+    }
+
+    private func project(_ race: Race) {
+        let events = storage.loadEvents(for: race.id)
+        statuses[race.id] = events.status
+        if events.status == .finished, let start = events.startedAt, let end = events.effectiveEnd {
+            durations[race.id] = end.timeIntervalSince(start)
+        } else {
+            durations.removeValue(forKey: race.id)
+        }
     }
 }
 
@@ -94,12 +115,18 @@ struct RacesView: View {
                 } else {
                     List {
                         ForEach(store.races) { race in
-                            RaceRow(race: race, status: store.status(for: race))
+                            NavigationLink {
+                                RaceDetailView(race: race)
+                            } label: {
+                                RaceRow(race: race, status: store.status(for: race),
+                                        duration: store.duration(for: race))
+                            }
                         }
                         .onDelete(perform: store.delete(at:))
                     }
                 }
             }
+            .onAppear { store.refreshStatuses() }   // status/duration are projections — refresh on return
             .navigationTitle("Races")
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
@@ -145,6 +172,7 @@ private struct EmptyRacesView: View {
 private struct RaceRow: View {
     let race: Race
     let status: RaceStatus
+    let duration: TimeInterval?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -154,9 +182,14 @@ private struct RaceRow: View {
                 Spacer()
                 StatusBadge(status: status)
             }
-            Text(dateLabel)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+            HStack(spacing: 6) {
+                Text(dateLabel)
+                if status == .finished, let duration {
+                    Text("· \(RaceFormat.duration(duration))")
+                }
+            }
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
         }
     }
 
