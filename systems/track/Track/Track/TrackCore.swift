@@ -98,6 +98,58 @@ struct PlanRef: Codable, Equatable {
     let integrityHash: String    // lets app 3 verify the exact plan version
 }
 
+/// The create/configure-race editing buffer (mvp-plan.md §6.2; WI-4). A pure value type so the
+/// load-bearing logic — keeping aid-station ordinals 1-based after a reorder, and toggling the
+/// palette snapshot by id — is unit-testable without the SwiftUI layer. `build()` freezes it into a
+/// `Race`; `palette` is the SNAPSHOT the race stores (selected library items + ad-hoc), per §4.
+struct RaceDraft: Equatable {
+    var name: String = ""
+    var date: Date?
+    var aidStations: [PlannedAidStation] = []
+    var palette: [TrackableElement] = []
+
+    var trimmedName: String { name.trimmingCharacters(in: .whitespacesAndNewlines) }
+    var isValid: Bool { !trimmedName.isEmpty }
+
+    // ── Aid stations: ordinals stay 1-based + contiguous through every edit ──
+    mutating func addAidStation(name: String = "") {
+        aidStations.append(PlannedAidStation(ordinal: aidStations.count + 1, name: name))
+    }
+
+    mutating func removeAidStations(at offsets: IndexSet) {
+        aidStations.remove(atOffsets: offsets)
+        renumberAidStations()
+    }
+
+    mutating func moveAidStations(fromOffsets: IndexSet, toOffset: Int) {
+        aidStations.move(fromOffsets: fromOffsets, toOffset: toOffset)
+        renumberAidStations()
+    }
+
+    private mutating func renumberAidStations() {
+        for index in aidStations.indices { aidStations[index].ordinal = index + 1 }
+    }
+
+    // ── Palette: a snapshot, matched by id (a later library edit must not mutate the snapshot) ──
+    func paletteContains(_ item: TrackableElement) -> Bool {
+        palette.contains { $0.id == item.id }
+    }
+
+    mutating func togglePalette(_ item: TrackableElement) {
+        if let index = palette.firstIndex(where: { $0.id == item.id }) {
+            palette.remove(at: index)
+        } else {
+            palette.append(item)
+        }
+    }
+
+    /// Build the configured race. `createdAt` defaults to now; the caller may pin it (tests).
+    func build(createdAt: Date = Date()) -> Race {
+        Race(name: trimmedName, createdAt: createdAt, date: date,
+             aidStations: aidStations, palette: palette)
+    }
+}
+
 // MARK: - Events (the append-only log)
 
 struct RaceEvent: Identifiable, Codable, Equatable {
@@ -282,6 +334,14 @@ struct RaceStorage {
         try FileManager.default.removeItem(at: bundleDir(for: id))
     }
 
+    /// Test affordance: remove every race bundle. Invoked once at launch under `-uitest-reset`
+    /// (from TrackApp.init), never from a store init — see that call site for why.
+    func reset() {
+        let contents = (try? FileManager.default.contentsOfDirectory(
+            at: racesRoot, includingPropertiesForKeys: nil)) ?? []
+        for url in contents { try? FileManager.default.removeItem(at: url) }
+    }
+
     // ── events.log: append-only, fsync after EVERY append ─────
     func append(_ event: RaceEvent, to raceID: RaceID) throws {
         let dir = bundleDir(for: raceID)
@@ -380,4 +440,7 @@ struct TrackableLibraryStorage {
     func save(_ items: [TrackableElement]) throws {
         try DurableFile.atomicWrite(Self.encoder.encode(items), to: fileURL)
     }
+
+    /// Test affordance: clear the library. Invoked once at launch under `-uitest-reset`.
+    func reset() { try? FileManager.default.removeItem(at: fileURL) }
 }

@@ -17,8 +17,7 @@ import SwiftUI
 
     init(storage: TrackableLibraryStorage = TrackableLibraryStorage()) {
         self.storage = storage
-        if CommandLine.arguments.contains("-uitest-reset") { try? storage.save([]) }
-        items = storage.load()
+        items = storage.load()   // reconstruction-safe; the `-uitest-reset` wipe lives in TrackApp.init.
     }
 
     /// Create (a new id) or edit (an existing id): the editor hands back a complete element.
@@ -162,7 +161,7 @@ private struct TrackableEditor: View {
     }
 }
 
-private extension TrackableCategory {
+extension TrackableCategory {
     var symbolName: String {
         switch self {
         case .nutrition: return "fork.knife"

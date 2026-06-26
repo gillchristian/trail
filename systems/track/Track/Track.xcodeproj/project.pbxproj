@@ -11,6 +11,7 @@
 		559A13562FEDB1FB009F8D06 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 559A13552FEDB1FB009F8D06 /* ContentView.swift */; };
 		AA0000000000000000000002 /* TrackCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000001 /* TrackCore.swift */; };
 		AA0000000000000000000004 /* TrackableLibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000003 /* TrackableLibrary.swift */; };
+		AA0000000000000000000006 /* CreateRaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000005 /* CreateRaceView.swift */; };
 		559A13582FEDB1FC009F8D06 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 559A13572FEDB1FC009F8D06 /* Assets.xcassets */; };
 		559A135C2FEDB1FC009F8D06 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 559A135B2FEDB1FC009F8D06 /* Preview Assets.xcassets */; };
 		559A13662FEDB1FC009F8D06 /* TrackTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 559A13652FEDB1FC009F8D06 /* TrackTests.swift */; };
@@ -41,6 +42,7 @@
 		559A13552FEDB1FB009F8D06 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		AA0000000000000000000001 /* TrackCore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrackCore.swift; sourceTree = "<group>"; };
 		AA0000000000000000000003 /* TrackableLibrary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrackableLibrary.swift; sourceTree = "<group>"; };
+		AA0000000000000000000005 /* CreateRaceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreateRaceView.swift; sourceTree = "<group>"; };
 		559A13572FEDB1FC009F8D06 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		559A13592FEDB1FC009F8D06 /* Track.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Track.entitlements; sourceTree = "<group>"; };
 		559A135B2FEDB1FC009F8D06 /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
@@ -103,6 +105,7 @@
 				559A13552FEDB1FB009F8D06 /* ContentView.swift */,
 				AA0000000000000000000001 /* TrackCore.swift */,
 				AA0000000000000000000003 /* TrackableLibrary.swift */,
+				AA0000000000000000000005 /* CreateRaceView.swift */,
 				559A13572FEDB1FC009F8D06 /* Assets.xcassets */,
 				559A13592FEDB1FC009F8D06 /* Track.entitlements */,
 				559A135A2FEDB1FC009F8D06 /* Preview Content */,
@@ -268,6 +271,7 @@
 				559A13562FEDB1FB009F8D06 /* ContentView.swift in Sources */,
 				AA0000000000000000000002 /* TrackCore.swift in Sources */,
 				AA0000000000000000000004 /* TrackableLibrary.swift in Sources */,
+				AA0000000000000000000006 /* CreateRaceView.swift in Sources */,
 				559A13542FEDB1FB009F8D06 /* TrackApp.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
