@@ -96,6 +96,10 @@ struct TrackingView: View {
             }
         }
         .navigationTitle(tracker.race.name).navigationBarTitleDisplayMode(.inline)
+        // Always-in-race-mode: a started race can't be left until it's finished. Hiding the back button
+        // also disables the swipe-back-to-pop gesture, so there's no way out of the tracking view. The
+        // finish flow lives on the AID tab; the back button returns on the finished (read) view.
+        .navigationBarBackButtonHidden(true)
         .contentShape(Rectangle())   // make the whole surface (incl. empty regions) hit-test for the swipe
         .simultaneousGesture(swipe)
         .task(id: tracker.lastAction?.token) { await autoDismissToast() }

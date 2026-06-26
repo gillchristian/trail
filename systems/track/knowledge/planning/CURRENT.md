@@ -4,7 +4,24 @@
 
 ## Active
 
-_(none active. **TRACK-008 complete** (✓ PR #172): tracking-view fixes from the first simulated race. (1)
+### TRACK-009 — always-in-race-mode (active race locked to the forefront)
+**Source:** user request (UX feedback — keep the active race front-and-centre during a race)
+**Branch:** track/track-009-active-race-lock
+**Acceptance criteria:**
+- [ ] **Can't leave a started race.** While a race is in progress, there's no way out of the tracking view —
+      back button hidden (which also disables swipe-back). The finish flow (AID tab) is the only exit; the
+      back button returns on the finished (read) view. _(UI: start → no "Races" back button)_
+- [ ] **Reopen into the active race.** A cold launch with an in-progress race opens straight to its tracking
+      view (no flash of the list). _(UI: start → kill → relaunch → land on the tracking view, not the list;
+      unit: `RaceStore.inProgressRace`)_
+- [ ] Browsing configured/finished races and the library is unchanged (normal push + back).
+**Notes:** Implemented as a typed `NavigationStack(path:)` — `RaceRoute.race(id)`/`.library` — with the initial
+path computed in `RacesView.init` (so the jump is flash-free and only fires on construction; a warm resume keeps
+the path). `TrackingView` gains `.navigationBarBackButtonHidden(true)`. At most one in-progress race exists once
+the lock is in place; if legacy data had several, the newest wins. Updated the WI-6 durability UI test (relaunch
+now lands on the tracking view, not the list badge).
+
+_(**TRACK-008 complete** (✓ PR #172): tracking-view fixes from the first simulated race. (1)
 **Aid-station notes** — a free-text `notes` field on `PlannedAidStation` (tolerant decode), editable per station
 in the create form, shown when the active station expands (the mislabelled services card is now correctly
 **"Services"**); `Race.notes(forVisitOrdinal:)`. (2) **Undo-toast replacement bug** — a new action's toast was

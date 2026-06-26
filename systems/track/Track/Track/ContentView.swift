@@ -48,6 +48,14 @@ enum Theme {
     /// Elapsed duration of a finished race (effective end − start); nil otherwise. Also a projection.
     func duration(for race: Race) -> TimeInterval? { durations[race.id] }
 
+    /// The race currently being run (status In-progress), if any — the "active race". The lock means at
+    /// most one exists going forward; if legacy data has several, the newest (list order) wins. Drives the
+    /// always-in-race-mode forefront: the app opens straight to it and can't be left mid-race (§6.1).
+    var inProgressRace: Race? { races.first { statuses[$0.id] == .inProgress } }
+
+    /// Look up a loaded race by id (for value-based navigation).
+    func race(for id: RaceID) -> Race? { races.first { $0.id == id } }
+
     /// Persist a fully-configured race (WI-4) and show it at the top — newest first, matching
     /// `loadAllRaces()`'s order. The race enters Configured (no events yet).
     func add(_ race: Race) {
@@ -100,24 +108,39 @@ enum Theme {
 
 // MARK: - Views
 
-/// Root: the Races list (mvp-plan.md §6.1). Shows the list with a projected status badge per row,
-/// an empty state, and wires `+` to the create/configure form (WI-4). Duration-when-finished and
-/// the status-branching detail (Start / tracking / read) are later WIs (WI-6/7).
+/// A typed navigation route for the Races stack (mvp-plan.md §6.1). Programmatic so the app can push the
+/// active race on launch — "always in race mode during a race."
+private enum RaceRoute: Hashable {
+    case race(RaceID)
+    case library
+}
+
+/// Root: the Races list (mvp-plan.md §6.1). A projected status badge + finished-duration per row, an empty
+/// state, `+` → the create/configure form. **Always-in-race-mode:** if a race is in progress, the stack
+/// opens straight to it (computed in `init`, so there's no flash of the list first), and the tracking view
+/// hides its back button (which also disables swipe-back), so a started race can't be left until it finishes.
 struct RacesView: View {
-    @State private var store = RaceStore()
+    @State private var store: RaceStore
+    @State private var path: [RaceRoute]
     @State private var creatingRace = false
 
+    init() {
+        let store = RaceStore()
+        _store = State(initialValue: store)
+        // Cold launch mid-race → forefront the active race instead of the list. A warm resume keeps the
+        // existing `path`, so this only needs to fire at construction (a killed-and-reopened app).
+        _path = State(initialValue: store.inProgressRace.map { [RaceRoute.race($0.id)] } ?? [])
+    }
+
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $path) {
             Group {
                 if store.races.isEmpty {
                     EmptyRacesView()
                 } else {
                     List {
                         ForEach(store.races) { race in
-                            NavigationLink {
-                                RaceDetailView(race: race)
-                            } label: {
+                            NavigationLink(value: RaceRoute.race(race.id)) {
                                 RaceRow(race: race, status: store.status(for: race),
                                         duration: store.duration(for: race))
                             }
@@ -126,13 +149,19 @@ struct RacesView: View {
                     }
                 }
             }
+            .navigationDestination(for: RaceRoute.self) { route in
+                switch route {
+                case let .race(id):
+                    if let race = store.race(for: id) { RaceDetailView(race: race) }
+                case .library:
+                    TrackableLibraryView()
+                }
+            }
             .onAppear { store.refreshStatuses() }   // status/duration are projections — refresh on return
             .navigationTitle("Races")
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    NavigationLink {
-                        TrackableLibraryView()
-                    } label: {
+                    NavigationLink(value: RaceRoute.library) {
                         Label("Trackable Library", systemImage: "list.bullet.rectangle")
                     }
                     .accessibilityIdentifier("openLibrary")

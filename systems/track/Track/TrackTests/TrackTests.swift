@@ -338,6 +338,25 @@ final class TrackTests: XCTestCase {
         XCTAssertEqual(reloaded.status(for: race), .configured)
     }
 
+    func testRaceStoreInProgressRaceAndLookup() throws {
+        let store = RaceStore(storage: storage())
+        var draft = RaceDraft(); draft.name = "Lock Race"
+        let race = draft.build()
+        store.add(race)
+        XCTAssertNil(store.inProgressRace, "a configured race is not the active race")
+        XCTAssertEqual(store.race(for: race.id)?.id, race.id, "lookup by id finds the race")
+        XCTAssertNil(store.race(for: UUID()), "an unknown id finds nothing")
+
+        // Start it (append raceStarted) → a fresh store (relaunch) sees it as the active race.
+        try storage().append(RaceEvent(kind: .raceStarted), to: race.id)
+        XCTAssertEqual(RaceStore(storage: storage()).inProgressRace?.id, race.id,
+                       "a started race is the active race the app forefronts on launch")
+
+        // Finish it → no longer active.
+        try storage().append(RaceEvent(kind: .raceEnded), to: race.id)
+        XCTAssertNil(RaceStore(storage: storage()).inProgressRace, "a finished race is not active")
+    }
+
     // MARK: - WI-5: aid-station CSV import (AidStationCSV)
 
     /// A canonical Trail export: 6-column header, pipe-joined services, a quoted name with a comma,
