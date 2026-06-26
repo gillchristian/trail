@@ -7,35 +7,31 @@
 
 import XCTest
 
+/// WI-1 acceptance, end-to-end through the UI: the app launches to an empty races list, and a
+/// race added with `+` survives a full relaunch.
 final class TrackUITests: XCTestCase {
-
     override func setUpWithError() throws {
-        // Put setup code here. This method is called before the invocation of each test method in the class.
-
-        // In UI tests it is usually best to stop immediately when a failure occurs.
         continueAfterFailure = false
-
-        // In UI tests it’s important to set the initial state - such as interface orientation - required for your tests before they run. The setUp method is a good place to do this.
     }
 
-    override func tearDownWithError() throws {
-        // Put teardown code here. This method is called after the invocation of each test method in the class.
-    }
-
-    func testExample() throws {
-        // UI tests must launch the application that they test.
+    func testStubRacePersistsAcrossRelaunch() throws {
         let app = XCUIApplication()
+        app.launchArguments = ["-uitest-reset"]     // start from an empty bundle root
         app.launch()
 
-        // Use XCTAssert and related functions to verify your tests produce the correct results.
-    }
+        XCTAssertTrue(app.staticTexts["No races yet"].waitForExistence(timeout: 10),
+                      "launches to the empty-races state")
+        XCTAssertFalse(app.staticTexts["Stub race 1"].exists)
 
-    func testLaunchPerformance() throws {
-        if #available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 7.0, *) {
-            // This measures how long it takes to launch your application.
-            measure(metrics: [XCTApplicationLaunchMetric()]) {
-                XCUIApplication().launch()
-            }
-        }
+        app.buttons["addRace"].tap()
+        XCTAssertTrue(app.staticTexts["Stub race 1"].waitForExistence(timeout: 10),
+                      "adding a race shows its row")
+
+        app.terminate()
+        app.launchArguments = []                     // relaunch WITHOUT reset
+        app.launch()
+
+        XCTAssertTrue(app.staticTexts["Stub race 1"].waitForExistence(timeout: 10),
+                      "the race persists across relaunch")
     }
 }
