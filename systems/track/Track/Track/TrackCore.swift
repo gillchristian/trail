@@ -83,14 +83,29 @@ struct PlannedAidStation: Identifiable, Codable, Equatable {
     var name: String             // may be "" -> display "AS <ordinal>"
     var services: [String]       // mirrors Trail's CSV (cell encoding lifted in WI-5)
     var distanceKm: Double?       // from the CSV; powers distance-to-next
+    var notes: String            // free-text plan note (manual); surfaced at the station in-race
 
     init(id: UUID = UUID(), ordinal: Int, name: String = "",
-         services: [String] = [], distanceKm: Double? = nil) {
+         services: [String] = [], distanceKm: Double? = nil, notes: String = "") {
         self.id = id
         self.ordinal = ordinal
         self.name = name
         self.services = services
         self.distanceKm = distanceKm
+        self.notes = notes
+    }
+
+    // Tolerant decode (same reasoning as `Race`): `notes` arrived after the first race bundles, so default
+    // it (and the other since-WI-2 fields) rather than failing the whole station — which would drop the
+    // race's entire aid-station list on load.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
+        ordinal = try c.decode(Int.self, forKey: .ordinal)
+        name = try c.decodeIfPresent(String.self, forKey: .name) ?? ""
+        services = try c.decodeIfPresent([String].self, forKey: .services) ?? []
+        distanceKm = try c.decodeIfPresent(Double.self, forKey: .distanceKm)
+        notes = try c.decodeIfPresent(String.self, forKey: .notes) ?? ""
     }
 }
 
@@ -680,6 +695,20 @@ enum TrackingTab: Int, CaseIterable, Identifiable {
     var next: TrackingTab { Self(rawValue: (rawValue + 1) % Self.allCases.count)! }
     var previous: TrackingTab { Self(rawValue: (rawValue + Self.allCases.count - 1) % Self.allCases.count)! }
 
+    /// Cyclic neighbours that, when `excludingFeed`, skip the read-only Feed tab — it has no record/stop
+    /// control, so while a recording is in progress the swipe stays among the tracking tabs (the stop
+    /// button is always one tab away). Feed borders Others (next) and Nutrition (previous), so one extra
+    /// hop clears it.
+    func next(excludingFeed: Bool) -> TrackingTab {
+        let n = next
+        return excludingFeed && n == .feed ? n.next : n
+    }
+
+    func previous(excludingFeed: Bool) -> TrackingTab {
+        let p = previous
+        return excludingFeed && p == .feed ? p.previous : p
+    }
+
     /// Which trackable categories' tiles appear on this grid tab (OQ-3): Nutrition shows
     /// `{nutrition, hydration}`, Others shows `{gear, other}`; the non-grid tabs map to none.
     var categories: [TrackableCategory] {
@@ -708,11 +737,17 @@ extension Race {
         palette.filter { tab.categories.contains($0.category) }
     }
 
-    /// Services of the planned station backing a visit (its "notes", OQ-2 — services for the MVP; a
-    /// dedicated plan-notes field arrives with `.trail`, WI-9). Empty for an ad-hoc visit (no ordinal).
+    /// Services of the planned station backing a visit (from the CSV). Empty for an ad-hoc visit (no ordinal).
     func services(forVisitOrdinal ordinal: Int?) -> [String] {
         guard let ordinal else { return [] }
         return aidStations.first { $0.ordinal == ordinal }?.services ?? []
+    }
+
+    /// The free-text plan note of the planned station backing a visit — surfaced when the station is active
+    /// (tracking-view-spec.md §3). Empty for an ad-hoc visit (no ordinal) or a station with no note.
+    func notes(forVisitOrdinal ordinal: Int?) -> String {
+        guard let ordinal else { return "" }
+        return aidStations.first { $0.ordinal == ordinal }?.notes ?? ""
     }
 
     /// The AID tab's projected layout (tracking-view-spec.md §3): the visit fold split into Passed /

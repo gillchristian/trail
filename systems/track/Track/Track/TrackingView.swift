@@ -89,7 +89,7 @@ struct TrackingView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            TrackingTabBar(selection: $tab)
+            TrackingTabBar(selection: $tab, lockedToTracking: recorder.isRecording)
             ZStack(alignment: .bottom) {
                 content.frame(maxWidth: .infinity, maxHeight: .infinity)
                 if tab.isTracking { chrome }
@@ -99,6 +99,9 @@ struct TrackingView: View {
         .contentShape(Rectangle())   // make the whole surface (incl. empty regions) hit-test for the swipe
         .simultaneousGesture(swipe)
         .task(id: tracker.lastAction?.token) { await autoDismissToast() }
+        // If the view goes away while recording (a Back tap — tabs can't reach the stop-less Feed),
+        // stop + save the clip so it isn't silently dropped (the symptom: "it never showed in the Feed").
+        .onDisappear { recorder.stopIfRecording { tracker.addVoiceNote(data: $0, durationSec: $1) } }
     }
 
     @ViewBuilder private var content: some View {
@@ -139,24 +142,38 @@ struct TrackingView: View {
         DragGesture(minimumDistance: 30, coordinateSpace: .local).onEnded { value in
             let (dx, dy) = (value.translation.width, value.translation.height)
             guard abs(dx) > abs(dy), abs(dx) > 50 else { return }
-            withAnimation(.easeInOut(duration: 0.2)) { tab = dx < 0 ? tab.next : tab.previous }
+            // While recording, skip the stop-less Feed tab so the record/stop button stays reachable.
+            let locked = recorder.isRecording
+            withAnimation(.easeInOut(duration: 0.2)) {
+                tab = dx < 0 ? tab.next(excludingFeed: locked) : tab.previous(excludingFeed: locked)
+            }
         }
     }
 
     private func autoDismissToast() async {
         guard tracker.lastAction != nil else { return }
-        try? await Task.sleep(for: .seconds(10))   // long-lived (§6): mid-race reaction is slow
+        // Only dismiss if the 10s elapses (§6: mid-race reaction is slow). If the sleep is *cancelled* —
+        // which happens when a newer action bumps `lastAction.token` and restarts this `.task` — we must
+        // NOT fall through to dismiss, or the new action's just-set toast vanishes immediately. (A bare
+        // `try? await sleep` swallows the cancellation and dismisses the replacement: that was the bug.)
+        do {
+            try await Task.sleep(for: .seconds(10))
+        } catch {
+            return
+        }
         tracker.dismissToast()
     }
 }
 
 private struct TrackingTabBar: View {
     @Binding var selection: TrackingTab
+    var lockedToTracking: Bool   // a recording is in progress → the stop-less Feed tab is unreachable
 
     var body: some View {
         HStack(spacing: 8) {
             ForEach(TrackingTab.allCases) { tab in
                 let selected = tab == selection
+                let locked = lockedToTracking && !tab.isTracking   // Feed only
                 Button {
                     withAnimation(.easeInOut(duration: 0.2)) { selection = tab }
                 } label: {
@@ -166,6 +183,8 @@ private struct TrackingTabBar: View {
                         .background(selected ? Theme.amber : Color(.secondarySystemBackground), in: Capsule())
                         .foregroundStyle(selected ? Theme.ground : Color.primary)
                 }
+                .disabled(locked)
+                .opacity(locked ? 0.35 : 1)
                 .accessibilityIdentifier("tab-\(tab)")
             }
         }
@@ -250,8 +269,10 @@ private struct AidTabView: View {
                     CurrentAidRow(visit: current,
                                   onFinish: { tracker.finishAid(current) },
                                   onCancel: { tracker.cancelAid(current) })
+                    let notes = tracker.race.notes(forVisitOrdinal: current.ordinal)
+                    if !notes.isEmpty { AidInfoCard(title: "Notes", text: notes) }
                     let services = tracker.race.services(forVisitOrdinal: current.ordinal)
-                    if !services.isEmpty { AidNotesCard(services: services) }
+                    if !services.isEmpty { AidInfoCard(title: "Services", text: services.joined(separator: " · ")) }
                 }
 
                 if board.isPlanned {
@@ -349,13 +370,15 @@ private struct CurrentAidRow: View {
     }
 }
 
-private struct AidNotesCard: View {
-    let services: [String]
+/// A titled info card shown under the active aid station (its Notes, its Services).
+private struct AidInfoCard: View {
+    let title: String
+    let text: String
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("Notes").font(.caption.weight(.bold)).textCase(.uppercase).foregroundStyle(.secondary)
-            Text(services.joined(separator: " · ")).font(.subheadline)
+            Text(title).font(.caption.weight(.bold)).textCase(.uppercase).foregroundStyle(.secondary)
+            Text(text).font(.subheadline)
         }
         .frame(maxWidth: .infinity, alignment: .leading).padding()
         .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(.quaternary))
@@ -384,6 +407,7 @@ private struct UpcomingAidRow: View {
             .foregroundStyle(Theme.amber)
             .padding()
             .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(Theme.amber.opacity(0.6), lineWidth: 1.5))
+            .contentShape(Rectangle())   // the whole row is the tap target, not just the text/icon (the Spacer gap was dead)
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier("arriveUpcoming")
@@ -501,6 +525,12 @@ private struct RecordButton: View {
 
     func toggle(onFinish: @escaping (Data, Double) -> Void) {
         if isRecording { stop(onFinish: onFinish) } else { begin() }
+    }
+
+    /// Stop + hand off the clip if a recording is in progress — used when the tracking view goes away
+    /// mid-record so the clip is saved, not silently dropped. No-op when idle.
+    func stopIfRecording(onFinish: @escaping (Data, Double) -> Void) {
+        if isRecording { stop(onFinish: onFinish) }
     }
 
     private func begin() {
