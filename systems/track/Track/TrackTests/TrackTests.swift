@@ -711,4 +711,100 @@ final class TrackTests: XCTestCase {
         XCTAssertNil(tracker.board.current, "the ad-hoc visit disappears")
         XCTAssertFalse(tracker.feed.contains { if case .aidArrived = $0.kind { return true } else { return false } })
     }
+
+    // MARK: - WI-7: post-race summary projection + finish-time correction
+
+    func testSummaryCountsDurationAndPerVisitDwell() throws {
+        let v1 = UUID(), v2 = UUID()
+        let events = [
+            RaceEvent(at: t(0), kind: .raceStarted),
+            RaceEvent(at: t(60), kind: .intake(trackableID: nil, label: "Gel")),
+            RaceEvent(at: t(90), kind: .intake(trackableID: nil, label: "Water")),
+            RaceEvent(at: t(120), kind: .aidStationEntered(visitID: v1, ordinal: 1, label: "A")),
+            RaceEvent(at: t(300), kind: .aidStationExited(visitID: v1)),                          // dwell 180s
+            RaceEvent(at: t(600), kind: .aidStationEntered(visitID: v2, ordinal: 2, label: "B")), // no exit marked
+            RaceEvent(at: t(900), kind: .raceEnded),
+        ]
+        let s = events.summary
+        XCTAssertEqual(s.startedAt, t(0))
+        XCTAssertEqual(s.effectiveEnd, t(900))
+        XCTAssertEqual(try XCTUnwrap(s.totalDuration), 900, accuracy: 0.0001)
+        XCTAssertEqual(s.aidVisitCount, 2)
+        XCTAssertEqual(s.intakeCount, 2)
+        XCTAssertEqual(s.voiceNoteCount, 0)
+        XCTAssertEqual(s.visits.map(\.label), ["A", "B"])
+        XCTAssertEqual(try XCTUnwrap(s.visits[0].dwell), 180, accuracy: 0.0001, "departed visit dwell = exit − entry")
+        XCTAssertNil(s.visits[1].dwell, "a visit with no recorded exit has no dwell (GPS reconstructs it later)")
+    }
+
+    func testSummaryIntakeTotalsRankedByCountThenLabel() {
+        let events: [RaceEvent] = ["Water", "Gel", "Water", "Salt", "Gel", "Water", "Apple"].enumerated().map {
+            RaceEvent(at: t(TimeInterval($0.offset)), kind: .intake(trackableID: nil, label: $0.element))
+        }
+        let totals = events.summary.intakeTotals
+        XCTAssertEqual(totals.map { "\($0.label):\($0.count)" }, ["Water:3", "Gel:2", "Apple:1", "Salt:1"],
+                       "most-consumed first; the 1-count tie breaks by label A→Z (Apple before Salt)")
+        XCTAssertEqual(events.summary.intakeCount, 7)
+    }
+
+    func testSummaryHonoursRetractionAndCorrection() throws {
+        let gel = RaceEvent(id: UUID(), at: t(10), kind: .intake(trackableID: nil, label: "Gel"))
+        let events = [
+            RaceEvent(at: t(0), kind: .raceStarted),
+            gel,
+            RaceEvent(at: t(20), kind: .intake(trackableID: nil, label: "Water")),
+            RaceEvent(at: t(30), kind: .retraction(target: gel.id)),      // undo the Gel
+            RaceEvent(at: t(900), kind: .raceEnded),                      // e.g. phone powered on late
+            RaceEvent(at: t(950), kind: .endTimeCorrected(to: t(500))),   // corrected to the real finish
+        ]
+        let s = events.summary
+        XCTAssertEqual(s.intakeCount, 1, "the retracted Gel is excluded from the totals")
+        XCTAssertEqual(s.intakeTotals.map(\.label), ["Water"])
+        XCTAssertEqual(s.effectiveEnd, t(500), "the correction wins over the raceEnded time")
+        XCTAssertEqual(try XCTUnwrap(s.totalDuration), 500, accuracy: 0.0001, "duration uses the corrected end")
+    }
+
+    func testCorrectEndTimeAppendsCorrectionPreservingOriginal() throws {
+        let race = Race(name: "R")
+        try storage().saveRace(race)
+        let tracker = RaceTracker(race: race, storage: storage())
+
+        tracker.correctEndTime(to: t(500))
+        XCTAssertNil(tracker.effectiveEnd, "correcting a race that hasn't finished is a no-op")
+
+        tracker.start()
+        tracker.finishRace()
+        let endAtFinish = try XCTUnwrap(tracker.effectiveEnd)
+
+        tracker.correctEndTime(to: t(123))
+        XCTAssertEqual(tracker.effectiveEnd, t(123), "the correction becomes the effective end")
+        XCTAssertNotEqual(tracker.effectiveEnd, endAtFinish)
+        XCTAssertEqual(tracker.status, .finished, "still finished after a correction")
+
+        // A correction is an append, never a rewrite: the original raceEnded survives in the durable log,
+        // and a relaunch (fresh tracker on the same root) sees the fsync'd correction.
+        let persisted = storage().loadEvents(for: race.id)
+        XCTAssertEqual(persisted.filter { if case .raceEnded = $0.kind { return true } else { return false } }.count, 1,
+                       "the original raceEnded stays in the log")
+        XCTAssertEqual(persisted.filter { if case .endTimeCorrected = $0.kind { return true } else { return false } }.count, 1,
+                       "the correction was appended")
+        XCTAssertEqual(RaceTracker(race: race, storage: storage()).effectiveEnd, t(123),
+                       "the correction was fsync'd and survives relaunch")
+    }
+
+    func testFeedVoiceNoteCarriesAudioFilenameForPlayback() throws {
+        let race = Race(name: "R")
+        try storage().saveRace(race)
+        let tracker = RaceTracker(race: race, storage: storage())
+        tracker.start()
+        XCTAssertTrue(tracker.addVoiceNote(data: Data("clip".utf8), durationSec: 3.0))
+
+        guard case let .voiceNote(filename, duration) = try XCTUnwrap(tracker.feed.last).kind else {
+            return XCTFail("the voice note is the last feed entry")
+        }
+        XCTAssertEqual(duration, 3.0, accuracy: 0.0001)
+        XCTAssertFalse(filename.isEmpty, "the feed row carries the clip filename so the post-race view can play it")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: tracker.clipURL(filename: filename).path),
+                      "and clipURL resolves the filename to the on-disk clip")
+    }
 }

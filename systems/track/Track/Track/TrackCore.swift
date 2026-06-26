@@ -751,11 +751,12 @@ struct AidBoard: Equatable {
     var isPlanned: Bool
 }
 
-/// A resolved, display-ready row for the in-race Feed (tracking-view-spec.md §4): the event stream with
-/// retractions already applied, each surviving event mapped to a kind the row renders as icon + label.
-/// `aidStationExited` carries only a `visitID`, so the matching arrival's label is resolved as the fold
-/// walks the stream. Corrections are a post-race concern (WI-7) and are omitted; start/end are kept as
-/// orienting milestone rows.
+/// A resolved, display-ready row for the event stream (tracking-view-spec.md §4; the post-race timeline,
+/// mvp-plan.md §6.4): retractions already applied, each surviving event mapped to a kind the row renders as
+/// icon + label. `aidStationExited` carries only a `visitID`, so the matching arrival's label is resolved as
+/// the fold walks the stream. The voice-note row carries the `audioFilename` so the post-race view can play
+/// the clip inline (the in-race Feed ignores it — playback is post-race only). Corrections are not their own
+/// rows (the effective end is applied where the finish renders); start/end are kept as orienting milestones.
 struct FeedEntry: Identifiable, Equatable {
     let id: EventID
     let at: Date
@@ -767,7 +768,7 @@ struct FeedEntry: Identifiable, Equatable {
         case intake(label: String)
         case aidArrived(label: String)
         case aidLeft(label: String)
-        case voiceNote(durationSec: Double)
+        case voiceNote(audioFilename: String, durationSec: Double)
     }
 }
 
@@ -798,13 +799,91 @@ extension Array where Element == RaceEvent {
             case let .aidStationExited(visitID):
                 entries.append(FeedEntry(id: event.id, at: event.at,
                                          kind: .aidLeft(label: labelByVisit[visitID] ?? "Aid station")))
-            case let .voiceNote(_, durationSec):
-                entries.append(FeedEntry(id: event.id, at: event.at, kind: .voiceNote(durationSec: durationSec)))
+            case let .voiceNote(filename, durationSec):
+                entries.append(FeedEntry(id: event.id, at: event.at,
+                                         kind: .voiceNote(audioFilename: filename, durationSec: durationSec)))
             case .endTimeCorrected, .retraction:
                 break
             }
         }
         return entries
+    }
+}
+
+// MARK: - Race summary (post-race projection; WI-7)
+
+/// The post-race summary (mvp-plan.md §6.4): headline counts, per-visit dwell, and per-item intake totals —
+/// all folds over the *resolved* log, so retracted events drop out exactly as they do everywhere else.
+/// Pure (no SwiftUI), so the arithmetic is unit-tested directly. `totalDuration` and a visit's `dwell` are
+/// nil when the bounding times aren't both known: the race isn't finished, or an exit was never marked
+/// (`.inProgress` / `.departedExitUnrecorded` — GPS reconstructs the real exit later, app 3).
+struct RaceSummary: Equatable {
+    var startedAt: Date?
+    var effectiveEnd: Date?
+    var totalDuration: TimeInterval?         // effectiveEnd − startedAt, when both known
+    var aidVisitCount: Int
+    var intakeCount: Int                     // total intake events (one tap = one item)
+    var voiceNoteCount: Int
+    var visits: [VisitDuration]              // chronological, one per aid-station visit
+    var intakeTotals: [IntakeTotal]          // per-item, most-consumed first (ties: label A→Z)
+
+    /// One aid-station visit's time on station. `dwell = exit − entry`; nil when the exit was never marked.
+    struct VisitDuration: Identifiable, Equatable {
+        let visitID: UUID
+        let label: String
+        let enteredAt: Date
+        let dwell: TimeInterval?
+        var id: UUID { visitID }
+    }
+
+    /// Per-item intake total — a count of intake events for that label (mvp-plan.md §6.4: quantity is a
+    /// projection, never stored).
+    struct IntakeTotal: Identifiable, Equatable {
+        let label: String
+        let count: Int
+        var id: String { label }
+    }
+}
+
+extension Array where Element == RaceEvent {
+    /// Fold the resolved log into the post-race `RaceSummary` (mvp-plan.md §6.4).
+    var summary: RaceSummary {
+        let events = resolved
+        let visits = aidStationVisits        // resolves internally; retracted arrivals already gone
+        let visitDurations = visits.map { visit -> RaceSummary.VisitDuration in
+            let dwell: TimeInterval?
+            if case let .departed(at) = visit.state { dwell = at.timeIntervalSince(visit.enteredAt) }
+            else { dwell = nil }
+            return RaceSummary.VisitDuration(visitID: visit.visitID, label: visit.label,
+                                             enteredAt: visit.enteredAt, dwell: dwell)
+        }
+
+        var counts: [String: Int] = [:]
+        var order: [String] = []             // first-seen order, so ties break deterministically by label below
+        var intakeCount = 0
+        var voiceNoteCount = 0
+        for event in events {
+            switch event.kind {
+            case let .intake(_, label):
+                if counts[label] == nil { order.append(label) }
+                counts[label, default: 0] += 1
+                intakeCount += 1
+            case .voiceNote:
+                voiceNoteCount += 1
+            default:
+                break
+            }
+        }
+        let intakeTotals = order
+            .map { RaceSummary.IntakeTotal(label: $0, count: counts[$0]!) }
+            .sorted { $0.count != $1.count ? $0.count > $1.count : $0.label < $1.label }
+
+        let total = (startedAt != nil && effectiveEnd != nil)
+            ? effectiveEnd!.timeIntervalSince(startedAt!) : nil
+        return RaceSummary(
+            startedAt: startedAt, effectiveEnd: effectiveEnd, totalDuration: total,
+            aidVisitCount: visits.count, intakeCount: intakeCount, voiceNoteCount: voiceNoteCount,
+            visits: visitDurations, intakeTotals: intakeTotals)
     }
 }
 
@@ -838,6 +917,10 @@ extension Array where Element == RaceEvent {
     var board: AidBoard { race.aidBoard(for: events) }
     var startedAt: Date? { events.startedAt }
     var effectiveEnd: Date? { events.effectiveEnd }
+    var summary: RaceSummary { events.summary }   // post-race (WI-7)
+
+    /// Where a feed voice-note's clip lives in the bundle — the post-race view plays it inline (WI-7).
+    func clipURL(filename: String) -> URL { storage.audioURL(for: race.id, filename: filename) }
 
     /// What the Undo toast shows + the event it retracts. `token` bumps on each action so the toast's
     /// auto-dismiss timer restarts when a newer action replaces it.
@@ -898,6 +981,14 @@ extension Array where Element == RaceEvent {
     func finishRace() {
         guard status == .inProgress else { return }
         appendSilently(RaceEvent(kind: .raceEnded))
+    }
+
+    /// Post-race finish-time correction (mvp-plan.md §6.4 — "phone died, set finish to 2:53 not the 3:30
+    /// power-on"): append an `endTimeCorrected`, never mutate the original `raceEnded`. `effectiveEnd` (and
+    /// thus the summary/duration) then prefers this latest correction. No-op unless the race is finished.
+    func correctEndTime(to date: Date) {
+        guard status == .finished else { return }
+        appendSilently(RaceEvent(kind: .endTimeCorrected(to: date)))
     }
 
     /// Persist a just-recorded clip + its `voiceNote` event (§5). `RaceStorage.appendVoiceNote` enforces

@@ -92,3 +92,20 @@ renumber; CSV→draft→`Race`→bundle round-trip). `TrackUITests` → **2** (c
 the `importAidCsv` affordance). **TEST SUCCEEDED — TrackTests 40 · TrackUITests 2** (iPhone 15 /
 iOS 17.4). Note: the `.fileImporter` Files-app picker is system UI (not XCUITest-automatable), so the
 import is verified by the parser + integration unit tests and the in-form affordance assertion.
+
+TRACK-006 (2026-06-26): `TrackTests` → **54**, `TrackUITests` → **3** (WI-6 race tracking view + the
+cancel-a-started-aid follow-up: `RaceTracker` actions, `TrackingTab`/`feedEntries`/`AidBoard`
+projections; an end-to-end relaunch-durability UI test that drives the AID path). The UI suite is kept
+**recording-free** — foreground audio capture isn't reliable under XCUITest — so the voice path is
+covered by `RaceStorage.appendVoiceNote` unit tests + manual sim runs.
+
+TRACK-007 (2026-06-26): `TrackTests` → **59** (+5 WI-7: `RaceSummary` counts + per-visit dwell incl.
+unrecorded-exit → nil; intake-total ranking + 1-count tie-break by label; retraction + correction
+honoured in the summary; `RaceTracker.correctEndTime` preserves the original `raceEnded` and survives
+relaunch; the feed `voiceNote` carries the clip filename + `clipURL` resolves it). `TrackUITests` → **4**
+(+1 `testFinishedRaceShowsSummaryTimelineAndEditFinish` — finish a race end-to-end → the post-race
+summary + timeline render → the edit-finish-time flow commits). **TEST SUCCEEDED — TrackTests 59 ·
+TrackUITests 4** (iPhone 15 / iOS 17.4), no warnings. **Inline clip playback** is verified **manually**
+(record → finish → play; the control flips to "playing"): a temporary recording-based UI test with the
+mic pre-granted (`xcrun simctl privacy booted grant microphone com.gillchristian.Track`) confirmed it,
+then was removed to keep the suite recording-free. Screenshots: `reference/design/track-007-{summary,timeline}.png`.
