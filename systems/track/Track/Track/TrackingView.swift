@@ -103,9 +103,15 @@ struct TrackingView: View {
         .contentShape(Rectangle())   // make the whole surface (incl. empty regions) hit-test for the swipe
         .simultaneousGesture(swipe)
         .task(id: tracker.lastAction?.token) { await autoDismissToast() }
-        // If the view goes away while recording (a Back tap — tabs can't reach the stop-less Feed),
-        // stop + save the clip so it isn't silently dropped (the symptom: "it never showed in the Feed").
-        .onDisappear { recorder.stopIfRecording { tracker.addVoiceNote(data: $0, durationSec: $1) } }
+        // Keep the screen awake for the whole race: the app is foreground-only, so a screen sleep would
+        // stop you recording (and hide the tabs) mid-race. Held only while the tracking view is up.
+        .onAppear { UIApplication.shared.isIdleTimerDisabled = true }
+        .onDisappear {
+            UIApplication.shared.isIdleTimerDisabled = false
+            // If the view goes away while recording (a Back tap — tabs can't reach the stop-less Feed),
+            // stop + save the clip so it isn't silently dropped (the symptom: "it never showed in the Feed").
+            recorder.stopIfRecording { tracker.addVoiceNote(data: $0, durationSec: $1) }
+        }
     }
 
     @ViewBuilder private var content: some View {

@@ -84,10 +84,11 @@ More steps and a yearly fee — skip it for a single race.
 - [ ] **Dry run:** start a throwaway race, tap a few tiles, **record a voice note** (grant the mic
       permission when asked the first time), mark an aid arrival, then **Finish race** and confirm the
       summary + clip playback look right. Delete the throwaway race afterward.
-- [ ] **Auto-Lock → Never** (or a long time) for the race: **Settings → Display & Brightness →
-      Auto-Lock**. The app is foreground-only — if the screen sleeps the app suspends, so you can't
-      record while it's asleep. (Your data is safe regardless — every action is written to disk
-      immediately, and reopening the app drops you straight back into the active race.)
+- [ ] **Screen sleep** — the app now **keeps the screen awake automatically while a race is in
+      progress**, so you don't need to touch Auto-Lock. (It's foreground-only, so a sleep would otherwise
+      stop you recording.) If you want to be extra safe you can still set **Settings → Display &
+      Brightness → Auto-Lock → Never**. Either way your data is safe — every action is written to disk
+      immediately, and reopening the app drops you straight back into the active race.
 - [ ] **Battery:** bring a power bank — screen-on + audio drains it.
 - [ ] **Airplane mode is fine** — the app needs no network, and it saves battery.
 
@@ -100,6 +101,8 @@ phone sleeps or the app gets killed, **reopening it returns straight to the acti
 
 - **App icon:** Trail's mountain-peak logo.
 - **Microphone:** the permission prompt text is set, so recording works (you'll be asked once).
+- **Portrait-locked** (iPhone) — no accidental rotation mid-race.
+- **Screen stays awake** automatically while a race is in progress.
 - **Version** 1.0 (build 1); **deployment target iOS 17.0** — your phone must run iOS 17+.
 - **Automatic signing** — you just pick your Team (step 4 above).
 - **No network, no GPS, no background mode** — the only permission is the microphone.

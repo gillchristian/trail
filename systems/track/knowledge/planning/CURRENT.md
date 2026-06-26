@@ -4,23 +4,27 @@
 
 ## Active
 
-### TRACK-010 — on-device testing prep (icon + run-on-phone guide)
-**Source:** user request (get the app ready to test on the phone for the next race; use Trail's icon)
-**Branch:** track/track-010-device-testing-prep
+### TRACK-011 — race-day hardening (portrait lock + keep screen awake)
+**Source:** found while smoke-testing the device build for TRACK-010 (the user asked me to figure out what
+else is missing for race-readiness).
+**Branch:** track/track-011-race-day-hardening
 **Acceptance criteria:**
-- [ ] **App icon** = Trail's mountain-peak logo, as a 1024×1024 **opaque, no-alpha** iOS icon (iOS masks
-      its own corners). _(verify: simulator build compiles the AppIcon; visual check)_
-- [ ] **Device-install guide** the user can follow — direct Xcode install on a **free** Apple ID
-      (recommended; covers signing, the 7-day expiry, trust step) + TestFlight as the paid alternative,
-      plus a race-day checklist. At `reference/device-testing.md`.
-- [ ] **Nothing else blocks device testing** — confirm the mic usage string (present ✓), entitlements are
-      free-team-compatible (macOS-sandbox keys only ✓), automatic signing, iOS 17.0 target.
-- [ ] **Verify** the app builds for real-device arm64 (no-signing) — signing itself is the user's Team.
-**Notes:** Icon rasterized from `systems/trail/public/icon.svg` (full-bleed square, `rx` removed) via QuickLook
-(WebKit — ImageMagick's SVG renderer dropped the gradients), flattened to opaque sRGB. `DEVELOPMENT_TEAM` is
-left unset deliberately (it's the user's Apple ID, chosen in Xcode). Also un-reserved the deferred WI task ids in
-`BACKLOG.md`: they carry no speculative `TRACK-NNN` now (assigned on promotion) — avoids the recurring collision
-with ad-hoc tasks; `WI-N` stays the `mvp-plan.md` spec reference.
+- [ ] **Portrait-locked** (iPhone) — a one-handed, glanced-at-mid-run app shouldn't flip to landscape.
+      _(verify: built `Info.plist` `UISupportedInterfaceOrientations~iphone` = Portrait only)_
+- [ ] **Screen stays awake during a race** — the app is foreground-only, so a screen sleep would stop you
+      recording; hold the idle timer off while the tracking view is up, release it on leave.
+- [ ] Guide updated (the Auto-Lock checklist item is now optional).
+**Notes:** Orientation is two `INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone` build settings → Portrait.
+Screen-awake is `UIApplication.shared.isIdleTimerDisabled` in `TrackingView.onAppear/onDisappear` (in-progress
+only). Both are config/side-effect changes with no clean automated test; verified by build + the launch-test
+UI-configuration count dropping 4→2 (proves the orientation lock) + manual reasoning.
+
+_(**TRACK-010 complete** (✓ PR #174): on-device testing prep. Trail's mountain-peak **app icon** (SVG →
+full-bleed opaque 1024 via QuickLook, no alpha); a **device-install guide** (`reference/device-testing.md` —
+free-Apple-ID Xcode install + the 7-day caveat, TestFlight alt, race-day checklist); audited the rest (mic
+string ✓, free-team-compatible entitlements ✓, automatic signing, iOS 17 target). Verified: simulator +
+device-arm64 builds succeed; unit tests 64. `DEVELOPMENT_TEAM` left for the user's Apple ID. Also un-reserved
+the deferred-WI task ids in `BACKLOG.md` (assigned on promotion; `WI-N` stays the spec ref).)_
 
 _(**TRACK-009 complete** (✓ PR #173): always-in-race-mode — the active race is locked to the
 forefront. (1) **Can't leave a started race** — `TrackingView` hides its back button (also disables swipe-back);
