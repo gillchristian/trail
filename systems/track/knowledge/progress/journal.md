@@ -499,3 +499,47 @@ matching WI-6's choice. Screenshots: `reference/design/track-007-{summary,timeli
 **Next:** WI-8 (`.trace` export) and WI-9 (`.trail` ingestion) are **deferred** (§7–8): `.trace` waits until
 ≥2–3 real races settle the event vocabulary. With WI-7 done, the MVP is feature-complete — the first real test
 is running an actual ultra on the WI-6/WI-7 build (the hand-off brief's definition of "done").
+
+---
+## 2026-06-26 — TRACK-008 COMPLETE: tracking-view fixes from the first simulated race
+
+The first real test (a simulated race) surfaced three issues. Branch `track/track-008-tracking-view-fixes` →
+**PR #172** (squash-merged). Not a planned WI — user-reported field fixes.
+
+**1. Aid-station notes (new).** Added a free-text `notes` field to `PlannedAidStation` (with a tolerant
+`init(from:)` — same reasoning as `Race`: `notes` post-dates the first bundles, so default it rather than fail
+the whole aid-station array and drop the race from the list). Editable per station in `CreateRaceView` (a
+multiline field under the name; note: a `TextField(axis:.vertical)` surfaces as a **text view** in XCUITest).
+Shown when the active station expands on the AID tab via a new `AidInfoCard(title:text:)`. The pre-existing
+services card was mislabelled "Notes" — now correctly **"Services"** (so both can show, distinctly).
+`Race.notes(forVisitOrdinal:)` mirrors `services(forVisitOrdinal:)`. (Spec had deferred a dedicated notes field
+to WI-9/`.trail`; brought forward on request for manual entry.)
+
+**2. Undo-toast replacement bug.** Tracking a second item dismissed the first toast but showed no new one.
+**Root cause:** `autoDismissToast` used a bare `try? await Task.sleep(10s)`. A new action bumps
+`lastAction.token`, which is the `.task(id:)` key → SwiftUI **cancels** the running task and starts a fresh one.
+The cancelled sleep throws `CancellationError`, but `try?` swallowed it and execution fell through to
+`dismissToast()` — clearing the just-set replacement within a frame. Fixed: `do/catch` that **returns** on
+cancellation. Chose **replace** (not stack): the design is most-recent-only Undo (the cancel-aid journal note
+already calls the toast "most-recent-only"); stacking adds mid-race complexity for little gain.
+
+**3. Recording lost when leaving for the Feed.** The recorder (a `@State` on `TrackingView`) already survives
+switching among the tracking tabs — but the read-only **Feed** has no record/stop control, so switching there
+left a recording un-stoppable and the clip never got saved ("never showed in the Feed"). Fix: while recording,
+Feed is **disabled** in the tab bar and **skipped** by the cyclic swipe (new testable
+`TrackingTab.next/previous(excludingFeed:)`), and `TrackingView.onDisappear` stops+saves any in-progress clip
+(a Back tap mid-record no longer drops it — `AudioRecorder.stopIfRecording`).
+
+**Also:** the AID **Upcoming** row (`UpcomingAidRow`, a `.plain` button whose label has a `Spacer`) had a dead
+center — a tap landing in the gap between the name and "Mark arrival" did nothing. Added `contentShape(Rectangle())`
+so the whole row is the tap target. (Surfaced while writing the notes UI test, whose `arrive.tap()` hit the gap.)
+
+**Verified** (from `systems/track/Track/`, iPhone 15 / iOS 17.4): **BUILD SUCCEEDED** (no warnings);
+**TrackTests 59→63** (+4: note round-trip; tolerant decode of a note-less station; `notes(forVisitOrdinal:)`;
+`TrackingTab` swipe skips Feed while recording) **· TrackUITests 4→6** (+2: a new action replaces the Undo toast
+and it persists past a settle; aid-station notes show at the active station). Recording + Feed-lock verified
+**manually** (Feed disabled while recording; recording survives tab switches; the clip lands in the Feed) — a
+temporary mic-granted UI test confirmed it, then removed to keep the suite recording-free (matching WI-6/WI-7).
+
+**Next:** unchanged — WI-8/WI-9 deferred; the MVP stands feature-complete, now a bit more robust for the next
+real-race test.

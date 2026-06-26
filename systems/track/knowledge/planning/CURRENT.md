@@ -4,24 +4,17 @@
 
 ## Active
 
-### TRACK-008 — tracking-view fixes from the first simulated race
-**Source:** user request (issues found running a simulated race on the WI-6/WI-7 build)
-**Branch:** track/track-008-tracking-view-fixes
-**Acceptance criteria:**
-- [ ] **Aid-station notes.** A free-text `notes` field on planned stations, editable in the create form,
-      shown when the active station expands on the AID tab. _(unit: round-trip + tolerant decode +
-      `notes(forVisitOrdinal:)`; UI: configure a note → arrive → it shows)_
-- [ ] **Undo-toast replacement.** A new tracked action's toast replaces the previous one and **persists**
-      (the bug: the prior toast's cancelled auto-dismiss task fell through and cleared the replacement).
-      Chose replace over stacking — matches the established most-recent-only Undo model. _(UI: arrive→finish
-      → toast shows the new action and survives a settle)_
-- [ ] **Recording across views.** The recording keeps running while switching among the tracking tabs;
-      the stop-less **Feed** tab is unreachable while recording (disabled + skipped by the swipe); leaving
-      the view mid-record stops+saves the clip (so it can't be silently dropped). _(unit: tab swipe skips
-      Feed; manual sim: Feed locked, recording survives tabs, clip lands in Feed)_
-**Notes:** Also makes the AID **Upcoming** row fully tappable (`contentShape` — the Spacer gap was dead).
-Relabelled the active-station services card "Services" (was mislabelled "Notes") now that real notes exist.
-Recording-based UI tests stay out of the committed suite (XCUITest audio is unreliable); verified manually.
+_(none active. **TRACK-008 complete** (✓ PR #172): tracking-view fixes from the first simulated race. (1)
+**Aid-station notes** — a free-text `notes` field on `PlannedAidStation` (tolerant decode), editable per station
+in the create form, shown when the active station expands (the mislabelled services card is now correctly
+**"Services"**); `Race.notes(forVisitOrdinal:)`. (2) **Undo-toast replacement bug** — a new action's toast was
+cleared within a frame by the prior toast's cancelled auto-dismiss `Task.sleep` (a bare `try?` swallowed the
+`CancellationError` and fell through to `dismissToast()`); fixed to return on cancellation (replace, not stack —
+the most-recent-only model). (3) **Recording across views** — the stop-less Feed is disabled + swipe-skipped
+while recording (`TrackingTab.next/previous(excludingFeed:)`), and `onDisappear` stops+saves an in-progress clip.
+Also: the AID **Upcoming** row is fully tappable now (`contentShape`). All 3 AC met. Verified from
+`systems/track/Track/`: **BUILD SUCCEEDED** (no warnings); **TrackTests 59→63 · TrackUITests 4→6**; recording +
+Feed-lock confirmed manually (XCUITest audio is unreliable, so the suite stays recording-free).)_
 
 _(**TRACK-007 complete** (✓ PR #171): WI-7 post-race race view — replaced the WI-6 minimal
 finished placeholder with `FinishedRaceView` (`TrackingView.swift`): a sectioned summary (big total duration +

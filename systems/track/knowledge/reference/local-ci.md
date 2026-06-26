@@ -109,3 +109,13 @@ TrackUITests 4** (iPhone 15 / iOS 17.4), no warnings. **Inline clip playback** i
 (record → finish → play; the control flips to "playing"): a temporary recording-based UI test with the
 mic pre-granted (`xcrun simctl privacy booted grant microphone com.gillchristian.Track`) confirmed it,
 then was removed to keep the suite recording-free. Screenshots: `reference/design/track-007-{summary,timeline}.png`.
+
+TRACK-008 (2026-06-26): `TrackTests` → **63** (+4: aid-station `notes` round-trip + tolerant decode of a
+note-less station + `Race.notes(forVisitOrdinal:)`; `TrackingTab.next/previous(excludingFeed:)` skips the
+stop-less Feed while recording). `TrackUITests` → **6** (+2: `testNewActionReplacesUndoToast` — a new
+action's toast replaces the prior one and persists past a settle; `testAidStationNotesShowAtTheStation` —
+configure a note → arrive → it shows). **TEST SUCCEEDED — TrackTests 63 · TrackUITests 6** (iPhone 15 /
+iOS 17.4), no warnings. Recording + Feed-lock verified **manually** (a temporary mic-granted UI test:
+Feed disabled while recording, recording survives tab switches, the clip lands in the Feed — then removed
+to keep the suite recording-free). Note: a multiline `TextField(axis: .vertical)` surfaces as a **text
+view** (`app.textViews`), not a text field, in XCUITest.
