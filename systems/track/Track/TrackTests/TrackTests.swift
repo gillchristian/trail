@@ -497,4 +497,187 @@ final class TrackTests: XCTestCase {
         XCTAssertEqual(storage().loadRace(id: race.id)?.aidStations.map(\.name), ["Trailhead", "Ridge"],
                        "imported stations persist through the WI-2 bundle spine")
     }
+
+    // MARK: - WI-6: tracking view projections (TrackingTab / palette buckets / feed / aid board)
+
+    func testTrackingTabIsCyclic() {
+        XCTAssertEqual(TrackingTab.feed.next, .nutrition, "next wraps past the last tab to the first")
+        XCTAssertEqual(TrackingTab.nutrition.previous, .feed, "previous wraps past the first to the last")
+        XCTAssertEqual(TrackingTab.nutrition.next, .aid)
+        XCTAssertEqual(TrackingTab.aid.previous, .nutrition)
+        XCTAssertTrue(TrackingTab.aid.isTracking)
+        XCTAssertFalse(TrackingTab.feed.isTracking, "Feed is read-only — no record/Undo chrome")
+    }
+
+    func testPaletteBucketsByTab() {
+        let race = Race(name: "R", palette: [
+            TrackableElement(label: "Gel", category: .nutrition),
+            TrackableElement(label: "Water", category: .hydration),
+            TrackableElement(label: "Poles", category: .gear),
+            TrackableElement(label: "Phone", category: .other),
+        ])
+        XCTAssertEqual(race.paletteItems(for: .nutrition).map(\.label), ["Gel", "Water"], "Nutrition = {nutrition, hydration}")
+        XCTAssertEqual(race.paletteItems(for: .others).map(\.label), ["Poles", "Phone"], "Others = {gear, other}")
+        XCTAssertTrue(race.paletteItems(for: .aid).isEmpty)
+        XCTAssertTrue(race.paletteItems(for: .feed).isEmpty)
+    }
+
+    func testPlannedAidStationDisplayName() {
+        XCTAssertEqual(PlannedAidStation(ordinal: 3, name: "   ").displayName, "AS 3", "a blank name falls back to AS <ordinal>")
+        XCTAssertEqual(PlannedAidStation(ordinal: 1, name: "Ridge").displayName, "Ridge")
+    }
+
+    func testFeedEntriesResolveAidLabelsInOrder() {
+        let visit = UUID()
+        let events = [
+            RaceEvent(id: UUID(), at: t(0), kind: .raceStarted),
+            RaceEvent(id: UUID(), at: t(10), kind: .intake(trackableID: nil, label: "Gel")),
+            RaceEvent(id: UUID(), at: t(20), kind: .aidStationEntered(visitID: visit, ordinal: 2, label: "Aid 2")),
+            RaceEvent(id: UUID(), at: t(30), kind: .aidStationExited(visitID: visit)),
+            RaceEvent(id: UUID(), at: t(40), kind: .raceEnded),
+        ]
+        XCTAssertEqual(events.feedEntries.map(\.kind), [
+            .raceStarted, .intake(label: "Gel"), .aidArrived(label: "Aid 2"), .aidLeft(label: "Aid 2"), .raceEnded,
+        ], "the exit row resolves its label from the matching arrival")
+    }
+
+    func testFeedDropsRetractedAndOmitsCorrections() {
+        let intake = RaceEvent(id: UUID(), at: t(10), kind: .intake(trackableID: nil, label: "Gel"))
+        let undo = RaceEvent(at: t(15), kind: .retraction(target: intake.id))
+        let correction = RaceEvent(at: t(20), kind: .endTimeCorrected(to: t(5)))
+        XCTAssertTrue([intake, undo, correction].feedEntries.isEmpty,
+                      "a retracted intake vanishes from the Feed; corrections are not feed rows")
+    }
+
+    func testAidBoardPlannedProgression() throws {
+        let race = Race(name: "R", aidStations: [
+            PlannedAidStation(ordinal: 1, name: "A", distanceKm: 0),
+            PlannedAidStation(ordinal: 2, name: "B", distanceKm: 5),
+            PlannedAidStation(ordinal: 3, name: "C", distanceKm: 12),
+        ])
+        // Nothing entered yet: the first station is upcoming.
+        var board = race.aidBoard(for: [])
+        XCTAssertTrue(board.isPlanned)
+        XCTAssertNil(board.current)
+        XCTAssertTrue(board.passed.isEmpty)
+        XCTAssertEqual(board.upcoming?.name, "A")
+
+        // Arrive at A → current = A, upcoming = B, leg A→B = 5 km.
+        let v1 = UUID()
+        let enterA = RaceEvent(at: t(100), kind: .aidStationEntered(visitID: v1, ordinal: 1, label: "A"))
+        board = race.aidBoard(for: [enterA])
+        XCTAssertEqual(board.current?.label, "A")
+        XCTAssertEqual(board.upcoming?.name, "B")
+        XCTAssertEqual(try XCTUnwrap(board.legToUpcomingKm), 5, accuracy: 0.0001)
+
+        // Finish A → A passed, no current, B still upcoming.
+        let exitA = RaceEvent(at: t(160), kind: .aidStationExited(visitID: v1))
+        board = race.aidBoard(for: [enterA, exitA])
+        XCTAssertNil(board.current)
+        XCTAssertEqual(board.passed.map(\.label), ["A"])
+        XCTAssertEqual(board.upcoming?.name, "B")
+    }
+
+    func testAidBoardForgotToFinishThenAllReached() {
+        let race = Race(name: "R", aidStations: [
+            PlannedAidStation(ordinal: 1, name: "A", distanceKm: 0),
+            PlannedAidStation(ordinal: 2, name: "B", distanceKm: 5),
+        ])
+        // Arrive A, then arrive B without finishing A → A is departedExitUnrecorded, B is current.
+        let board = race.aidBoard(for: [
+            RaceEvent(at: t(1), kind: .aidStationEntered(visitID: UUID(), ordinal: 1, label: "A")),
+            RaceEvent(at: t(2), kind: .aidStationEntered(visitID: UUID(), ordinal: 2, label: "B")),
+        ])
+        XCTAssertEqual(board.passed.map(\.label), ["A"])
+        XCTAssertEqual(board.passed.first?.state, .departedExitUnrecorded)
+        XCTAssertEqual(board.current?.label, "B")
+        XCTAssertNil(board.upcoming, "both planned stations have been entered")
+    }
+
+    func testAidBoardPlanlessUsesVisitsOnly() {
+        let race = Race(name: "R")   // no planned stations
+        let board = race.aidBoard(for: [
+            RaceEvent(at: t(1), kind: .aidStationEntered(visitID: UUID(), ordinal: nil, label: "Aid 1")),
+        ])
+        XCTAssertFalse(board.isPlanned)
+        XCTAssertNil(board.upcoming)
+        XCTAssertEqual(board.current?.label, "Aid 1")
+    }
+
+    func testRaceFormatDuration() {
+        XCTAssertEqual(RaceFormat.duration(3 * 3600 + 24 * 60 + 5), "3h 24m")
+        XCTAssertEqual(RaceFormat.duration(24 * 60 + 10), "24m 10s")
+        XCTAssertEqual(RaceFormat.duration(9), "9s")
+        XCTAssertEqual(RaceFormat.duration(-5), "0s", "negative clamps to zero")
+    }
+
+    // MARK: - WI-6: RaceTracker (durable append → in-memory mirror)
+
+    func testRaceTrackerStartTrackUndoFinish() throws {
+        let race = Race(name: "R", palette: [TrackableElement(label: "Gel", category: .nutrition)])
+        try storage().saveRace(race)
+        let tracker = RaceTracker(race: race, storage: storage())
+        XCTAssertEqual(tracker.status, .configured)
+
+        tracker.start()
+        XCTAssertEqual(tracker.status, .inProgress)
+
+        tracker.track(race.palette[0])
+        XCTAssertEqual(tracker.feed.last?.kind, .intake(label: "Gel"))
+        XCTAssertEqual(tracker.lastAction?.description, "Tracked Gel")
+
+        tracker.undoLast()
+        XCTAssertNil(tracker.lastAction, "undo clears the toast")
+        XCTAssertFalse(tracker.feed.contains { $0.kind == .intake(label: "Gel") },
+                       "Undo appends a retraction the Feed honors — the intake vanishes")
+
+        tracker.finishRace()
+        XCTAssertEqual(tracker.status, .finished)
+
+        // A fresh tracker on the same storage models a relaunch — rebuilt from the durable log.
+        let reloaded = RaceTracker(race: race, storage: storage())
+        XCTAssertEqual(reloaded.status, .finished, "every action was fsync'd; the relaunch sees them")
+        XCTAssertFalse(reloaded.feed.contains { $0.kind == .intake(label: "Gel") }, "the retraction persisted too")
+    }
+
+    func testRaceTrackerAidArriveThenFinish() throws {
+        let race = Race(name: "R", aidStations: [
+            PlannedAidStation(ordinal: 1, name: "A", distanceKm: 0),
+            PlannedAidStation(ordinal: 2, name: "B", distanceKm: 5),
+        ])
+        try storage().saveRace(race)
+        let tracker = RaceTracker(race: race, storage: storage())
+        tracker.start()
+
+        tracker.arrive(at: try XCTUnwrap(tracker.board.upcoming))
+        XCTAssertEqual(tracker.board.current?.label, "A")
+        XCTAssertEqual(tracker.lastAction?.description, "Arrived at A")
+
+        tracker.finishAid(try XCTUnwrap(tracker.board.current))
+        XCTAssertNil(tracker.board.current)
+        XCTAssertEqual(tracker.board.passed.map(\.label), ["A"])
+        XCTAssertEqual(tracker.board.upcoming?.name, "B")
+    }
+
+    func testRaceTrackerAdHocAidAndVoiceNoteAreDurable() throws {
+        let race = Race(name: "R")   // plan-less
+        try storage().saveRace(race)
+        let tracker = RaceTracker(race: race, storage: storage())
+        tracker.start()
+
+        tracker.startAdHocAid()
+        XCTAssertFalse(tracker.board.isPlanned)
+        XCTAssertEqual(tracker.board.current?.label, "Aid 1", "ad-hoc stations auto-label by visit count")
+
+        XCTAssertTrue(tracker.addVoiceNote(data: Data("clip".utf8), durationSec: 2.0))
+        guard case .voiceNote = tracker.feed.last?.kind else { return XCTFail("the voice note is in the feed") }
+
+        // The clip is on disk and the persisted event references it (no dangling ref).
+        let events = storage().loadEvents(for: race.id)
+        guard case let .voiceNote(filename, _) = try XCTUnwrap(events.last).kind else {
+            return XCTFail("expected a persisted voiceNote event")
+        }
+        XCTAssertTrue(FileManager.default.fileExists(atPath: storage().audioURL(for: race.id, filename: filename).path),
+                      "the clip was written into the race bundle")
+    }
 }

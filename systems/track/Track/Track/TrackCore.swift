@@ -12,6 +12,7 @@
 //
 
 import Foundation
+import Observation
 
 // MARK: - Identity
 
@@ -652,4 +653,301 @@ struct TrackableLibraryStorage {
 
     /// Test affordance: clear the library. Invoked once at launch under `-uitest-reset`.
     func reset() { try? FileManager.default.removeItem(at: fileURL) }
+}
+
+// MARK: - Race tracking view: tabs (TRACK-006 / WI-6)
+
+/// The four cyclic tabs of the in-race surface (tracking-view-spec.md §1). Nutrition/AID/Others are
+/// tracking tabs (record-voice + Undo chrome); Feed is read-only. **Cyclic:** `next` past the last
+/// wraps to the first and `previous` before the first wraps to the last (the swipe is cyclic).
+enum TrackingTab: Int, CaseIterable, Identifiable {
+    case nutrition, aid, others, feed
+
+    var id: Int { rawValue }
+
+    var title: String {
+        switch self {
+        case .nutrition: return "Nutrition"
+        case .aid:       return "AID"
+        case .others:    return "Others"
+        case .feed:      return "Feed"
+        }
+    }
+
+    /// Tracking tabs carry the record-voice button + Undo toast; Feed (read) carries neither (§1).
+    var isTracking: Bool { self != .feed }
+
+    var next: TrackingTab { Self(rawValue: (rawValue + 1) % Self.allCases.count)! }
+    var previous: TrackingTab { Self(rawValue: (rawValue + Self.allCases.count - 1) % Self.allCases.count)! }
+
+    /// Which trackable categories' tiles appear on this grid tab (OQ-3): Nutrition shows
+    /// `{nutrition, hydration}`, Others shows `{gear, other}`; the non-grid tabs map to none.
+    var categories: [TrackableCategory] {
+        switch self {
+        case .nutrition: return [.nutrition, .hydration]
+        case .others:    return [.gear, .other]
+        case .aid, .feed: return []
+        }
+    }
+}
+
+extension PlannedAidStation {
+    /// What to show for a station whose name may be blank (mvp-plan.md §4 → display "AS <ordinal>").
+    var displayName: String {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? "AS \(ordinal)" : trimmed
+    }
+}
+
+// MARK: - Race tracking view: projections (pure, derived)
+
+extension Race {
+    /// The palette items shown on a given grid tab — the snapshot filtered by that tab's categories
+    /// (OQ-3 mapping lives in `TrackingTab.categories`).
+    func paletteItems(for tab: TrackingTab) -> [TrackableElement] {
+        palette.filter { tab.categories.contains($0.category) }
+    }
+
+    /// Services of the planned station backing a visit (its "notes", OQ-2 — services for the MVP; a
+    /// dedicated plan-notes field arrives with `.trail`, WI-9). Empty for an ad-hoc visit (no ordinal).
+    func services(forVisitOrdinal ordinal: Int?) -> [String] {
+        guard let ordinal else { return [] }
+        return aidStations.first { $0.ordinal == ordinal }?.services ?? []
+    }
+
+    /// The AID tab's projected layout (tracking-view-spec.md §3): the visit fold split into Passed /
+    /// Current, plus — in planned mode — the next not-yet-entered station and the leg to reach it.
+    /// Pure, so the passed/current/upcoming derivation is unit-tested without the SwiftUI layer.
+    func aidBoard(for events: [RaceEvent]) -> AidBoard {
+        let visits = events.aidStationVisits
+        let current = visits.first { $0.state == .inProgress }
+        let passed = visits.filter { $0.state != .inProgress }
+        let planned = !aidStations.isEmpty
+
+        var upcoming: PlannedAidStation?
+        var legKm: Double?
+        if planned {
+            let enteredOrdinals = Set(visits.compactMap(\.ordinal))
+            if let next = aidStations.first(where: { !enteredOrdinals.contains($0.ordinal) }),
+               let nextIndex = aidStations.firstIndex(where: { $0.id == next.id }) {
+                upcoming = next
+                // The leg currently being run: the previous planned station → this one; for the very
+                // first station it's that station's own cumulative distance (from the start line).
+                legKm = nextIndex == 0 ? next.distanceKm : aidStations.distanceToNextKm(after: nextIndex - 1)
+            }
+        }
+        return AidBoard(passed: passed, current: current, upcoming: upcoming,
+                        legToUpcomingKm: legKm, isPlanned: planned)
+    }
+}
+
+/// The AID tab's render model (tracking-view-spec.md §3). `isPlanned` selects the layout: planned mode
+/// shows Passed → Current → Upcoming; plan-less shows the past visits + an ad-hoc "start new" affordance.
+struct AidBoard: Equatable {
+    var passed: [AidStationVisit]      // departed visits, chronological
+    var current: AidStationVisit?      // the lone in-progress visit, if any
+    var upcoming: PlannedAidStation?   // next planned station not yet entered (planned mode only)
+    var legToUpcomingKm: Double?       // distance of the leg to `upcoming`, when distances are known
+    var isPlanned: Bool
+}
+
+/// A resolved, display-ready row for the in-race Feed (tracking-view-spec.md §4): the event stream with
+/// retractions already applied, each surviving event mapped to a kind the row renders as icon + label.
+/// `aidStationExited` carries only a `visitID`, so the matching arrival's label is resolved as the fold
+/// walks the stream. Corrections are a post-race concern (WI-7) and are omitted; start/end are kept as
+/// orienting milestone rows.
+struct FeedEntry: Identifiable, Equatable {
+    let id: EventID
+    let at: Date
+    let kind: Kind
+
+    enum Kind: Equatable {
+        case raceStarted
+        case raceEnded
+        case intake(label: String)
+        case aidArrived(label: String)
+        case aidLeft(label: String)
+        case voiceNote(durationSec: Double)
+    }
+}
+
+extension Array where Element == RaceEvent {
+    /// The race start time (first `raceStarted`, retractions applied) — the origin for elapsed time
+    /// and finished-race duration. Nil before the race starts.
+    var startedAt: Date? {
+        resolved.first { if case .raceStarted = $0.kind { return true } else { return false } }?.at
+    }
+
+    /// The Feed projection — chronological (oldest → newest); the view presents it newest-first (OQ-4).
+    /// Retractions are pre-filtered via `resolved`, so an undone event (and any aid visit it implicitly
+    /// closed) is honoured here exactly as in the other projections.
+    var feedEntries: [FeedEntry] {
+        var labelByVisit: [UUID: String] = [:]
+        var entries: [FeedEntry] = []
+        for event in resolved {
+            switch event.kind {
+            case .raceStarted:
+                entries.append(FeedEntry(id: event.id, at: event.at, kind: .raceStarted))
+            case .raceEnded:
+                entries.append(FeedEntry(id: event.id, at: event.at, kind: .raceEnded))
+            case let .intake(_, label):
+                entries.append(FeedEntry(id: event.id, at: event.at, kind: .intake(label: label)))
+            case let .aidStationEntered(visitID, _, label):
+                labelByVisit[visitID] = label
+                entries.append(FeedEntry(id: event.id, at: event.at, kind: .aidArrived(label: label)))
+            case let .aidStationExited(visitID):
+                entries.append(FeedEntry(id: event.id, at: event.at,
+                                         kind: .aidLeft(label: labelByVisit[visitID] ?? "Aid station")))
+            case let .voiceNote(_, durationSec):
+                entries.append(FeedEntry(id: event.id, at: event.at, kind: .voiceNote(durationSec: durationSec)))
+            case .endTimeCorrected, .retraction:
+                break
+            }
+        }
+        return entries
+    }
+}
+
+// MARK: - Race tracker (the in-race session view-model)
+
+/// The in-race session view-model (tracking-view-spec.md). Owns the live event list for one race and
+/// turns each user action into a **durable append (fsync) → in-memory mirror**, so the projections
+/// (feed / visits / status) recompute and the SwiftUI views update. The on-disk `events.log` stays
+/// authoritative: a relaunch reconstructs `events` from it. Every mutating method honours the invariant
+/// *open → append → fsync → done*; **Undo and Finish are events, never mutations** (mvp-plan.md §2).
+@Observable final class RaceTracker {
+    let race: Race
+    private(set) var events: [RaceEvent]
+    /// The most-recent undoable tracking action (intake / aid arrival·departure / voice note), surfaced
+    /// by the Undo toast. Cleared after a timeout or once undone. Start/Finish are deliberate and are
+    /// **not** toast-undoable (mvp-plan.md "kept visually separate so a tired thumb can't end the race").
+    private(set) var lastAction: TrackedAction?
+
+    private let storage: RaceStorage
+    private var actionCounter = 0
+
+    init(race: Race, storage: RaceStorage = RaceStorage()) {
+        self.race = race
+        self.storage = storage
+        self.events = storage.loadEvents(for: race.id)
+    }
+
+    // ── Projections ──────────────────────────────────────────
+    var status: RaceStatus { events.status }
+    var feed: [FeedEntry] { events.feedEntries }
+    var board: AidBoard { race.aidBoard(for: events) }
+    var startedAt: Date? { events.startedAt }
+    var effectiveEnd: Date? { events.effectiveEnd }
+
+    /// What the Undo toast shows + the event it retracts. `token` bumps on each action so the toast's
+    /// auto-dismiss timer restarts when a newer action replaces it.
+    struct TrackedAction: Identifiable, Equatable {
+        let id: EventID
+        let description: String
+        let token: Int
+    }
+
+    // ── Actions: each appends durably, then mirrors in memory ──
+    /// The race detail's Start (§1): opens the in-race view. No-op if already started/finished.
+    func start() {
+        guard status == .configured else { return }
+        appendSilently(RaceEvent(kind: .raceStarted))
+    }
+
+    /// A palette tile tap → one `intake` (§2; one tap = one item).
+    func track(_ item: TrackableElement) {
+        append(RaceEvent(kind: .intake(trackableID: item.id, label: item.label)),
+               undoable: "Tracked \(item.label)")
+    }
+
+    /// Mark arrival at the next planned station (§3). The fold implicitly departs any still-open visit.
+    func arrive(at station: PlannedAidStation) {
+        let label = station.displayName
+        append(RaceEvent(kind: .aidStationEntered(visitID: UUID(), ordinal: station.ordinal, label: label)),
+               undoable: "Arrived at \(label)")
+    }
+
+    /// Plan-less arrival (§3): an ad-hoc station, no ordinal, auto-labelled "Aid N" by visit count.
+    func startAdHocAid() {
+        let label = "Aid \(events.aidStationVisits.count + 1)"
+        append(RaceEvent(kind: .aidStationEntered(visitID: UUID(), ordinal: nil, label: label)),
+               undoable: "Arrived at \(label)")
+    }
+
+    /// The current station's green Finish (§3) → an (approximate) exit; pairs by `visitID`.
+    func finishAid(_ visit: AidStationVisit) {
+        append(RaceEvent(kind: .aidStationExited(visitID: visit.visitID)),
+               undoable: "Left \(visit.label)")
+    }
+
+    /// The distinct Finish-race control (§3, confirmed upstream) → `raceEnded`. No-op unless in progress.
+    func finishRace() {
+        guard status == .inProgress else { return }
+        appendSilently(RaceEvent(kind: .raceEnded))
+    }
+
+    /// Persist a just-recorded clip + its `voiceNote` event (§5). `RaceStorage.appendVoiceNote` enforces
+    /// the write-audio-then-append order. Returns false (and shows nothing) if the durable write fails.
+    @discardableResult
+    func addVoiceNote(data: Data, durationSec: Double) -> Bool {
+        do {
+            let event = try storage.appendVoiceNote(audio: data, durationSec: durationSec, to: race.id)
+            events.append(event)
+            setLastAction(event.id, "Voice note")
+            return true
+        } catch {
+            print("Track: failed to save voice note for \(race.id): \(error)")
+            return false
+        }
+    }
+
+    /// Undo the toast's action (§6): append a `retraction` targeting it — never a delete or rewrite.
+    /// Projections pre-filter retracted ids, so the target (and any visit it implicitly closed) vanishes.
+    func undoLast() {
+        guard let action = lastAction else { return }
+        appendSilently(RaceEvent(kind: .retraction(target: action.id)))
+        lastAction = nil
+    }
+
+    func dismissToast() { lastAction = nil }
+
+    // ── Append helpers ────────────────────────────────────────
+    private func append(_ event: RaceEvent, undoable description: String) {
+        guard persist(event) else { return }
+        setLastAction(event.id, description)
+    }
+
+    private func appendSilently(_ event: RaceEvent) {
+        _ = persist(event)
+    }
+
+    private func persist(_ event: RaceEvent) -> Bool {
+        do {
+            try storage.append(event, to: race.id)
+            events.append(event)
+            return true
+        } catch {
+            print("Track: failed to append \(event.kind) to \(race.id): \(error)")
+            return false
+        }
+    }
+
+    private func setLastAction(_ id: EventID, _ description: String) {
+        actionCounter += 1
+        lastAction = TrackedAction(id: id, description: description, token: actionCounter)
+    }
+}
+
+// MARK: - Display formatting
+
+enum RaceFormat {
+    /// Compact elapsed duration: "3h 24m", "24m 10s", or "10s". Used by the finished-race header and
+    /// the Races-list row's duration-when-finished (mvp-plan.md §6.1).
+    static func duration(_ seconds: TimeInterval) -> String {
+        let total = max(0, Int(seconds.rounded()))
+        let (h, m, s) = (total / 3600, (total % 3600) / 60, total % 60)
+        if h > 0 { return "\(h)h \(m)m" }
+        if m > 0 { return "\(m)m \(s)s" }
+        return "\(s)s"
+    }
 }

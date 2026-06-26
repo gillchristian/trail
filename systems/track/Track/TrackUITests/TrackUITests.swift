@@ -14,6 +14,15 @@ final class TrackUITests: XCTestCase {
         continueAfterFailure = false
     }
 
+    /// Save a screenshot of the current app state into the result bundle (extracted to PNG for the docs).
+    /// `XCUIScreen.main` captures the full device screen in the correct (portrait) orientation.
+    private func attach(_ app: XCUIApplication, _ name: String) {
+        let shot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        shot.name = name
+        shot.lifetime = .keepAlways
+        add(shot)
+    }
+
     /// WI-4: `+` opens the create form; a saved race appears with a Configured badge and persists.
     func testConfiguredRacePersistsAcrossRelaunch() throws {
         let app = XCUIApplication()
@@ -82,5 +91,74 @@ final class TrackUITests: XCTestCase {
         app.buttons["openLibrary"].tap()
         XCTAssertTrue(app.buttons.matching(labelContains).firstMatch.waitForExistence(timeout: 10),
                       "the trackable persists across relaunch")
+    }
+
+    /// WI-6: start a configured race, log an aid-station arrival on the AID tab (plan-less ad-hoc),
+    /// confirm an Undo toast appeared and the Feed lists it — then relaunch and confirm the event was
+    /// durably logged (append + fsync) and is still in the Feed when the in-progress race reopens.
+    /// (The intake-grid path shares this same append spine and is unit-covered; this drives the UI
+    /// end-to-end without the create-form palette setup.)
+    func testTrackingDurablyLogsAnEventAcrossRelaunch() throws {
+        let aidRow = NSPredicate(format: "label CONTAINS[c] %@", "Aid 1")
+        XCUIDevice.shared.orientation = .portrait   // deterministic orientation for the doc screenshots
+        let app = XCUIApplication()
+        app.launchArguments = ["-uitest-reset"]
+        app.launch()
+
+        // A plan-less race (name only) — mirrors the proven WI-4 create flow.
+        app.buttons["addRace"].tap()
+        let nameField = app.textFields["raceName"]
+        XCTAssertTrue(nameField.waitForExistence(timeout: 10))
+        expectation(for: NSPredicate(format: "isHittable == true"), evaluatedWith: nameField)
+        waitForExpectations(timeout: 10)
+        nameField.tap()
+        nameField.typeText("Trail Test")
+        let save = app.buttons["saveRace"]
+        expectation(for: NSPredicate(format: "isEnabled == true"), evaluatedWith: save)
+        waitForExpectations(timeout: 10)
+        save.tap()
+
+        // Open the race → Start it → land on the tracking view.
+        let row = app.staticTexts["Trail Test"]
+        XCTAssertTrue(row.waitForExistence(timeout: 10), "the configured race is in the list")
+        row.tap()
+        let start = app.buttons["startRace"]
+        XCTAssertTrue(start.waitForExistence(timeout: 10), "a Configured race opens to Start")
+        start.tap()
+
+        // Reach the AID tab by a left drag (Nutrition → AID), exercising the cyclic-swipe navigation
+        // (the wrap-around math is unit-tested in testTrackingTabIsCyclic). A deliberate press-drag
+        // triggers the content's DragGesture more reliably than a quick flick.
+        let from = app.coordinate(withNormalizedOffset: CGVector(dx: 0.85, dy: 0.45))
+        let to = app.coordinate(withNormalizedOffset: CGVector(dx: 0.12, dy: 0.45))
+        from.press(forDuration: 0.15, thenDragTo: to)
+        let adHoc = app.buttons["startAdHocAid"]
+        XCTAssertTrue(adHoc.waitForExistence(timeout: 10),
+                      "swiping left moves to the AID tab, which (plan-less) offers Start new aid station")
+        adHoc.tap()
+        XCTAssertTrue(app.buttons["undoAction"].waitForExistence(timeout: 5),
+                      "logging an aid arrival shows the Undo toast")
+        attach(app, "track-006-aid-tab")   // live AID tab: current visit, Finish, chrome, tab bar
+
+        // Feed tab lists the arrival.
+        app.buttons["tab-feed"].tap()
+        XCTAssertTrue(app.staticTexts.matching(aidRow).firstMatch.waitForExistence(timeout: 10),
+                      "the Feed lists the aid-station arrival")
+        attach(app, "track-006-feed")
+
+        // Relaunch (no reset): the in-progress race reopens straight to tracking, event still logged.
+        app.terminate()
+        app.launchArguments = []
+        app.launch()
+
+        let reopened = app.staticTexts["Trail Test"]
+        XCTAssertTrue(reopened.waitForExistence(timeout: 10), "the race persists")
+        XCTAssertTrue(app.staticTexts["status-inProgress"].exists, "and is now In progress")
+        reopened.tap()
+        let feedTab = app.buttons["tab-feed"]
+        XCTAssertTrue(feedTab.waitForExistence(timeout: 10), "the in-progress race reopens to the tracking view")
+        feedTab.tap()
+        XCTAssertTrue(app.staticTexts.matching(aidRow).firstMatch.waitForExistence(timeout: 10),
+                      "the arrival was durably logged (append + fsync) and survives relaunch")
     }
 }
