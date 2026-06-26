@@ -93,6 +93,14 @@ struct RacesView: View {
             }
             .navigationTitle("Races")
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    NavigationLink {
+                        TrackableLibraryView()
+                    } label: {
+                        Label("Trackable Library", systemImage: "list.bullet.rectangle")
+                    }
+                    .accessibilityIdentifier("openLibrary")
+                }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
                         store.addStubRace()

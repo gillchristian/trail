@@ -35,6 +35,8 @@ struct TrackableElement: Identifiable, Codable, Equatable {
 
 enum TrackableCategory: String, Codable, CaseIterable {
     case nutrition, hydration, gear, other
+
+    var displayName: String { rawValue.capitalized }
 }
 
 // MARK: - Race (metadata; events live separately in events.log)
@@ -256,15 +258,7 @@ struct RaceStorage {
     func saveRace(_ race: Race) throws {
         let dir = bundleDir(for: race.id)
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        let url = raceJSONURL(for: race.id)
-        let tmp = dir.appending(path: "race.json.tmp")
-        try Self.raceEncoder.encode(race).write(to: tmp)
-        try Self.fsync(tmp)
-        if FileManager.default.fileExists(atPath: url.path) {
-            _ = try FileManager.default.replaceItemAt(url, withItemAt: tmp)
-        } else {
-            try FileManager.default.moveItem(at: tmp, to: url)
-        }
+        try DurableFile.atomicWrite(Self.raceEncoder.encode(race), to: raceJSONURL(for: race.id))
     }
 
     func loadRace(id: RaceID) -> Race? {
@@ -322,17 +316,68 @@ struct RaceStorage {
         try FileManager.default.createDirectory(at: audioDir(for: raceID), withIntermediateDirectories: true)
         let filename = "\(id.uuidString).m4a"
         try audio.write(to: audioURL(for: raceID, filename: filename))
-        try Self.fsync(audioURL(for: raceID, filename: filename))   // audio durably on disk FIRST
+        try DurableFile.sync(audioURL(for: raceID, filename: filename))   // audio durably on disk FIRST
         let event = RaceEvent(id: id, at: at,
                               kind: .voiceNote(audioFilename: filename, durationSec: durationSec))
         try append(event, to: raceID)                                // THEN the referencing event
         return event
     }
 
-    // ── helpers ───────────────────────────────────────────────
-    private static func fsync(_ url: URL) throws {
+}
+
+// MARK: - Durable file primitives
+
+/// The crash-safe write primitives shared by the whole-file config writers (race.json,
+/// trackables.json). `sync` is fsync (FileHandle.synchronize). The append-only events.log fsyncs
+/// inline in `RaceStorage.append`; these are only for atomic *replacement* of a whole file.
+enum DurableFile {
+    static func sync(_ url: URL) throws {
         let handle = try FileHandle(forWritingTo: url)
         defer { try? handle.close() }
         try handle.synchronize()
+    }
+
+    /// Atomic write: temp → fsync → rename. You get either the old bytes or the new, never a
+    /// half-written file.
+    static func atomicWrite(_ data: Data, to url: URL) throws {
+        let tmp = url.appendingPathExtension("tmp")
+        try data.write(to: tmp)
+        try sync(tmp)
+        if FileManager.default.fileExists(atPath: url.path) {
+            _ = try FileManager.default.replaceItemAt(url, withItemAt: tmp)
+        } else {
+            try FileManager.default.moveItem(at: tmp, to: url)
+        }
+    }
+}
+
+// MARK: - Trackable library storage
+
+/// The trackable library — a flat list persisted as `trackables.json` at the persistence root
+/// (sibling to `Races/`). Config-like, so it's written atomically (not appended). The source for
+/// race palettes (mvp-plan.md §6.5). Root is injectable for tests.
+struct TrackableLibraryStorage {
+    let fileURL: URL
+
+    init(root: URL? = nil) {
+        let base = root ?? FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        try? FileManager.default.createDirectory(at: base, withIntermediateDirectories: true)
+        fileURL = base.appending(path: "trackables.json")
+    }
+
+    private static let encoder: JSONEncoder = {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        return encoder
+    }()
+    private static let decoder = JSONDecoder()
+
+    func load() -> [TrackableElement] {
+        guard let data = try? Data(contentsOf: fileURL) else { return [] }
+        return (try? Self.decoder.decode([TrackableElement].self, from: data)) ?? []
+    }
+
+    func save(_ items: [TrackableElement]) throws {
+        try DurableFile.atomicWrite(Self.encoder.encode(items), to: fileURL)
     }
 }

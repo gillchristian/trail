@@ -57,7 +57,7 @@ Run from `systems/track/Track/`. Builds + runs the unit suite (`TrackTests`) and
 xcodebuild test -project Track.xcodeproj -scheme Track \
   -destination 'platform=iOS Simulator,name=iPhone 15' \
   -derivedDataPath build CODE_SIGNING_ALLOWED=NO
-# → ** TEST SUCCEEDED **  (TrackTests: 17 passed · TrackUITests: relaunch-persistence passed)
+# → ** TEST SUCCEEDED **  (TrackTests: 22 passed · TrackUITests: 2 relaunch-persistence tests passed)
 ```
 
 TRACK-001 (2026-06-25): `TrackTests` covers the `RaceStorage` round-trip (save → fresh instance
@@ -70,3 +70,8 @@ fsync survives a fresh-instance reload; a **torn last line** is dropped; atomic 
 tolerant legacy decode) and the pure projections (status / effectiveEnd / aid-visit pairing + the
 forgot-to-Finish rule / **retraction pre-filtering** / write-audio-then-append ordering). All
 Foundation-only (`TrackCore.swift`), so they run on the host in <0.03 s with no Simulator UI.
+
+TRACK-003 (2026-06-25): `TrackTests` → **22** (+5 trackable-library: storage round-trip, store
+upsert-create/edit, create + delete persistence across reload). `TrackUITests` → **2** —
+`testTrackablePersistsAcrossRelaunch` drives the real library UI (open from the Races toolbar → empty
+state → `+` → type a label → Save → row appears → `terminate()`/relaunch → persists).

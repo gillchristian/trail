@@ -217,4 +217,49 @@ final class TrackTests: XCTestCase {
         XCTAssertEqual(storage().loadEvents(for: raceID), [],
                        "an orphan audio file yields no event — orphan audio, not a dangling reference")
     }
+
+    // MARK: - WI-3: trackable library
+
+    func testTrackableLibraryStorageRoundTrip() throws {
+        let store = TrackableLibraryStorage(root: root)
+        let items = [TrackableElement(id: UUID(), label: "Gel", category: .nutrition),
+                     TrackableElement(id: UUID(), label: "Water", category: .hydration)]
+        try store.save(items)
+        XCTAssertEqual(TrackableLibraryStorage(root: root).load(), items, "the library round-trips after relaunch")
+    }
+
+    func testTrackableLibraryEmptyByDefault() {
+        XCTAssertEqual(TrackableLibraryStorage(root: root).load(), [])
+    }
+
+    func testTrackableStoreUpsertCreatesThenEdits() {
+        let store = TrackableLibraryStore(storage: TrackableLibraryStorage(root: root))
+        var gel = TrackableElement(label: "Gel", category: .nutrition)
+        store.upsert(gel)
+        XCTAssertEqual(store.items.count, 1)
+        gel.label = "Maurten Gel"
+        gel.category = .hydration
+        store.upsert(gel)   // same id -> edit in place, not a second row
+        XCTAssertEqual(store.items.count, 1)
+        XCTAssertEqual(store.items.first?.label, "Maurten Gel")
+        XCTAssertEqual(store.items.first?.category, .hydration)
+    }
+
+    func testTrackableStoreCreatePersistsAcrossReload() {
+        let store = TrackableLibraryStore(storage: TrackableLibraryStorage(root: root))
+        store.upsert(TrackableElement(label: "Tailwind", category: .hydration))
+        store.upsert(TrackableElement(label: "Poles", category: .gear))
+        let reloaded = TrackableLibraryStore(storage: TrackableLibraryStorage(root: root))
+        XCTAssertEqual(reloaded.items.map(\.label), ["Tailwind", "Poles"], "create persists; order preserved")
+    }
+
+    func testTrackableStoreDeletePersists() {
+        let store = TrackableLibraryStore(storage: TrackableLibraryStorage(root: root))
+        store.upsert(TrackableElement(label: "A", category: .other))
+        store.upsert(TrackableElement(label: "B", category: .gear))
+        store.delete(at: IndexSet(integer: 0))
+        XCTAssertEqual(store.items.map(\.label), ["B"])
+        let reloaded = TrackableLibraryStore(storage: TrackableLibraryStorage(root: root))
+        XCTAssertEqual(reloaded.items.map(\.label), ["B"], "the delete persisted across relaunch")
+    }
 }

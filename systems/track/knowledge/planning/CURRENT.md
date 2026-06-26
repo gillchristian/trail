@@ -4,20 +4,19 @@
 
 ## Active
 
-_(none active. **TRACK-002 complete** (✓ PR #164): WI-2 domain model + durable persistence —
-`TrackCore.swift` (Foundation-only) carries the full §4 model, the `status`/`effectiveEnd`/
-`aidStationVisits` projections with retraction pre-filtering, and `RaceStorage` (append-only
-`events.log` with **fsync per append**, atomic `race.json`, crash-tolerant load, write-audio-then-append
-voice-note ordering). Lifted the WI-1 stub out of `ContentView.swift`. Verified: BUILD + TEST SUCCEEDED
-(**17 unit tests** + the UI relaunch-persistence test)._
-
-_**Next up: TRACK-003 (WI-3)** — trackable library: CRUD UI + storage for `TrackableElement` (label +
-category); the source for race palettes (`mvp-plan.md` §6.5, §7 WI-3). **AC** (§7 WI-3): create / edit /
-delete trackables; persist; reload. The first UI-bearing feature on top of the WI-2 core — needs a
-`TrackableElement` store (mirror `RaceStore`) + a List/edit screen, persisted under the persistence
-root (a `trackables.json`, sibling to `Races/`). Deps: TRACK-002 (done). Copy its AC into the template
-below and branch `track/track-003-…`. (TRACK-004 — create/configure race — is the other unblocked
-critical-path item.)_
+### TRACK-003 — WI-3: trackable library
+**Source:** BACKLOG (epic "Tracker MVP"; spec `reference/mvp-plan.md` §6.5, §7 WI-3)
+**Branch:** track/track-003-trackable-library
+**Acceptance criteria:**
+- [ ] **create** a trackable (label + category) — via the library UI
+- [ ] **edit** a trackable — changes persist
+- [ ] **delete** a trackable
+- [ ] **persist + reload** — trackables survive relaunch (verified by a fresh-store reload + a UI relaunch test)
+**Notes:**
+- `TrackableElement` (label + `TrackableCategory`) already exists in `TrackCore.swift` (WI-2). WI-3 adds the **storage** + the **CRUD UI**; it's the source for race palettes (WI-4 consumes it).
+- **Storage:** a flat list persisted as `trackables.json` at the persistence root (sibling to `Races/`), written atomically (config, not the append-only log). Extract the `temp → fsync → rename` primitive shared with `race.json` into a small `DurableFile` helper (rule-of-three exception: durability primitives belong in one place; WI-2 tests cover the refactor).
+- **UI:** a Trackable Library screen reached from a Races-list toolbar action (§6); `List` + add/edit (sheet form: label TextField + category Picker) + swipe-delete. New file `TrackableLibrary.swift` (store + views).
+- Verification: unit tests (storage round-trip + store upsert/edit/delete + reload) + a UI test (open library → add → relaunch → persists). Scope: NOT the race-palette picker (that's WI-4); NOT promote-ad-hoc-to-library (WI-4 config).
 
 ## Entry template
 
