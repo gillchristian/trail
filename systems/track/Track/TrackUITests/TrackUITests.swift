@@ -148,17 +148,16 @@ final class TrackUITests: XCTestCase {
                       "the Feed lists the aid-station arrival")
         attach(app, "track-006-feed")
 
-        // Relaunch (no reset): the in-progress race reopens straight to tracking, event still logged.
+        // Relaunch (no reset): always-in-race-mode (TRACK-009) reopens straight to the tracking view — no
+        // list, no row tap — and the arrival is still there (append + fsync survived).
         app.terminate()
         app.launchArguments = []
         app.launch()
 
-        let reopened = app.staticTexts["Trail Test"]
-        XCTAssertTrue(reopened.waitForExistence(timeout: 10), "the race persists")
-        XCTAssertTrue(app.staticTexts["status-inProgress"].exists, "and is now In progress")
-        reopened.tap()
         let feedTab = app.buttons["tab-feed"]
-        XCTAssertTrue(feedTab.waitForExistence(timeout: 10), "the in-progress race reopens to the tracking view")
+        XCTAssertTrue(feedTab.waitForExistence(timeout: 10),
+                      "the in-progress race reopens directly to the tracking view")
+        XCTAssertFalse(app.buttons["addRace"].exists, "straight into the race, not back on the Races list")
         feedTab.tap()
         XCTAssertTrue(app.staticTexts.matching(aidRow).firstMatch.waitForExistence(timeout: 10),
                       "the arrival was durably logged (append + fsync) and survives relaunch")
@@ -316,5 +315,41 @@ final class TrackUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Watch for the river crossing"].waitForExistence(timeout: 10),
                       "the active station shows its notes")
         attach(app, "track-008-aid-notes")
+    }
+
+    /// TRACK-009: a started race is locked to the forefront — no back button out of the tracking view —
+    /// and the app reopens straight to it on a fresh launch ("always in race mode during a race").
+    func testActiveRaceLocksAndReopensOnLaunch() throws {
+        XCUIDevice.shared.orientation = .portrait
+        let app = XCUIApplication()
+        app.launchArguments = ["-uitest-reset"]
+        app.launch()
+
+        // Create + start a race.
+        app.buttons["addRace"].tap()
+        let nameField = app.textFields["raceName"]
+        XCTAssertTrue(nameField.waitForExistence(timeout: 10))
+        expectation(for: NSPredicate(format: "isHittable == true"), evaluatedWith: nameField)
+        waitForExpectations(timeout: 10)
+        nameField.tap()
+        nameField.typeText("Lock Race")
+        let save = app.buttons["saveRace"]
+        expectation(for: NSPredicate(format: "isEnabled == true"), evaluatedWith: save)
+        waitForExpectations(timeout: 10)
+        save.tap()
+        app.staticTexts["Lock Race"].tap()
+        app.buttons["startRace"].tap()
+
+        // Locked into the tracking view: the tab bar is up, and there's no back button to the list.
+        XCTAssertTrue(app.buttons["tab-aid"].waitForExistence(timeout: 10), "starting a race opens the tracking view")
+        XCTAssertFalse(app.navigationBars.buttons["Races"].exists, "no back button — the race can't be left mid-race")
+
+        // Kill + relaunch (no reset): the app reopens straight to the active race, not the Races list.
+        app.terminate()
+        app.launchArguments = []
+        app.launch()
+        XCTAssertTrue(app.buttons["tab-aid"].waitForExistence(timeout: 10),
+                      "the app reopens directly to the in-progress race")
+        XCTAssertFalse(app.buttons["addRace"].exists, "we're in the race, not back on the Races list")
     }
 }

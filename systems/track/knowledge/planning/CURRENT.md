@@ -4,7 +4,18 @@
 
 ## Active
 
-_(none active. **TRACK-008 complete** (✓ PR #172): tracking-view fixes from the first simulated race. (1)
+_(none active. **TRACK-009 complete** (✓ PR #173): always-in-race-mode — the active race is locked to the
+forefront. (1) **Can't leave a started race** — `TrackingView` hides its back button (also disables swipe-back);
+the AID finish flow is the only exit, and the back button returns on the finished (read) view. (2) **Reopen into
+the active race** — a cold launch with an in-progress race opens straight to its tracking view (no list flash),
+via a typed `NavigationStack(path: [RaceRoute])` whose initial path is computed in `RacesView.init` from
+`RaceStore.inProgressRace`. Browsing configured/finished races + the library is unchanged (push + back). `RaceStore`
+gained `inProgressRace` + `race(for:)`. All AC met. Verified from `systems/track/Track/`: **BUILD SUCCEEDED** (no
+warnings); **TrackTests 63→64 · TrackUITests 6→7** (new lock+relaunch test; the WI-6 durability test updated to
+expect the tracking view on relaunch). Note: this used the ad-hoc id TRACK-009, so the deferred WIs in `BACKLOG.md`
+were renumbered TRACK-010+ — `WI-N` stays the spec reference.)_
+
+_(**TRACK-008 complete** (✓ PR #172): tracking-view fixes from the first simulated race. (1)
 **Aid-station notes** — a free-text `notes` field on `PlannedAidStation` (tolerant decode), editable per station
 in the create form, shown when the active station expands (the mislabelled services card is now correctly
 **"Services"**); `Race.notes(forVisitOrdinal:)`. (2) **Undo-toast replacement bug** — a new action's toast was
