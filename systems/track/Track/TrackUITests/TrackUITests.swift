@@ -230,4 +230,91 @@ final class TrackUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["totalDuration"].waitForExistence(timeout: 10),
                       "saving the finish-time correction returns to the post-race summary")
     }
+
+    /// TRACK-008: a new tracked action replaces the previous one's Undo toast, and the new toast **persists**
+    /// — the regression was the prior toast's cancelled auto-dismiss task falling through and clearing the
+    /// replacement within a frame. Driven via the AID arrive→finish path (two consecutive toast-producing
+    /// actions, no palette needed).
+    func testNewActionReplacesUndoToast() throws {
+        XCUIDevice.shared.orientation = .portrait
+        let app = XCUIApplication()
+        app.launchArguments = ["-uitest-reset"]
+        app.launch()
+
+        app.buttons["addRace"].tap()
+        let nameField = app.textFields["raceName"]
+        XCTAssertTrue(nameField.waitForExistence(timeout: 10))
+        expectation(for: NSPredicate(format: "isHittable == true"), evaluatedWith: nameField)
+        waitForExpectations(timeout: 10)
+        nameField.tap()
+        nameField.typeText("Toast Test")
+        let save = app.buttons["saveRace"]
+        expectation(for: NSPredicate(format: "isEnabled == true"), evaluatedWith: save)
+        waitForExpectations(timeout: 10)
+        save.tap()
+
+        app.staticTexts["Toast Test"].tap()
+        app.buttons["startRace"].tap()
+        let from = app.coordinate(withNormalizedOffset: CGVector(dx: 0.85, dy: 0.45))
+        let to = app.coordinate(withNormalizedOffset: CGVector(dx: 0.12, dy: 0.45))
+        from.press(forDuration: 0.15, thenDragTo: to)
+
+        // First toast: arrive at an ad-hoc station.
+        let adHoc = app.buttons["startAdHocAid"]
+        XCTAssertTrue(adHoc.waitForExistence(timeout: 10))
+        adHoc.tap()
+        XCTAssertTrue(app.staticTexts["Arrived at Aid 1"].waitForExistence(timeout: 5), "the first action shows its toast")
+
+        // Second toast: finish the station — the new toast must replace the first AND stick around.
+        app.buttons["finishAid"].tap()
+        XCTAssertTrue(app.staticTexts["Left Aid 1"].waitForExistence(timeout: 5),
+                      "the new action's toast appears (replacing the first)")
+        Thread.sleep(forTimeInterval: 1.5)   // the bug cleared it within a frame; confirm it persisted
+        XCTAssertTrue(app.buttons["undoAction"].exists, "the new toast persists — not cleared by the prior toast's timer")
+        XCTAssertTrue(app.staticTexts["Left Aid 1"].exists)
+        XCTAssertFalse(app.staticTexts["Arrived at Aid 1"].exists, "and it's the new toast, not the stale one")
+    }
+
+    /// TRACK-008: an aid station's notes (entered in the create form) show on the station while you're
+    /// there — i.e. when the active station expands on the AID tab.
+    func testAidStationNotesShowAtTheStation() throws {
+        XCUIDevice.shared.orientation = .portrait
+        let app = XCUIApplication()
+        app.launchArguments = ["-uitest-reset"]
+        app.launch()
+
+        app.buttons["addRace"].tap()
+        let nameField = app.textFields["raceName"]
+        XCTAssertTrue(nameField.waitForExistence(timeout: 10))
+        expectation(for: NSPredicate(format: "isHittable == true"), evaluatedWith: nameField)
+        waitForExpectations(timeout: 10)
+        nameField.tap()
+        nameField.typeText("Notes Race")
+
+        // Add one aid station and give it a note. (A multiline `TextField(axis: .vertical)` surfaces as a
+        // text view in the accessibility tree, not a text field.)
+        app.buttons["addAidStation"].tap()
+        let notes = app.textViews["aidNotes-1"]
+        XCTAssertTrue(notes.waitForExistence(timeout: 10), "the aid station offers a notes field")
+        notes.tap()
+        notes.typeText("Watch for the river crossing")
+
+        let save = app.buttons["saveRace"]
+        expectation(for: NSPredicate(format: "isEnabled == true"), evaluatedWith: save)
+        waitForExpectations(timeout: 10)
+        save.tap()
+
+        // Open → start → AID tab → arrive at the planned station → its notes show.
+        app.staticTexts["Notes Race"].tap()
+        app.buttons["startRace"].tap()
+        let from = app.coordinate(withNormalizedOffset: CGVector(dx: 0.85, dy: 0.45))
+        let to = app.coordinate(withNormalizedOffset: CGVector(dx: 0.12, dy: 0.45))
+        from.press(forDuration: 0.15, thenDragTo: to)
+        let arrive = app.buttons["arriveUpcoming"]
+        XCTAssertTrue(arrive.waitForExistence(timeout: 10), "the planned station is upcoming on the AID tab")
+        arrive.tap()
+        XCTAssertTrue(app.staticTexts["Watch for the river crossing"].waitForExistence(timeout: 10),
+                      "the active station shows its notes")
+        attach(app, "track-008-aid-notes")
+    }
 }

@@ -807,4 +807,57 @@ final class TrackTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: tracker.clipURL(filename: filename).path),
                       "and clipURL resolves the filename to the on-disk clip")
     }
+
+    // MARK: - TRACK-008: aid-station notes · recording-aware tab navigation
+
+    func testPlannedAidStationNotesRoundTrip() throws {
+        let race = Race(name: "R", aidStations: [
+            PlannedAidStation(ordinal: 1, name: "Ridge", services: ["water"], distanceKm: 8,
+                              notes: "Drop bag here; swap shoes"),
+        ])
+        try storage().saveRace(race)
+        XCTAssertEqual(storage().loadRace(id: race.id)?.aidStations.first?.notes, "Drop bag here; swap shoes",
+                       "a station note round-trips through race.json")
+    }
+
+    func testTolerantDecodeOfAidStationWithoutNotes() throws {
+        // A pre-notes race.json: an aid station carrying no "notes" key must still load (note → "") rather
+        // than failing the whole aid-station array — which would drop the race from the list.
+        let id = UUID()
+        let dir = storage().bundleDir(for: id)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let legacy = #"{"createdAt":1,"id":"\#(id.uuidString)","name":"R","aidStations":[{"id":"\#(UUID().uuidString)","ordinal":1,"name":"Ridge","services":["water"],"distanceKm":8}]}"#
+        try Data(legacy.utf8).write(to: dir.appending(path: "race.json"))
+        let race = try XCTUnwrap(storage().loadRace(id: id))
+        XCTAssertEqual(race.aidStations.count, 1, "the station still loads")
+        XCTAssertEqual(race.aidStations.first?.name, "Ridge")
+        XCTAssertEqual(race.aidStations.first?.notes, "", "a missing note defaults to empty")
+    }
+
+    func testNotesForVisitOrdinal() {
+        let race = Race(name: "R", aidStations: [
+            PlannedAidStation(ordinal: 1, name: "A", notes: "first"),
+            PlannedAidStation(ordinal: 2, name: "B"),
+        ])
+        XCTAssertEqual(race.notes(forVisitOrdinal: 1), "first")
+        XCTAssertEqual(race.notes(forVisitOrdinal: 2), "", "a station with no note returns empty")
+        XCTAssertEqual(race.notes(forVisitOrdinal: nil), "", "an ad-hoc visit (no ordinal) has no note")
+        XCTAssertEqual(race.notes(forVisitOrdinal: 99), "", "an unknown ordinal has no note")
+    }
+
+    func testTrackingTabSwipeSkipsFeedWhileRecording() {
+        // Plain cyclic order: nutrition → aid → others → feed → nutrition.
+        XCTAssertEqual(TrackingTab.others.next, .feed)
+        XCTAssertEqual(TrackingTab.nutrition.previous, .feed)
+        // While recording, the stop-less Feed is skipped so the record/stop button stays reachable.
+        XCTAssertEqual(TrackingTab.others.next(excludingFeed: true), .nutrition, "others → (skip feed) → nutrition")
+        XCTAssertEqual(TrackingTab.nutrition.previous(excludingFeed: true), .others, "nutrition ← (skip feed) ← others")
+        // Transitions that don't touch Feed are unchanged.
+        XCTAssertEqual(TrackingTab.nutrition.next(excludingFeed: true), .aid)
+        XCTAssertEqual(TrackingTab.aid.next(excludingFeed: true), .others)
+        XCTAssertEqual(TrackingTab.aid.previous(excludingFeed: true), .nutrition)
+        // excludingFeed:false matches the plain neighbours exactly.
+        XCTAssertEqual(TrackingTab.others.next(excludingFeed: false), .feed)
+        XCTAssertEqual(TrackingTab.nutrition.previous(excludingFeed: false), .feed)
+    }
 }

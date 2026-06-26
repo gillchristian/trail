@@ -117,11 +117,18 @@ struct CreateRaceView: View {
     private var aidStationsSection: some View {
         Section {
             ForEach($draft.aidStations) { $station in
-                HStack(spacing: 8) {
-                    Text("\(station.ordinal).")
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(spacing: 8) {
+                        Text("\(station.ordinal).")
+                            .foregroundStyle(.secondary)
+                            .monospacedDigit()
+                        TextField("AS \(station.ordinal)", text: $station.name)
+                    }
+                    TextField("Notes (optional)", text: $station.notes, axis: .vertical)
+                        .font(.subheadline)
                         .foregroundStyle(.secondary)
-                        .monospacedDigit()
-                    TextField("AS \(station.ordinal)", text: $station.name)
+                        .lineLimit(1...4)
+                        .accessibilityIdentifier("aidNotes-\(station.ordinal)")
                 }
             }
             .onDelete { draft.removeAidStations(at: $0) }
@@ -147,7 +154,7 @@ struct CreateRaceView: View {
                 if !draft.aidStations.isEmpty { EditButton() }
             }
         } footer: {
-            Text("Optional. Add manually or import a Trail CSV (replaces the list); reorder while editing. May be left empty for a plan-less race.")
+            Text("Optional. Add manually or import a Trail CSV (replaces the list); reorder while editing. Notes show on the station while you're there. May be left empty for a plan-less race.")
         }
     }
 

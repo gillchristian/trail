@@ -4,7 +4,19 @@
 
 ## Active
 
-_(none active. **TRACK-007 complete** (✓ PR #171): WI-7 post-race race view — replaced the WI-6 minimal
+_(none active. **TRACK-008 complete** (✓ PR #172): tracking-view fixes from the first simulated race. (1)
+**Aid-station notes** — a free-text `notes` field on `PlannedAidStation` (tolerant decode), editable per station
+in the create form, shown when the active station expands (the mislabelled services card is now correctly
+**"Services"**); `Race.notes(forVisitOrdinal:)`. (2) **Undo-toast replacement bug** — a new action's toast was
+cleared within a frame by the prior toast's cancelled auto-dismiss `Task.sleep` (a bare `try?` swallowed the
+`CancellationError` and fell through to `dismissToast()`); fixed to return on cancellation (replace, not stack —
+the most-recent-only model). (3) **Recording across views** — the stop-less Feed is disabled + swipe-skipped
+while recording (`TrackingTab.next/previous(excludingFeed:)`), and `onDisappear` stops+saves an in-progress clip.
+Also: the AID **Upcoming** row is fully tappable now (`contentShape`). All 3 AC met. Verified from
+`systems/track/Track/`: **BUILD SUCCEEDED** (no warnings); **TrackTests 59→63 · TrackUITests 4→6**; recording +
+Feed-lock confirmed manually (XCUITest audio is unreliable, so the suite stays recording-free).)_
+
+_(**TRACK-007 complete** (✓ PR #171): WI-7 post-race race view — replaced the WI-6 minimal
 finished placeholder with `FinishedRaceView` (`TrackingView.swift`): a sectioned summary (big total duration +
 start→effective-end span + counts) + an **Aid stations** per-visit **dwell** section (exit − entry; "—" when the
 exit was never marked) + **Intake totals** (per item, most-consumed first) + the **chronological timeline**
