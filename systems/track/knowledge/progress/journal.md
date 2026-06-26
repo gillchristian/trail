@@ -365,3 +365,72 @@ persisted `Race`) and the in-form affordance assertion, rather than an end-to-en
 **Next:** **TRACK-006 (WI-6)** — race tracking view (the in-race four-tab surface; `tracking-view-spec.md`).
 The big one (L): category grids → `intake`, AID tab → enter/exit + Finish race, Feed projection,
 foreground voice notes, Undo→retraction; every action appends + fsyncs. Deps: TRACK-002/004/005.
+
+---
+## 2026-06-26 — TRACK-006 COMPLETE: WI-6 race tracking view
+
+**Task:** TRACK-006 (WI-6, `tracking-view-spec.md`; `mvp-plan.md` §6.3, §7). Branch
+`track/track-006-race-tracking-view` → **PR #168** (squash-merged, `c320e81`). Close PR:
+`docs/track-006-close`. The big one (L) — first build a race can actually be run on.
+
+**Resolved the open questions first** (spec §8; OQ-1 race-end was already resolved):
+- **OQ-2 notes** → render the current station's **services** (a dedicated plan-notes field waits for `.trail`, WI-9).
+- **OQ-3 category→tab** → Nutrition = `{nutrition, hydration}`, Others = `{gear, other}` (matches the §4 type comment).
+- **OQ-4 feed ordering** → **newest-first**.
+- **OQ-5 grid overflow** → grids **scroll**.
+- **OQ-6 undo breadth** → **toast-only / most-recent** for MVP.
+
+**No `mvp-plan.md` §4 domain change.** The whole event spine WI-6 needs — `aidStationEntered/Exited`,
+`retraction`, the three-state `VisitState`, and `resolved`/`aidStationVisits`/`status`/`effectiveEnd` —
+already landed in WI-2. WI-6 is the SwiftUI surface + *pure* view projections + a session view-model.
+
+**What landed:**
+- **`TrackCore.swift`** (Foundation-only, unit-tested): `TrackingTab` (cyclic `next`/`previous` + the
+  category→tab buckets), `Race.paletteItems(for:)` / `services(forVisitOrdinal:)` / `aidBoard(for:)`,
+  the `AidBoard` + `FeedEntry` render models, `[RaceEvent].feedEntries` (resolves aid-exit labels from
+  the matching arrival as it folds; drops retracted, omits corrections) + `.startedAt`, `RaceFormat.duration`,
+  and **`RaceTracker`** — the `@Observable` session model: each action does a durable append (fsync) then
+  mirrors it in memory; `start` / `track` / `arrive` / `finishAid` / `startAdHocAid` / `finishRace` /
+  `addVoiceNote` / `undoLast`; `lastAction` drives the Undo toast (Start/Finish are deliberately not toast-undoable).
+- **`TrackingView.swift`** (new file): the four-tab shell + a **cyclic** horizontal swipe (`simultaneousGesture`,
+  so the grids/lists keep scrolling and tiles keep their taps); the two trackable grids (`LazyVGrid`,
+  category-tinted high-contrast tiles); the **AID manager** (Passed → Current + green Finish → services notes →
+  Upcoming-marks-arrival in planned mode; past visits + **Start new aid station** in plan-less mode; a distinct
+  **Finish race** control with a confirm dialog); the read-only **Feed** (newest-first, category-colored icons,
+  no chrome); the **record-voice button** + `AudioRecorder` (AVFoundation, foreground tap-record-tap-stop, mono
+  AAC/m4a, `AVAudioApplication.requestRecordPermission`); the **Undo toast** (→ `retraction`, ~10s auto-dismiss
+  via `.task(id:)`); `RaceDetailView` (status branch: Configured → `StartRaceView`, In-progress → `TrackingView`,
+  Finished → a **minimal** read placeholder — full post-race view is WI-7); a `#Preview`.
+- **`ContentView.swift`**: list rows → `RaceDetailView` (`NavigationLink`); `RaceStore.refreshStatuses()` on
+  reappear (status/duration are projections, refreshed after start/finish in the detail); **duration-when-finished**
+  on the row.
+- **`project.pbxproj`**: registered `TrackingView.swift`; added `INFOPLIST_KEY_NSMicrophoneUsageDescription`.
+
+**Bug caught by the UI test (and fixed before merge):** the cyclic swipe did nothing — a `DragGesture` on a
+container only receives touches where the container is hit-testable, and a `VStack`'s empty/transparent regions
+aren't. A scripted left-drag (Nutrition→AID) failed until I added **`.contentShape(Rectangle())`** to the tracking
+surface. This was a real defect for users too (swiping over empty space), not just a test artifact.
+
+**Verified** (from `systems/track/Track/`, iPhone 15 / iOS 17.4):
+- `xcodebuild build … -sdk iphonesimulator` → **BUILD SUCCEEDED** (no warnings).
+- `xcodebuild test …` → **TEST SUCCEEDED — TrackTests 52** (+12 WI-6: cyclic tab math, palette buckets,
+  `feedEntries` label-resolution/retraction/correction, `AidBoard` planned-progression / forgot-to-Finish /
+  plan-less, `RaceFormat.duration`, and the `RaceTracker` flows incl. relaunch + durable voice note) **·
+  TrackUITests 3.** The new UI test `testTrackingDurablyLogsAnEventAcrossRelaunch` drives the real app:
+  create → Start → **swipe** Nutrition→AID → ad-hoc arrival → **Undo toast** appears → Feed lists it →
+  terminate/relaunch → the in-progress race reopens and the event is still logged (append + fsync survived).
+- Live tracking-view screenshots (captured via `XCUIScreen.main` from the UI test, extracted with
+  `xcresulttool`): `reference/design/track-006-aid-tab.png` (current visit + Finish + Start-new-aid + Finish-race
+  + Undo toast + record button + tab bar) and `track-006-feed.png` (newest-first stream).
+
+**Notes / scope:** the **live mic** is Simulator-limited (the AVAudioApplication permission alert is system UI),
+so voice-note durability is proven by the WI-2 `appendVoiceNote` ordering test + a new `RaceTracker` durability
+test + the in-app affordance, mirroring WI-5's `.fileImporter` precedent — not a real mic capture. The intake-grid
+tile→`intake` path shares the same append spine and is unit-covered (`testRaceTrackerStartTrackUndoFinish`); the
+UI test drives the AID path to avoid the lazy create-form palette setup. Out of scope → **WI-7 (TRACK-007)**:
+inline clip playback, edit-finish-time (`endTimeCorrected`), the full per-visit summary; WI-6 ships only a minimal
+finished placeholder so the finish flow is reachable + verifiable.
+
+**Next:** **TRACK-007 (WI-7)** — race view (post-race; `mvp-plan.md` §6.4, §7 WI-7): resolved chronological
+event stream, inline clip playback, edit-finish-time → `endTimeCorrected`, summary (counts + per-visit time).
+Replaces the WI-6 minimal finished placeholder. Deps: TRACK-002, TRACK-006. (M.)

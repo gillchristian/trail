@@ -4,34 +4,23 @@
 
 ## Active
 
-### TRACK-006 — WI-6 race tracking view
-**Source:** BACKLOG (Tracker MVP epic) · **Branch:** track/track-006-race-tracking-view
-**Spec:** `reference/tracking-view-spec.md` (drives this WI) + `mvp-plan.md` §6.3, §7 WI-6. Wireframes:
-`reference/design/track-{nutrition,aid-stations,others,feed}.webp` (layout only; styling follows Trail).
+_(none active. **TRACK-006 complete** (✓ PR #168): WI-6 race tracking view — the in-race four-tab surface
+(Nutrition · AID · Others · Feed, cyclic swipe) over an `@Observable RaceTracker` (durable append → in-memory
+mirror). Grids → `intake`; AID tab → arrive / `finishAid` / plan-less ad-hoc + a distinct **Finish race**
+(`raceEnded`, with confirm); Feed projection (newest-first); foreground tap-record-tap-stop voice → mono AAC/m4a
+in the bundle; Undo toast → `retraction`. Pure view projections (`TrackingTab` cyclic + buckets, `feedEntries`,
+`AidBoard`) + `RaceDetailView` status branch (Configured → Start, In-progress → tracking, Finished → a **minimal**
+read placeholder; full view → WI-7) + duration-when-finished on the list row. **No `mvp-plan.md` §4 change** — the
+event spine landed in WI-2. Resolved spec OQ-2…6 (notes=services; Nutrition `{nutrition,hydration}`/Others
+`{gear,other}`; feed newest-first; grids scroll; undo toast-only). Verified from `systems/track/Track/`: BUILD
+SUCCEEDED (no warnings); **TrackTests 52 · TrackUITests 3** + a real end-to-end relaunch-durability UI test that
+**caught a swipe hit-testing bug** (fixed with `contentShape`). Screenshots: `reference/design/track-006-{aid-tab,feed}.png`.)_
 
-**Open questions resolved at build** (spec §8; OQ-1 race-end already resolved = Finish-race control in AID):
-- **OQ-2 AID notes** → render the current station's **services** (a dedicated plan-notes field arrives with `.trail`, WI-9).
-- **OQ-3 category→tab** → Nutrition tab = `{nutrition, hydration}`; Others tab = `{gear, other}` (matches §4 type comment).
-- **OQ-4 feed ordering** → **newest-first** (most recent on top) — best for mid-race "what did I just do".
-- **OQ-5 grid overflow** → grids **scroll** vertically when a bucket overflows.
-- **OQ-6 undo breadth** → **toast-only / most-recent** for MVP; per-row Feed retraction deferred.
-
-**Acceptance criteria** (§7 WI-6 — "run a race through all four tabs with every event durably logged"):
-- [ ] Four **cyclic** swipeable tabs Nutrition · AID · Others · Feed; tab bar taps + wrap-around swipe (verify in Simulator).
-- [ ] Nutrition/Others grids show the palette items in that tab's categories; tapping a tile appends `intake` (durable). (UI test: tap tile → Feed shows it → relaunch → still there.)
-- [ ] AID tab (planned): Passed rows, the in-progress current station with a green **Finish** (`aidStationExited`), services notes, an **Upcoming** row that marks arrival (`aidStationEntered`, implicitly departing the open visit); plan-less: past visits + **Start new aid station** (ad-hoc). Visits pair by `visitID`; the forgot-to-Finish rule holds. (unit-tested projection.)
-- [ ] A distinct **Finish race** control (with confirm) appends `raceEnded`; status → finished. (verify)
-- [ ] Record-voice button (tracking tabs only): tap-record-tap-stop → mono AAC/m4a written to the bundle → `voiceNote` appended (audio-then-event order). (unit-tested durability; live mic noted as Simulator-limited.)
-- [ ] Undo toast (tracking tabs only) after any tracking action; **Undo appends a `retraction`** the Feed/counts/visits honor (the target vanishes). (unit + UI.)
-- [ ] Every action appends + **fsyncs**; a relaunch reloads from disk with zero loss (durability invariant). (UI relaunch test.)
-- [ ] Races list: row → race detail branching on status (Configured → Start; In-progress → tracking; Finished → minimal read placeholder, full view is WI-7); duration shown when finished.
-- [ ] From `systems/track/Track/`: BUILD + TEST SUCCEEDED (no warnings); a Simulator run screenshot of the live tracking view.
-
-**Notes:** No `mvp-plan.md` §4 domain change needed — the event spine (`aidStationEntered/Exited`, `retraction`,
-three-state `VisitState`, `resolved`/`aidStationVisits`/`status`) already landed in WI-2. New code is the SwiftUI
-tracking surface + pure view projections (`feedEntries`, `AidBoard`, `TrackingTab`) + an `@Observable RaceTracker`
-session model (durable append → in-memory mirror). Out of scope → WI-7: clip playback, edit-finish-time, the full
-post-race summary (this WI ships only a minimal finished placeholder so the finish flow is reachable + verifiable).
+_**Next up: TRACK-007 (WI-7)** — race view (post-race; `mvp-plan.md` §6.4, §7 WI-7): the chronological event stream
+resolved (effective end + retractions), **inline clip playback**, **edit finish time** → `endTimeCorrected`, and a
+summary (counts + per-visit time). Replaces the WI-6 minimal finished placeholder. **AC** (§7 WI-7): view a finished
+race; play a clip; correct the finish via a correction event; summary reflects effective end + visit durations. Deps:
+TRACK-002, TRACK-006 (done). (M.) Promote it into the template below and branch `track/track-007-…`._
 
 ## Entry template
 
