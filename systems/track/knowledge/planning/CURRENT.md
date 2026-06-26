@@ -4,21 +4,19 @@
 
 ## Active
 
-_(none active. **TRACK-001 complete** (✓ PR #162): WI-1 project skeleton — `RacesView`
-(`NavigationStack` + empty state + `+`/swipe-delete) over a durable race bundle
-(`Documents/Races/<id>/race.json`, atomic write, scan-on-load); stub `Race` model + `@Observable
-RaceStore`; Trail `Theme` tokens + amber `AccentColor`; **iOS deployment target pinned 17.0**
-(ADR-0001); **scheme promoted to a committed shared scheme**. Verified: BUILD + TEST SUCCEEDED
-(4 unit + 1 UI relaunch-persistence test), screenshots in `reference/design/`._
-
-_**Next up: TRACK-002 (WI-2)** — domain model + durable persistence: the full `mvp-plan.md` §4
-types, append-only `events.log` with **fsync per append**, atomic `race.json`,
-write-audio-then-append ordering, and the `status`/`effectiveEnd`/`aidStationVisits` projections
-with retraction pre-filtering (the L-sized durability spine). **AC** (§7 WI-2): create race, append
-events programmatically, force-quit/relaunch with zero loss; status/effective-end/visit-pairing
-correct; a retraction hides its target everywhere; orphan-audio (not dangling-ref) the only crash
-artifact. Also: lift the WI-1 stub types out of `ContentView.swift` into their own files. Copy its
-AC from the BACKLOG line into the template below and branch `track/track-002-…`.)_
+### TRACK-002 — WI-2: domain model + durable persistence
+**Source:** BACKLOG (epic "Tracker MVP"; spec `reference/mvp-plan.md` §4 types, §3 persistence, §2 invariants, §7 WI-2)
+**Branch:** track/track-002-domain-persistence
+**Acceptance criteria:**
+- [ ] create a race, append events programmatically, **force-quit/relaunch with zero loss** (fsync per append + crash-tolerant load; verified by a fresh-instance reload + a torn-last-line test)
+- [ ] `status` / `effectiveEnd` / `aidStationVisits` projections correct — incl. visit pairing by `visitID`, the implicit-depart ("forgot to Finish") rule, and `endTimeCorrected` resolution
+- [ ] a **retraction hides its target everywhere** — all projections pre-filter retracted ids (the retracted event *and* its retraction vanish)
+- [ ] **orphan-audio (not dangling-ref) is the only crash artifact** — write-audio → fsync → *then* append the `voiceNote` event
+**Notes:**
+- The durability-critical spine (L). Implements the full §4 Swift types; race-bundle read/write; append-only `events.log` (one JSON/line, **fsync after every append**); **atomic `race.json`** (temp + fsync + rename); crash recovery on launch (tolerate a torn last line); retraction pre-filtering.
+- **Load-bearing invariants** (§2, do not violate): no background exec; append-only log (Undo + finish-edit are *events*, not mutations); offline; capture-now-process-later; status/effective-end/visit-state are **projections**, never stored flags.
+- **Reorganize:** lift the WI-1 stub `Race`/`RaceStorage` out of `ContentView.swift` into a Foundation-only core file (sets up the ADR-0001 SPM-core split later). Keep the `@Observable` store + views in the SwiftUI layer.
+- Verification = XCTest (projections + persistence round-trip + torn-line recovery + retraction + audio-ordering) — fast, simulator-hosted; app still builds + lists races. Audio *recording UI* is WI-6; WI-2 implements the persistence ordering with stand-in bytes.
 
 ## Entry template
 
