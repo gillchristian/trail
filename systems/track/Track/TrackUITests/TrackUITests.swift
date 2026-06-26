@@ -7,32 +7,51 @@
 
 import XCTest
 
-/// WI-1 acceptance, end-to-end through the UI: the app launches to an empty races list, and a
-/// race added with `+` survives a full relaunch.
+/// End-to-end acceptance through the UI: the app launches to an empty races list; a race created
+/// and configured via the WI-4 form appears as Configured and survives a full relaunch.
 final class TrackUITests: XCTestCase {
     override func setUpWithError() throws {
         continueAfterFailure = false
     }
 
-    func testStubRacePersistsAcrossRelaunch() throws {
+    /// WI-4: `+` opens the create form; a saved race appears with a Configured badge and persists.
+    func testConfiguredRacePersistsAcrossRelaunch() throws {
         let app = XCUIApplication()
         app.launchArguments = ["-uitest-reset"]     // start from an empty bundle root
         app.launch()
 
         XCTAssertTrue(app.staticTexts["No races yet"].waitForExistence(timeout: 10),
                       "launches to the empty-races state")
-        XCTAssertFalse(app.staticTexts["Stub race 1"].exists)
 
         app.buttons["addRace"].tap()
-        XCTAssertTrue(app.staticTexts["Stub race 1"].waitForExistence(timeout: 10),
-                      "adding a race shows its row")
+        let nameField = app.textFields["raceName"]
+        XCTAssertTrue(nameField.waitForExistence(timeout: 10), "the create/configure form opens")
+        // Wait out the sheet's presentation animation so the tap reliably focuses the field.
+        expectation(for: NSPredicate(format: "isHittable == true"), evaluatedWith: nameField)
+        waitForExpectations(timeout: 10)
+        nameField.tap()
+        nameField.typeText("Sunset 50K")
+
+        // Save enables only once the name registers — waiting on it both confirms the text landed
+        // and avoids tapping a disabled button.
+        let save = app.buttons["saveRace"]
+        expectation(for: NSPredicate(format: "isEnabled == true"), evaluatedWith: save)
+        waitForExpectations(timeout: 10)
+        save.tap()
+
+        XCTAssertTrue(app.staticTexts["Sunset 50K"].waitForExistence(timeout: 10),
+                      "the configured race appears in the list")
+        XCTAssertTrue(app.staticTexts["status-configured"].waitForExistence(timeout: 10),
+                      "with a Configured status badge")
 
         app.terminate()
         app.launchArguments = []                     // relaunch WITHOUT reset
         app.launch()
 
-        XCTAssertTrue(app.staticTexts["Stub race 1"].waitForExistence(timeout: 10),
+        XCTAssertTrue(app.staticTexts["Sunset 50K"].waitForExistence(timeout: 10),
                       "the race persists across relaunch")
+        XCTAssertTrue(app.staticTexts["status-configured"].waitForExistence(timeout: 10),
+                      "and is still Configured")
     }
 
     /// WI-3: the trackable library opens from the Races toolbar, a created trackable appears, and

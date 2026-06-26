@@ -262,4 +262,79 @@ final class TrackTests: XCTestCase {
         let reloaded = TrackableLibraryStore(storage: TrackableLibraryStorage(root: root))
         XCTAssertEqual(reloaded.items.map(\.label), ["B"], "the delete persisted across relaunch")
     }
+
+    // MARK: - WI-4: create / configure race (RaceDraft + RaceStore)
+
+    func testRaceDraftValidationRequiresNonBlankName() {
+        var draft = RaceDraft()
+        XCTAssertFalse(draft.isValid, "an empty name is invalid")
+        draft.name = "   "
+        XCTAssertFalse(draft.isValid, "whitespace-only is still blank")
+        draft.name = "  UTMB "
+        XCTAssertTrue(draft.isValid)
+        XCTAssertEqual(draft.build().name, "UTMB", "build() trims the name")
+    }
+
+    func testRaceDraftAidStationOrdinalsStayContiguousOnDelete() {
+        var draft = RaceDraft()
+        draft.addAidStation(name: "Start")
+        draft.addAidStation(name: "Mid")
+        draft.addAidStation(name: "Finish")
+        XCTAssertEqual(draft.aidStations.map(\.ordinal), [1, 2, 3])
+        draft.removeAidStations(at: IndexSet(integer: 1))   // drop "Mid"
+        XCTAssertEqual(draft.aidStations.map(\.name), ["Start", "Finish"])
+        XCTAssertEqual(draft.aidStations.map(\.ordinal), [1, 2], "ordinals renumber after a delete")
+    }
+
+    func testRaceDraftMoveRenumbersOrdinals() {
+        var draft = RaceDraft()
+        for name in ["A", "B", "C"] { draft.addAidStation(name: name) }
+        draft.moveAidStations(fromOffsets: IndexSet(integer: 2), toOffset: 0)   // C to the front
+        XCTAssertEqual(draft.aidStations.map(\.name), ["C", "A", "B"])
+        XCTAssertEqual(draft.aidStations.map(\.ordinal), [1, 2, 3], "ordinals follow position, not identity")
+    }
+
+    func testRaceDraftPaletteIsASnapshotMatchedById() {
+        var draft = RaceDraft()
+        let gel = TrackableElement(label: "Gel", category: .nutrition)
+        draft.togglePalette(gel)
+        XCTAssertEqual(draft.palette, [gel])
+        XCTAssertTrue(draft.paletteContains(gel))
+        draft.togglePalette(gel)                       // toggling the same id again removes it
+        XCTAssertTrue(draft.palette.isEmpty)
+        draft.togglePalette(gel)
+        var edited = gel; edited.label = "Maurten Gel" // same id, later library edit
+        XCTAssertEqual(draft.palette.first?.label, "Gel", "the snapshot keeps the value as captured")
+        XCTAssertTrue(draft.paletteContains(edited), "membership is by id, so the edited item still matches")
+    }
+
+    func testRaceDraftBuildProducesConfiguredRace() {
+        var draft = RaceDraft()
+        draft.name = "Trail 100"
+        draft.date = t(5000)
+        draft.addAidStation(name: "AS1")
+        draft.togglePalette(TrackableElement(label: "Gel", category: .nutrition))
+        let race = draft.build(createdAt: t(1000))
+        XCTAssertEqual(race.name, "Trail 100")
+        XCTAssertEqual(race.date, t(5000))
+        XCTAssertEqual(race.createdAt, t(1000))
+        XCTAssertEqual(race.aidStations.map(\.name), ["AS1"])
+        XCTAssertEqual(race.palette.map(\.label), ["Gel"])
+        // No events yet → the race is Configured.
+        XCTAssertEqual(storage().loadEvents(for: race.id).status, .configured)
+    }
+
+    func testRaceStoreAddPersistsConfiguredRace() {
+        let store = RaceStore(storage: storage())
+        var draft = RaceDraft()
+        draft.name = "Sunset 50K"
+        let race = draft.build()
+        store.add(race)
+        XCTAssertEqual(store.races.first?.id, race.id, "the new race is shown at the top")
+        XCTAssertEqual(store.status(for: race), .configured)
+        // A fresh store on the same root models a relaunch.
+        let reloaded = RaceStore(storage: storage())
+        XCTAssertEqual(reloaded.races.map(\.name), ["Sunset 50K"], "the configured race persisted")
+        XCTAssertEqual(reloaded.status(for: race), .configured)
+    }
 }

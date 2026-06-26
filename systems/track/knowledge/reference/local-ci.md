@@ -75,3 +75,11 @@ TRACK-003 (2026-06-25): `TrackTests` → **22** (+5 trackable-library: storage r
 upsert-create/edit, create + delete persistence across reload). `TrackUITests` → **2** —
 `testTrackablePersistsAcrossRelaunch` drives the real library UI (open from the Races toolbar → empty
 state → `+` → type a label → Save → row appears → `terminate()`/relaunch → persists).
+
+TRACK-004 (2026-06-25): `TrackTests` → **28** (+6 WI-4: `RaceDraft` name validation/trim, aid-station
+ordinal renumber on delete + move, palette snapshot matched by id; `RaceStore.add` persists a
+configured race + `.configured` status projection across reload). `TrackUITests` → **2** — the WI-1
+stub test became `testConfiguredRacePersistsAcrossRelaunch` (tap `+` → fill the create form → Save →
+row appears with a **Configured** badge → `terminate()`/relaunch → persists). Full run from
+`systems/track/Track/`: **TEST SUCCEEDED — TrackTests 28 · TrackUITests 2** (iPhone 15 / iOS 17.4).
+Screenshot of the Configured list: `reference/design/track-004-races-configured.png`.

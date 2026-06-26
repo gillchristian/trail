@@ -255,3 +255,56 @@ race), as is promote-ad-hoc-to-library. WI-3 is the library itself. UI-test note
 palette from the library (multi-select) + ad-hoc create, save → **Configured** (`mvp-plan.md` §6.2,
 §7 WI-4). Wires the library into race creation and replaces the WI-1 `addStubRace` placeholder with the
 real form. (M.)
+
+---
+## 2026-06-25 — TRACK-004 COMPLETE: WI-4 create / configure race + status badge
+
+**Task:** TRACK-004 (WI-4, `mvp-plan.md` §6.2, §7). Branch `track/track-004-create-configure-race` →
+**PR #166** (squash-merged). Replaces the WI-1 stub create flow with the real form; wires WI-3's
+library in as the palette source.
+
+**What landed:**
+- **`RaceDraft`** (in `TrackCore.swift`, Foundation-only): the create/configure editing buffer — name
+  + optional date, aid stations with auto-maintained **1-based ordinals** (add/delete/reorder), and a
+  palette **snapshot** toggled/matched by id. Pure value logic so the ordinal/palette rules are
+  unit-testable without the SwiftUI layer. `build(createdAt:)` freezes it into a `Race`.
+- **`CreateRaceView.swift`** (new SwiftUI file): a `Form` sheet presented from the Races `+`. Sections:
+  race (name `TextField` required + Save-disabled-when-blank; optional date toggle → `DatePicker`);
+  aid stations (rows with ordinal prefix + name field; section-header `EditButton` drives
+  reorder/delete; "Add aid station"); palette (library items as checkmark toggle rows + ad-hoc rows;
+  "Add custom item" → `AdHocItemEditor`: label + category + **Add to library** opt-in promote).
+- **`RaceStore`** (`ContentView.swift`): `add(_:)` (persist + insert newest-first) and a
+  **`status(for:)` projection** that folds `events.log` (configured race → `.configured`); dropped
+  `addStubRace`. The `+` toolbar presents the sheet. New **`StatusBadge`** on each row (amber
+  Configured / race-red In-progress / green Finished); the row date shows the scheduled date (day) when
+  set, else `createdAt` (with time).
+- **`RaceStorage.reset()` / `TrackableLibraryStorage.reset()`** + `TrackableCategory.symbolName` made
+  internal (shared by the library + palette rows). Registered `CreateRaceView.swift` in the Track
+  target (4 `project.pbxproj` edits, ids `AA…0005/0006`).
+
+**Durability bug fixed (latent since WI-1, surfaced by the new sheet):** the `-uitest-reset` wipe lived
+in the stores' `init`s. SwiftUI re-evaluates a view's `@State = Store()` **default expression on every
+re-creation** of that view — so presenting/dismissing the create sheet re-ran the destructive reset and
+**deleted the just-created race** before relaunch. Proven by NSLog: two `RESET running` lines in one
+pid, the second *after* the race was created. The on-disk persistence was always sound — a `simctl`
+terminate/relaunch reloaded the race fine (`races=1`). **Fix:** moved the one-time reset to
+`TrackApp.init` (runs once per process); the stores' inits now only `load()` (reconstruction-safe).
+
+**Verified** (from `systems/track/Track/`, iPhone 15 / iOS 17.4):
+- `xcodebuild build … -sdk iphonesimulator` → **BUILD SUCCEEDED** (no warnings).
+- `xcodebuild test …` → **TEST SUCCEEDED** — **TrackTests: 28** (+6 WI-4: `RaceDraft` name
+  validation/trim, ordinal renumber on delete + move, palette snapshot-by-id, `build` → configured
+  race; `RaceStore.add` persists + `.configured` across reload). **TrackUITests: 2** — the WI-1 stub
+  test became `testConfiguredRacePersistsAcrossRelaunch` (tap `+` → wait for the field hittable → type
+  name → wait for Save enabled → Save → row + **Configured** badge → `terminate()`/relaunch → persists).
+- Screenshot of the Configured list (two seeded races, both badged): `reference/design/track-004-races-configured.png`.
+
+**Notes / scope:** out of scope (later WIs) — CSV import (WI-5); race detail / Start / tracking /
+duration-when-finished (WI-6/7); editing an existing race's config. UI-test hardening: the heavier
+3-section sheet races its presentation animation, so the test waits for the name field to be `hittable`
+and for Save to become `isEnabled` (which also confirms the typed name registered) before tapping.
+
+**Next:** **TRACK-005 (WI-5)** — aid-station CSV import: parse Trail's CSV (columns **name, services,
+distance**) into `[PlannedAidStation]`; lift Trail's exact `services` cell encoding/delimiter from its
+parser. AC (§7 WI-5): import a Trail CSV; name/services/distance populate; stations editable; views can
+derive distance-to-next. Deps: TRACK-004. (S/M.)
