@@ -653,3 +653,34 @@ with no clean automated test; verified by build + that signal + reasoning. Also 
 
 **Next:** unchanged — the app is genuinely race-ready now (icon, portrait, screen-awake, locked to the active
 race, durable). The user installs it via `reference/device-testing.md`; deferred WIs wait on real-race data.
+
+---
+## 2026-06-26 — TRACK-012 COMPLETE: fix iOS device signing (empty the macOS entitlements)
+
+The user hit *"Entitlements file 'Track.entitlements' was modified during the build, which is not supported"*
+on their **first real device build** in Xcode. Branch `track/track-012-fix-ios-entitlements` → **PR #176**.
+
+**Cause.** `Track.entitlements` carried **macOS App Sandbox** keys — `com.apple.security.app-sandbox` and
+`com.apple.security.files.user-selected.read-only` — a leftover from the multiplatform project template. iOS
+signing strips keys it doesn't support, and rewriting the source entitlements file mid-build is the exact thing
+that error forbids. My simulator and `CODE_SIGNING_ALLOWED=NO` device builds never sign, so I never hit it — and
+in the TRACK-010 audit I wrongly called these "free-team-compatible / harmless on iOS." **Lesson: runtime-harmless
+≠ sign-time-harmless; an entitlements audit needs a *signed* build.**
+
+**Fix.** Empty the file to `<dict/>`. The app needs **no** entitlements on iOS — the mic is an Info.plist usage
+string (not an entitlement), and the CSV `.fileImporter` uses security-scoped URLs (no entitlement). Kept the
+`CODE_SIGN_ENTITLEMENTS` reference pointing at the now-empty file (minimal; no `project.pbxproj` surgery).
+
+**Verified — with a *real signed device build*** (not just no-signing): the user's `DEVELOPMENT_TEAM` was now in
+the working tree, so `xcodebuild -sdk iphoneos -destination generic/platform=iOS -allowProvisioningUpdates
+DEVELOPMENT_TEAM=…` actually ran `codesign --sign … --entitlements …Track.app.xcent` and reported
+`** BUILD SUCCEEDED **`. So the app signs cleanly for a device now. (The user had independently removed the
+App Sandbox **capability** in Xcode's Signing & Capabilities — the same fix from the UI side; the empty
+capabilities list is correct, the app needs none.) Guide gained a Troubleshooting section incl. this error.
+
+**Left uncommitted (intentionally):** the user's `project.pbxproj` working-tree changes — their personal
+`DEVELOPMENT_TEAM = U959A2354F` and Xcode-added `CFBundleDisplayName`/`LSApplicationCategoryType` + some
+reordering. Personal/local signing state; flagged to the user to commit if they want it tracked. The committed
+fix is just the emptied entitlements (+ guide).
+
+**Next:** unchanged — real-race test is the next signal; deferred WIs wait.

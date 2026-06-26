@@ -152,3 +152,17 @@ no clean automated test, so verification is build + suite + signals. **BUILD SUC
 `UISupportedInterfaceOrientations~iphone = [UIInterfaceOrientationPortrait]`, and `TrackUITestsLaunchTests`
 (runs once per target UI configuration) dropped **4 → 2** runs (fewer orientations). Screen-awake
 (`UIApplication.isIdleTimerDisabled` in `TrackingView`) verified by build + reasoning (in-progress view only).
+
+TRACK-012 (2026-06-26): iOS device-signing fix — emptied `Track.entitlements` (macOS App Sandbox keys broke
+iOS signing). First verification here done with a **real signed device build** (the lesson: no-signing builds
+can't catch entitlement/signing issues). With the user's team in the working tree:
+
+```sh
+xcodebuild build -project Track.xcodeproj -scheme Track -sdk iphoneos \
+  -destination 'generic/platform=iOS' -derivedDataPath build-device \
+  DEVELOPMENT_TEAM=<team> -allowProvisioningUpdates
+# → CodeSign … --entitlements …/Track.app.xcent …   ** BUILD SUCCEEDED **
+```
+
+(`timeout` is not on macOS — exit 127; run long builds via background + monitor instead. `build-device/`
+is gitignored.)
