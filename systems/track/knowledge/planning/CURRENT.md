@@ -4,20 +4,17 @@
 
 ## Active
 
-### TRACK-011 — race-day hardening (portrait lock + keep screen awake)
-**Source:** found while smoke-testing the device build for TRACK-010 (the user asked me to figure out what
-else is missing for race-readiness).
-**Branch:** track/track-011-race-day-hardening
-**Acceptance criteria:**
-- [ ] **Portrait-locked** (iPhone) — a one-handed, glanced-at-mid-run app shouldn't flip to landscape.
-      _(verify: built `Info.plist` `UISupportedInterfaceOrientations~iphone` = Portrait only)_
-- [ ] **Screen stays awake during a race** — the app is foreground-only, so a screen sleep would stop you
-      recording; hold the idle timer off while the tracking view is up, release it on leave.
-- [ ] Guide updated (the Auto-Lock checklist item is now optional).
-**Notes:** Orientation is two `INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone` build settings → Portrait.
-Screen-awake is `UIApplication.shared.isIdleTimerDisabled` in `TrackingView.onAppear/onDisappear` (in-progress
-only). Both are config/side-effect changes with no clean automated test; verified by build + the launch-test
-UI-configuration count dropping 4→2 (proves the orientation lock) + manual reasoning.
+_(none active. **TRACK-011 complete** (✓ PR #175): race-day hardening. **Portrait-locked** the iPhone
+(`INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone` → Portrait only) so a glanced-at, one-handed app
+can't flip to landscape mid-run; and **keep the screen awake during a race** (`UIApplication.isIdleTimerDisabled`
+held while `TrackingView` is up, released on leave) since the foreground-only app would otherwise stop recording
+on a screen sleep. Guide's Auto-Lock item is now optional. Verified: **BUILD SUCCEEDED**; **TrackTests 64 ·
+TrackUITests 7**; orientation lock confirmed by the built `Info.plist` + the launch-test UI-config count dropping
+4→2. The app is now genuinely race-ready — install via `reference/device-testing.md`.)_
+
+**Backlog is empty of active work.** The MVP is feature-complete + hardened for a real-device race. Deferred:
+WI-8 (`.trace` export) / WI-9 (`.trail` ingestion) / WI-10 (Live Activity) — promote after the first real race
+settles the event vocabulary (`mvp-plan.md` §7–8). Next concrete step is the user's real-race test.
 
 _(**TRACK-010 complete** (✓ PR #174): on-device testing prep. Trail's mountain-peak **app icon** (SVG →
 full-bleed opaque 1024 via QuickLook, no alpha); a **device-install guide** (`reference/device-testing.md` —

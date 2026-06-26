@@ -623,3 +623,33 @@ ad-hoc tasks each time one was pulled). They're now tracked by `WI-N` only and g
 
 **Next:** the app is ready for a real-device race test. After the first real race, revisit WI-8 (`.trace` export)
 once the event vocabulary has settled (the `mvp-plan.md` deferral condition).
+
+---
+## 2026-06-26 — TRACK-011 COMPLETE: race-day hardening (portrait lock + keep screen awake)
+
+Found while smoke-testing the TRACK-010 device build (installed to the simulator, screenshotted): the app
+rendered in **landscape** — it allowed rotation — and being foreground-only it would also sleep mid-race. Two
+gaps for a one-handed, glanced-at, hours-long race-day app. The user had explicitly asked me to figure out
+what else is missing, so I fixed both. Branch `track/track-011-race-day-hardening` → **PR #175** (squash-merged).
+
+**1. Portrait-lock (iPhone).** Both build configs' `INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone` →
+`UIInterfaceOrientationPortrait` only (was Portrait + LandscapeLeft + LandscapeRight). The whole UI (tab bar,
+grids, bottom-corner toast/record chrome) is portrait-designed, and accidental rotation mid-run is exactly the
+kind of thing a tired/jostled runner doesn't want. iPad orientations left untouched (the race device is a phone).
+
+**2. Keep the screen awake during a race.** The app is foreground-only — a screen auto-lock would stop you
+recording and hide the tabs. `TrackingView.onAppear` sets `UIApplication.shared.isIdleTimerDisabled = true`,
+`onDisappear` clears it (next to the existing stop-and-save-recording-on-disappear). Scoped to the in-progress
+tracking view only, so the list / configured / finished screens sleep normally. Better than telling the user to
+change Auto-Lock by hand (the guide's checklist item is now optional). `UIApplication` is reachable without an
+explicit `import UIKit` (SwiftUI pulls it in).
+
+**Verified** (from `systems/track/Track/`): **BUILD SUCCEEDED**; full suite **TrackTests 64 · TrackUITests 7**,
+no failures. Neat confirmation of the orientation lock: `TrackUITestsLaunchTests` (which runs once per target UI
+configuration) dropped from **4 → 2** runs — fewer orientations to launch-test. The built `Info.plist` shows
+`UISupportedInterfaceOrientations~iphone = [UIInterfaceOrientationPortrait]`. Both changes are config/side-effect
+with no clean automated test; verified by build + that signal + reasoning. Also marked TRACK-010 complete in
+`CURRENT.md` (it was merged but I'd missed flipping its CURRENT entry — bundled its close docs in the one PR).
+
+**Next:** unchanged — the app is genuinely race-ready now (icon, portrait, screen-awake, locked to the active
+race, durable). The user installs it via `reference/device-testing.md`; deferred WIs wait on real-race data.

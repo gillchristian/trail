@@ -145,3 +145,10 @@ xcodebuild build -project Track.xcodeproj -scheme Track -sdk iphoneos \
 Icon: SVG→PNG via **QuickLook** `qlmanage -t -s 1024` (WebKit renders the gradients; ImageMagick's internal
 SVG renderer does not — it dropped the gradient fill + the peak path), then `magick … -flatten -alpha off`
 to an opaque sRGB 1024 (iOS icons reject alpha). `build-device/` is also gitignored build output.
+
+TRACK-011 (2026-06-26): race-day hardening (portrait lock + keep screen awake) — config/side-effect only,
+no clean automated test, so verification is build + suite + signals. **BUILD SUCCEEDED**; full suite green
+(**TrackTests 64 · TrackUITests 7**). Orientation lock confirmed two ways: the built `Info.plist` has
+`UISupportedInterfaceOrientations~iphone = [UIInterfaceOrientationPortrait]`, and `TrackUITestsLaunchTests`
+(runs once per target UI configuration) dropped **4 → 2** runs (fewer orientations). Screen-awake
+(`UIApplication.isIdleTimerDisabled` in `TrackingView`) verified by build + reasoning (in-progress view only).
