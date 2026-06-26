@@ -215,3 +215,43 @@ the natural point to reorganize the WI-1 stub types out of `ContentView.swift` i
 **Next:** **TRACK-003 (WI-3)** — trackable library: CRUD UI + storage for `TrackableElement` (label +
 category); the source for race palettes (`mvp-plan.md` §6.5, §7 WI-3). First UI-bearing feature on top
 of the WI-2 core (a `TrackableElement` store + a list/edit screen). Smaller (S).
+
+---
+## 2026-06-25 — TRACK-003 COMPLETE: WI-3 trackable library (CRUD + storage)
+
+**Task:** TRACK-003 (WI-3, `mvp-plan.md` §6.5, §7). Branch `track/track-003-trackable-library` →
+**PR #165** (squash-merged). First UI feature on the WI-2 core.
+
+**What landed:**
+- **New `TrackableLibrary.swift`** (SwiftUI): `TrackableLibraryStore` (`@Observable`, mirrors
+  `RaceStore`) + `TrackableLibraryView` (a `List` with swipe-delete + an empty state) + a
+  create/edit **sheet** (`TrackableEditor`: label `TextField` + category `Picker`; `Save` disabled on
+  blank). Reached from a new **leading toolbar action** on `RacesView` (`openLibrary` →
+  `NavigationLink` push). Category rows show an SF Symbol per category (presentation-only extension).
+- **`TrackableLibraryStorage`** (in `TrackCore.swift`): the library is a flat list persisted as
+  **`trackables.json`** at the persistence root (sibling to `Races/`), written atomically (config,
+  not the append-only log). `load()`/`save()`; root injectable for tests.
+- **Refactor:** extracted the shared `temp → fsync → rename` primitive into **`DurableFile`**
+  (`sync` + `atomicWrite`); `RaceStorage.saveRace` and `appendVoiceNote` now call it, as does the
+  library store — one correct durability primitive (a deliberate rule-of-three exception: durability
+  code shouldn't be duplicated; the 17 WI-2 tests guard the refactor). Added `TrackableCategory.displayName`.
+- Added `TrackableLibrary.swift` to the Track target via 4 `project.pbxproj` edits (file refs
+  `AA…0003/0004`). The pbxproj-add procedure is now routine (2-tab section entries, 4-tab list entries).
+
+**Verified** (from `systems/track/Track/`, iPhone 15 / iOS 17.4):
+- `xcodebuild build … -sdk iphonesimulator` → **BUILD SUCCEEDED** (no warnings).
+- `xcodebuild test …` → **TEST SUCCEEDED** — **TrackTests: 22** (17 WI-2 + 5 library: storage
+  round-trip, store upsert-create/edit, create + delete persistence across reload). **TrackUITests: 2**
+  — `testTrackablePersistsAcrossRelaunch` drives the real screen (open from the Races toolbar → empty
+  state → `+` → type a label → Save → row appears → `terminate()`/relaunch → persists). No static
+  screenshot: the UI test exercises the new surface end-to-end (the WI-1 dark+amber look is unchanged).
+
+**Notes / scope:** the race-palette picker that *consumes* the library is **WI-4** (create/configure
+race), as is promote-ad-hoc-to-library. WI-3 is the library itself. UI-test note: the row is a
+`.buttonStyle(.plain)` Button, so its label absorbs the child Texts — the test matches on
+`buttons` with a `label CONTAINS` predicate rather than `staticTexts`.
+
+**Next:** **TRACK-004 (WI-4)** — create / configure race: name + optional date, manual aid stations,
+palette from the library (multi-select) + ad-hoc create, save → **Configured** (`mvp-plan.md` §6.2,
+§7 WI-4). Wires the library into race creation and replaces the WI-1 `addStubRace` placeholder with the
+real form. (M.)
