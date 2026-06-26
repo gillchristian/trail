@@ -434,3 +434,25 @@ finished placeholder so the finish flow is reachable + verifiable.
 **Next:** **TRACK-007 (WI-7)** — race view (post-race; `mvp-plan.md` §6.4, §7 WI-7): resolved chronological
 event stream, inline clip playback, edit-finish-time → `endTimeCorrected`, summary (counts + per-visit time).
 Replaces the WI-6 minimal finished placeholder. Deps: TRACK-002, TRACK-006. (M.)
+
+---
+## 2026-06-26 — TRACK-006 follow-up: cancel a started aid station (user-reported)
+
+**Trigger (user):** "There's no undo for a new aid station. If I start one the only option is to finish it."
+Real gap: the Undo toast is **most-recent-only and auto-dismisses (~10s)**, so once it's gone (or another
+action replaces it), a mistakenly-started aid station could only be **Finished** — which logs a bogus
+*departed* visit instead of removing it. Branch `track/track-006-aid-cancel` → **PR #170** (squash-merged).
+
+**Fix:** a persistent **Cancel arrival** control on the in-progress station row (`RaceTracker.cancelAid(_:)`
+→ appends a `retraction` targeting that visit's *arrival* event, found by `visitID`). Same one-rule
+invariant as Undo — a retraction, never a mutation. The fold then drops the visit: in planned mode the
+station returns to **Upcoming**; a plan-less ad-hoc visit just disappears. If the toast still referenced
+that arrival, it's cleared. Styled as a small white-tinted bordered chip under the arrival time — clearly
+secondary to the prominent green Finish, so it can't be mis-tapped for it.
+
+**Verified** (from `systems/track/Track/`, iPhone 15 / iOS 17.4): **BUILD SUCCEEDED** (no warnings);
+**TrackTests 54** (+2: cancel restores the planned station to Upcoming and removes it from the Feed; cancel
+of a plan-less ad-hoc visit) **· TrackUITests 3** (the durability test now also asserts the `cancelAid`
+affordance renders on the current station). Refreshed `reference/design/track-006-aid-tab.png` to show the
+Cancel control. Note: this tightens the spec's OQ-6 resolution (toast-only) — per-station cancel is now in
+for the in-progress station; broader per-row Feed retraction stays deferred.

@@ -138,7 +138,9 @@ final class TrackUITests: XCTestCase {
         adHoc.tap()
         XCTAssertTrue(app.buttons["undoAction"].waitForExistence(timeout: 5),
                       "logging an aid arrival shows the Undo toast")
-        attach(app, "track-006-aid-tab")   // live AID tab: current visit, Finish, chrome, tab bar
+        XCTAssertTrue(app.buttons["cancelAid"].exists,
+                      "the in-progress station offers a persistent Cancel (not just Finish)")
+        attach(app, "track-006-aid-tab")   // live AID tab: current visit, Finish + Cancel, chrome, tab bar
 
         // Feed tab lists the arrival.
         app.buttons["tab-feed"].tap()

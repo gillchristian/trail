@@ -247,7 +247,9 @@ private struct AidTabView: View {
                 ForEach(board.passed) { PassedAidRow(visit: $0) }
 
                 if let current = board.current {
-                    CurrentAidRow(visit: current) { tracker.finishAid(current) }
+                    CurrentAidRow(visit: current,
+                                  onFinish: { tracker.finishAid(current) },
+                                  onCancel: { tracker.cancelAid(current) })
                     let services = tracker.race.services(forVisitOrdinal: current.ordinal)
                     if !services.isEmpty { AidNotesCard(services: services) }
                 }
@@ -319,13 +321,21 @@ private struct PassedAidRow: View {
 private struct CurrentAidRow: View {
     let visit: AidStationVisit
     let onFinish: () -> Void
+    let onCancel: () -> Void
 
     var body: some View {
         HStack(spacing: 12) {
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 6) {
                 Text(visit.label).font(.headline).foregroundStyle(.white)
                 Text("In progress · arrived \(visit.enteredAt.formatted(date: .omitted, time: .shortened))")
                     .font(.caption).foregroundStyle(.white.opacity(0.85))
+                // Persistent escape hatch (the toast is most-recent-only): retract the arrival, so a
+                // mistaken station isn't stuck with Finish as its only option.
+                Button(action: onCancel) {
+                    Label("Cancel arrival", systemImage: "arrow.uturn.backward").font(.caption.weight(.semibold))
+                }
+                .buttonStyle(.bordered).tint(.white).controlSize(.small)
+                .accessibilityIdentifier("cancelAid")
             }
             Spacer()
             Button(action: onFinish) {
