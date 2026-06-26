@@ -543,3 +543,41 @@ temporary mic-granted UI test confirmed it, then removed to keep the suite recor
 
 **Next:** unchanged — WI-8/WI-9 deferred; the MVP stands feature-complete, now a bit more robust for the next
 real-race test.
+
+---
+## 2026-06-26 — TRACK-009 COMPLETE: always-in-race-mode (active race locked to the forefront)
+
+User UX feedback from race testing: the active race should always be front-and-centre — you shouldn't be able
+to leave it mid-race, and reopening the app should drop you straight back into it ("race mode" during a race).
+Branch `track/track-009-active-race-lock` → **PR #173** (squash-merged).
+
+**Behavior.** (1) **Can't leave a started race** — while in progress, `TrackingView` hides its back button,
+which also disables the swipe-back-to-pop gesture, so there's no way out until the race is finished. The finish
+flow (AID tab → Finish race, with confirm) is the only exit; the back button returns on the finished (read)
+view, so post-race review is leavable. (2) **Reopen into the active race** — a cold launch with an in-progress
+race opens straight to its tracking view, no flash of the list. Browsing configured/finished races + the library
+is unchanged (normal push + back).
+
+**Implementation.** `RacesView` became a typed `NavigationStack(path: [RaceRoute])` (`.race(id)` / `.library`),
+value-based `NavigationLink`s + `navigationDestination`. The initial path is computed in `RacesView.init` from
+`RaceStore.inProgressRace` (→ `[.race(id)]`), so the jump is **flash-free** and only fires at construction (a
+killed-and-reopened app); a warm resume keeps the existing `@State path`. No `scenePhase` juggling needed — if a
+race is in progress you're *already* locked onto it, so there's no "on the list with an active race" state to
+resync. `TrackingView` gained `.navigationBarBackButtonHidden(true)`. `RaceStore` gained `inProgressRace` +
+`race(for:)`. At most one in-progress race exists once the lock holds; legacy multi-in-progress → newest wins.
+
+**Decision: lock via `navigationBarBackButtonHidden`, not a `fullScreenCover`.** The cover gives a structurally
+unescapable modal, but it fights the start-race transition (a pushed StartRaceView → cover) and the title bar.
+Hiding the back button on the pushed `TrackingView` is the smaller change, keeps the existing browse-then-push
+flow, and (verified) also kills the swipe-back gesture — so it's escape-proof in practice.
+
+**Verified** (from `systems/track/Track/`, iPhone 15 / iOS 17.4): **BUILD SUCCEEDED** (no warnings);
+**TrackTests 63→64** (+1: `RaceStore.inProgressRace` across configured→started→finished + `race(for:)`) **·
+TrackUITests 6→7** (+1: `testActiveRaceLocksAndReopensOnLaunch` — start → assert no "Races" back button → kill →
+relaunch lands directly on the tracking view, not the list). Also **updated** the WI-6 durability test
+(`testTrackingDurablyLogsAnEventAcrossRelaunch`): its relaunch assertion expected the list's in-progress badge,
+but the new behavior reopens the tracking view — so it now asserts that directly (and that `addRace` is absent,
+i.e. we're not on the list). A good sign the lock works: the change *forced* that test to update.
+
+**Next:** unchanged — WI-8 (`.trace`) / WI-9 (`.trail`) deferred. The MVP is feature-complete and now behaves
+like a race-day companion: start a race and the app stays on it, through a kill/relaunch, until you finish.

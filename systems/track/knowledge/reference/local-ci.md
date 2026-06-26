@@ -119,3 +119,12 @@ iOS 17.4), no warnings. Recording + Feed-lock verified **manually** (a temporary
 Feed disabled while recording, recording survives tab switches, the clip lands in the Feed — then removed
 to keep the suite recording-free). Note: a multiline `TextField(axis: .vertical)` surfaces as a **text
 view** (`app.textViews`), not a text field, in XCUITest.
+
+TRACK-009 (2026-06-26): `TrackTests` → **64** (+1: `RaceStore.inProgressRace` across
+configured→started→finished + `race(for:)` lookup). `TrackUITests` → **7** (+1:
+`testActiveRaceLocksAndReopensOnLaunch` — start a race → assert no "Races" back button → kill + relaunch →
+land directly on the tracking view, not the list). The WI-6 `testTrackingDurablyLogsAnEventAcrossRelaunch`
+was **updated** (relaunch now reopens the tracking view, so it asserts that + `addRace` absent, instead of
+the list's in-progress badge). **TEST SUCCEEDED — TrackTests 64 · TrackUITests 7** (iPhone 15 / iOS 17.4),
+no warnings. Note: `.navigationBarBackButtonHidden(true)` on a pushed view also disables the interactive
+swipe-back-to-pop — the lock is escape-proof, asserted by the absent back button.
