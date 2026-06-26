@@ -4,19 +4,20 @@
 
 ## Active
 
-### TRACK-002 — WI-2: domain model + durable persistence
-**Source:** BACKLOG (epic "Tracker MVP"; spec `reference/mvp-plan.md` §4 types, §3 persistence, §2 invariants, §7 WI-2)
-**Branch:** track/track-002-domain-persistence
-**Acceptance criteria:**
-- [ ] create a race, append events programmatically, **force-quit/relaunch with zero loss** (fsync per append + crash-tolerant load; verified by a fresh-instance reload + a torn-last-line test)
-- [ ] `status` / `effectiveEnd` / `aidStationVisits` projections correct — incl. visit pairing by `visitID`, the implicit-depart ("forgot to Finish") rule, and `endTimeCorrected` resolution
-- [ ] a **retraction hides its target everywhere** — all projections pre-filter retracted ids (the retracted event *and* its retraction vanish)
-- [ ] **orphan-audio (not dangling-ref) is the only crash artifact** — write-audio → fsync → *then* append the `voiceNote` event
-**Notes:**
-- The durability-critical spine (L). Implements the full §4 Swift types; race-bundle read/write; append-only `events.log` (one JSON/line, **fsync after every append**); **atomic `race.json`** (temp + fsync + rename); crash recovery on launch (tolerate a torn last line); retraction pre-filtering.
-- **Load-bearing invariants** (§2, do not violate): no background exec; append-only log (Undo + finish-edit are *events*, not mutations); offline; capture-now-process-later; status/effective-end/visit-state are **projections**, never stored flags.
-- **Reorganize:** lift the WI-1 stub `Race`/`RaceStorage` out of `ContentView.swift` into a Foundation-only core file (sets up the ADR-0001 SPM-core split later). Keep the `@Observable` store + views in the SwiftUI layer.
-- Verification = XCTest (projections + persistence round-trip + torn-line recovery + retraction + audio-ordering) — fast, simulator-hosted; app still builds + lists races. Audio *recording UI* is WI-6; WI-2 implements the persistence ordering with stand-in bytes.
+_(none active. **TRACK-002 complete** (✓ PR #164): WI-2 domain model + durable persistence —
+`TrackCore.swift` (Foundation-only) carries the full §4 model, the `status`/`effectiveEnd`/
+`aidStationVisits` projections with retraction pre-filtering, and `RaceStorage` (append-only
+`events.log` with **fsync per append**, atomic `race.json`, crash-tolerant load, write-audio-then-append
+voice-note ordering). Lifted the WI-1 stub out of `ContentView.swift`. Verified: BUILD + TEST SUCCEEDED
+(**17 unit tests** + the UI relaunch-persistence test)._
+
+_**Next up: TRACK-003 (WI-3)** — trackable library: CRUD UI + storage for `TrackableElement` (label +
+category); the source for race palettes (`mvp-plan.md` §6.5, §7 WI-3). **AC** (§7 WI-3): create / edit /
+delete trackables; persist; reload. The first UI-bearing feature on top of the WI-2 core — needs a
+`TrackableElement` store (mirror `RaceStore`) + a List/edit screen, persisted under the persistence
+root (a `trackables.json`, sibling to `Races/`). Deps: TRACK-002 (done). Copy its AC into the template
+below and branch `track/track-003-…`. (TRACK-004 — create/configure race — is the other unblocked
+critical-path item.)_
 
 ## Entry template
 

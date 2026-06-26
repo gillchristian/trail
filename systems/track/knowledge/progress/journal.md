@@ -167,3 +167,51 @@ the deployment target. The orientation note's Part 4 sketches the skeleton.
 `status`/`effectiveEnd`/`aidStationVisits` projections with retraction pre-filtering. The L-sized
 durability spine — AC: append events programmatically, force-quit/relaunch with zero loss. This is also
 the natural point to reorganize the WI-1 stub types out of `ContentView.swift` into their own files.
+
+---
+## 2026-06-25 — TRACK-002 COMPLETE: WI-2 domain model + durable persistence (the event-log spine)
+
+**Task:** TRACK-002 (WI-2, `mvp-plan.md` §2/§3/§4/§7). Branch `track/track-002-domain-persistence` →
+**PR #164** (squash-merged). The durability-critical spine — race data is unrepeatable.
+
+**What landed:**
+- **New `TrackCore.swift`** (Foundation-only, no SwiftUI). Lifted the WI-1 stub `Race`/`RaceStorage`
+  out of `ContentView.swift`; this is the pure core (sets up the ADR-0001 SPM-core split cleanly when
+  it's wanted). Added to the Track target via 4 `project.pbxproj` edits (build file / file ref / group /
+  Sources phase — file refs `AA000…0001/0002`, verified by a clean build).
+- **Full §4 model:** `Race` (+ tolerant `init(from:)` so WI-1 race.json still loads),
+  `TrackableElement`/`TrackableCategory`, `PlannedAidStation`, `PlanRef`, `RaceEvent` + `RaceEventKind`
+  (Codable **synthesized** for the enum-with-associated-values — confirmed on this toolchain).
+- **Projections** (`extension Array where Element == RaceEvent`): `resolved` (drops retracted events
+  *and* their retractions), `status`, `effectiveEnd` (latest correction › raceEnded.at › nil),
+  `aidStationVisits` (pair by `visitID`; a new arrival implicitly departs the open visit →
+  `.departedExitUnrecorded`; lone open → `.inProgress`). All fold `resolved`, so **a retraction hides
+  its target everywhere**.
+- **`RaceStorage` — the spine:** bundle `Races/<id>/{race.json, events.log, audio/}`. **events.log
+  append-only, `fsync` (FileHandle.synchronize) after every append**; **atomic race.json** (write
+  `race.json.tmp` → fsync → `replaceItemAt`/`moveItem`); **crash-tolerant load** (`split` on `\n` +
+  `compactMap` decode — a torn last line is dropped, losing at most the in-flight write);
+  **appendVoiceNote** writes audio → fsync → *then* appends the event (orphan audio is the safe
+  failure, never a dangling ref). Compact encoder for the log (one JSON/line), pretty for race.json.
+- `ContentView.swift` trimmed to the SwiftUI layer (Theme + `RaceStore` + views), store on the new API
+  (`saveRace`/`loadAllRaces`/`deleteRace`). No UI change.
+
+**Verified** (from `systems/track/Track/`, iPhone 15 / iOS 17.4):
+- `xcodebuild build … -sdk iphonesimulator` → **BUILD SUCCEEDED** (no warnings).
+- `xcodebuild test …` → **TEST SUCCEEDED** — **TrackTests: 17 passed** (race round-trip + atomic
+  overwrite + legacy decode; events append/reload + torn-line recovery; status/effectiveEnd; visit
+  pairing + forgot-to-Finish; retraction hides intake/aid-visit and reverts a retracted finish;
+  voice-note ordering + orphan-not-dangling). **TrackUITests** relaunch-persistence still green (the
+  refactor didn't break the running app). Pure-logic tests run in <0.03 s. Commands in `local-ci.md`.
+
+**Decisions / notes:**
+- **One Foundation-only core file** rather than several — bounds the pbxproj surgery to a single
+  file-add (ADR-0001 "minimise pbxproj edits"); still cleanly separates core from the SwiftUI layer.
+- Default `JSONDecoder`/`Encoder` date strategy (deferredToDate, full precision) — exact `Date`
+  round-trip; tests use whole-second fixed dates for determinism.
+- Edge left as-is (won't happen in practice, projection reflects literal events): a retracted
+  `raceEnded` with a surviving `endTimeCorrected` → status inProgress but effectiveEnd non-nil.
+
+**Next:** **TRACK-003 (WI-3)** — trackable library: CRUD UI + storage for `TrackableElement` (label +
+category); the source for race palettes (`mvp-plan.md` §6.5, §7 WI-3). First UI-bearing feature on top
+of the WI-2 core (a `TrackableElement` store + a list/edit screen). Smaller (S).
