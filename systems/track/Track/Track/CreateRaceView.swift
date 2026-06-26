@@ -10,6 +10,7 @@
 //
 
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct CreateRaceView: View {
     @Environment(\.dismiss) private var dismiss
@@ -17,6 +18,8 @@ struct CreateRaceView: View {
     @State private var hasDate = false
     @State private var scheduledDate = Date()
     @State private var addingAdHoc = false
+    @State private var importingCSV = false
+    @State private var importMessage: String?
     @State private var library: TrackableLibraryStore
     private let onSave: (Race) -> Void
 
@@ -51,6 +54,16 @@ struct CreateRaceView: View {
                     draft.palette.append(item)            // …then include it in this race's snapshot
                 }
             }
+            .fileImporter(isPresented: $importingCSV,
+                          allowedContentTypes: [.commaSeparatedText, .plainText]) { result in
+                handleImport(result)
+            }
+            .alert("CSV Import", isPresented: Binding(get: { importMessage != nil },
+                                                      set: { if !$0 { importMessage = nil } })) {
+                Button("OK", role: .cancel) { importMessage = nil }
+            } message: {
+                Text(importMessage ?? "")
+            }
         }
     }
 
@@ -58,6 +71,34 @@ struct CreateRaceView: View {
         draft.date = hasDate ? scheduledDate : nil
         onSave(draft.build())
         dismiss()
+    }
+
+    /// Read a user-picked Trail CSV and replace the aid stations with what it parses (mvp-plan.md
+    /// §5; WI-5). Replacing (not appending) matches "import a plan's stations"; they stay editable.
+    private func handleImport(_ result: Result<URL, Error>) {
+        guard case let .success(url) = result else {
+            importMessage = "Couldn't import the file."
+            return
+        }
+        let didAccess = url.startAccessingSecurityScopedResource()
+        defer { if didAccess { url.stopAccessingSecurityScopedResource() } }
+        guard let text = try? String(contentsOf: url, encoding: .utf8) else {
+            importMessage = "Couldn't read the file (expected UTF-8 text)."
+            return
+        }
+        let parsed = AidStationCSV.parse(text)
+        draft.replaceAidStations(with: parsed.stations)
+        if parsed.stations.isEmpty {
+            importMessage = "No aid stations found in that file."
+        } else {
+            let n = parsed.stations.count
+            var message = "Imported \(n) aid station\(n == 1 ? "" : "s")."
+            if parsed.skippedRows > 0 {
+                let m = parsed.skippedRows
+                message += " Skipped \(m) malformed row\(m == 1 ? "" : "s")."
+            }
+            importMessage = message
+        }
     }
 
     // MARK: - Sections
@@ -92,6 +133,13 @@ struct CreateRaceView: View {
                 Label("Add aid station", systemImage: "plus.circle.fill")
             }
             .accessibilityIdentifier("addAidStation")
+
+            Button {
+                importingCSV = true
+            } label: {
+                Label("Import from CSV…", systemImage: "square.and.arrow.down")
+            }
+            .accessibilityIdentifier("importAidCsv")
         } header: {
             HStack {
                 Text("Aid stations")
@@ -99,7 +147,7 @@ struct CreateRaceView: View {
                 if !draft.aidStations.isEmpty { EditButton() }
             }
         } footer: {
-            Text("Optional. Add manually now (CSV import comes later); reorder while editing. May be left empty for a plan-less race.")
+            Text("Optional. Add manually or import a Trail CSV (replaces the list); reorder while editing. May be left empty for a plan-less race.")
         }
     }
 

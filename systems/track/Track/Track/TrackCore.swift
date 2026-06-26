@@ -126,6 +126,12 @@ struct RaceDraft: Equatable {
         renumberAidStations()
     }
 
+    /// Replace the aid stations wholesale (a CSV import, WI-5) and renumber to 1-based ordinals.
+    mutating func replaceAidStations(with stations: [PlannedAidStation]) {
+        aidStations = stations
+        renumberAidStations()
+    }
+
     private mutating func renumberAidStations() {
         for index in aidStations.indices { aidStations[index].ordinal = index + 1 }
     }
@@ -147,6 +153,209 @@ struct RaceDraft: Equatable {
     func build(createdAt: Date = Date()) -> Race {
         Race(name: trimmedName, createdAt: createdAt, date: date,
              aidStations: aidStations, palette: palette)
+    }
+}
+
+// MARK: - Aid-station distances (derived)
+
+extension Array where Element == PlannedAidStation {
+    /// Leg distance from the station at `index` to the next one, in km. Distances are cumulative
+    /// from the start, so this is `next - here`; nil if either distance is missing or there is no
+    /// next station. Lets a view show "→ next aid: N km" (mvp-plan.md §5).
+    func distanceToNextKm(after index: Int) -> Double? {
+        guard indices.contains(index), index + 1 < count,
+              let here = self[index].distanceKm, let next = self[index + 1].distanceKm
+        else { return nil }
+        return next - here
+    }
+}
+
+// MARK: - Aid-station CSV import (Trail's format)
+
+/// Parses the aid-station CSV that Trail imports/exports (format lifted from Trail's `AidCsv.elm`)
+/// into `[PlannedAidStation]`. The tracker models only the three columns it needs — **name**,
+/// cumulative **distance** (km), and **services** — and ignores Trail's rest/cutoff/notes (plan
+/// richness that arrives with full `.trail` ingestion, WI-9). Faithful to Trail on the load-bearing
+/// details: RFC-4180 quoting, comma-or-semicolon delimiter, the services-cell separators, and km/mi
+/// headers. Lenient like Trail: a header row is optional, and a row missing a name or a parseable
+/// distance is skipped (counted) rather than failing the whole import. Services are kept as the raw
+/// cell tokens (the tracker is a passive recorder; it does not normalise to Trail's typed enum).
+enum AidStationCSV {
+    struct Result {
+        var stations: [PlannedAidStation]
+        var skippedRows: Int
+    }
+
+    static func parse(_ raw: String) -> Result {
+        let text = normalizeNewlines(stripBOM(raw))
+        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return Result(stations: [], skippedRows: 0)
+        }
+        let delimiter = detectDelimiter(text)
+        var rows = tokenize(text, delimiter: delimiter).filter { row in
+            row.contains { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+        }
+        guard !rows.isEmpty else { return Result(stations: [], skippedRows: 0) }
+
+        let layout = columnLayout(header: rows[0])
+        if layout.fromHeader { rows.removeFirst() }
+
+        var stations: [PlannedAidStation] = []
+        var skipped = 0
+        for row in rows {
+            if let station = station(from: row, layout: layout, delimiter: delimiter,
+                                     ordinal: stations.count + 1) {
+                stations.append(station)
+            } else {
+                skipped += 1
+            }
+        }
+        return Result(stations: stations, skippedRows: skipped)
+    }
+
+    // ── Column layout ─────────────────────────────────────────
+    private struct Layout {
+        var name: Int
+        var distance: Int
+        var services: Int
+        var distanceInMiles: Bool
+        var fromHeader: Bool
+    }
+
+    /// Recognise a header row and map columns by name; else fall back to Trail's positional order
+    /// (name, distance_km, rest_min, services, cutoff, notes) and treat row 0 as data.
+    private static func columnLayout(header: [String]) -> Layout {
+        var name: Int?, distance: Int?, services: Int?
+        var miles = false
+        for (index, cell) in header.enumerated() {
+            switch headerKind(cell) {
+            case .name where name == nil:           name = index
+            case .distanceKm where distance == nil: distance = index
+            case .distanceMiles where distance == nil: distance = index; miles = true
+            case .services where services == nil:   services = index
+            default: break
+            }
+        }
+        if name != nil || distance != nil || services != nil {
+            return Layout(name: name ?? 0, distance: distance ?? 1, services: services ?? 3,
+                          distanceInMiles: miles, fromHeader: true)
+        }
+        return Layout(name: 0, distance: 1, services: 3, distanceInMiles: false, fromHeader: false)
+    }
+
+    private enum HeaderKind { case name, distanceKm, distanceMiles, services, other }
+
+    private static func headerKind(_ cell: String) -> HeaderKind {
+        var normalized = ""
+        for scalar in cell.lowercased().unicodeScalars {
+            normalized.append(CharacterSet.alphanumerics.contains(scalar) ? Character(scalar) : " ")
+        }
+        let key = normalized.split(separator: " ").joined(separator: " ")
+        switch key {
+        case "name", "station", "aid", "aid station", "aid station name",
+             "location", "place", "point", "checkpoint", "cp":
+            return .name
+        case "distance mi", "dist mi", "mi", "miles", "mile", "distance miles", "miles from start":
+            return .distanceMiles
+        case "distance km", "dist km", "km", "distance", "dist",
+             "distance from start", "km from start", "kms":
+            return .distanceKm
+        case "services", "service", "facilities", "amenities":
+            return .services
+        default:
+            return .other
+        }
+    }
+
+    // ── One row -> station ────────────────────────────────────
+    private static func station(from row: [String], layout: Layout, delimiter: Character,
+                                ordinal: Int) -> PlannedAidStation? {
+        let name = field(row, layout.name).trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty else { return nil }                      // name required (Trail rejects)
+        guard let km = distanceKm(field(row, layout.distance), miles: layout.distanceInMiles) else {
+            return nil                                               // distance required + parseable
+        }
+        let services = splitServices(field(row, layout.services), delimiter: delimiter)
+        return PlannedAidStation(ordinal: ordinal, name: name, services: services, distanceKm: km)
+    }
+
+    private static func field(_ row: [String], _ index: Int) -> String {
+        index >= 0 && index < row.count ? row[index] : ""
+    }
+
+    /// Trail's `cleanNumber`: a comma is the decimal separator when there's no period, else thousands
+    /// punctuation to strip; then keep only digits / `.` / `-`. Miles convert to km.
+    private static func distanceKm(_ raw: String, miles: Bool) -> Double? {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        let unified = trimmed.contains(".") ? trimmed.replacingOccurrences(of: ",", with: "")
+                                            : trimmed.replacingOccurrences(of: ",", with: ".")
+        let cleaned = unified.filter { $0.isNumber || $0 == "." || $0 == "-" }
+        guard let value = Double(cleaned) else { return nil }
+        return miles ? value * 1.609344 : value
+    }
+
+    /// Trail's `splitServices`: split the one cell on `|` and `/` (and `;` when the field delimiter
+    /// is a comma), trim, drop empties. Tokens are kept verbatim.
+    private static func splitServices(_ raw: String, delimiter: Character) -> [String] {
+        let separators: Set<Character> = delimiter == "," ? ["|", "/", ";"] : ["|", "/"]
+        return raw.split(whereSeparator: { separators.contains($0) })
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+    }
+
+    // ── RFC-4180 tokenizer ────────────────────────────────────
+    private static func stripBOM(_ s: String) -> String {
+        s.hasPrefix("\u{FEFF}") ? String(s.dropFirst()) : s
+    }
+
+    /// Normalise CRLF and lone CR to LF first. Swift treats `\r\n` as a *single* `Character`
+    /// (one grapheme cluster), so the tokenizer — which iterates Characters — would otherwise never
+    /// match it against `"\n"`; collapsing line endings up front lets it see only `"\n"`.
+    private static func normalizeNewlines(_ s: String) -> String {
+        s.replacingOccurrences(of: "\r\n", with: "\n").replacingOccurrences(of: "\r", with: "\n")
+    }
+
+    /// Pick `;` over `,` only if the first line has strictly more semicolons (Trail's heuristic).
+    private static func detectDelimiter(_ text: String) -> Character {
+        let firstLine = text.prefix { $0 != "\n" }
+        let semis = firstLine.filter { $0 == ";" }.count
+        let commas = firstLine.filter { $0 == "," }.count
+        return semis > commas ? ";" : ","
+    }
+
+    /// Split into rows of fields honouring RFC-4180 quoting: `"`-quoted fields may contain the
+    /// delimiter, embedded `\n`, and doubled `""` for a literal quote. Line endings are already
+    /// normalised to `\n` by `normalizeNewlines`, so only `"\n"` ends a row here.
+    private static func tokenize(_ text: String, delimiter: Character) -> [[String]] {
+        var rows: [[String]] = []
+        var row: [String] = []
+        var field = ""
+        var inQuotes = false
+        let chars = Array(text)
+        var i = 0
+        while i < chars.count {
+            let c = chars[i]
+            if inQuotes {
+                if c == "\"" {
+                    if i + 1 < chars.count, chars[i + 1] == "\"" { field.append("\""); i += 2 }
+                    else { inQuotes = false; i += 1 }
+                } else {
+                    field.append(c); i += 1
+                }
+            } else if c == "\"" {
+                inQuotes = true; i += 1
+            } else if c == delimiter {
+                row.append(field); field = ""; i += 1
+            } else if c == "\n" {
+                row.append(field); rows.append(row); field = ""; row = []; i += 1
+            } else {
+                field.append(c); i += 1
+            }
+        }
+        row.append(field)
+        rows.append(row)
+        return rows
     }
 }
 

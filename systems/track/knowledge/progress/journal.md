@@ -308,3 +308,60 @@ and for Save to become `isEnabled` (which also confirms the typed name registere
 distance**) into `[PlannedAidStation]`; lift Trail's exact `services` cell encoding/delimiter from its
 parser. AC (§7 WI-5): import a Trail CSV; name/services/distance populate; stations editable; views can
 derive distance-to-next. Deps: TRACK-004. (S/M.)
+
+---
+## 2026-06-26 — TRACK-005 COMPLETE: WI-5 aid-station CSV import
+
+**Task:** TRACK-005 (WI-5, `mvp-plan.md` §5, §7). Branch `track/track-005-aid-station-csv-import` →
+**PR #167** (squash-merged).
+
+**Resolved the residual first.** The plan said "lift the exact services cell encoding/delimiter from
+Trail's parser." An `Explore` agent read `systems/trail/src/AidCsv.elm` and found Trail's real format
+is **richer** than the plan's "name/services/distance" shorthand: columns
+`name,distance_km,rest_min,services,cutoff,notes`, a header row, **RFC-4180 quoting**, comma-*or*-`;`
+delimiter, services **pipe-joined** (import also accepts `/` and, under a comma delimiter, `;`), and
+km/mi distance headers. Decision: import only the **three columns the tracker models** (name,
+`distance_km`→`distanceKm`, services) and ignore `rest_min`/`cutoff`/`notes` (plan richness → WI-9);
+keep services as **raw cell tokens** (the tracker is a passive recorder, not Trail's typed `Service`
+enum).
+
+**What landed:**
+- **`AidStationCSV`** (Foundation-only, `TrackCore.swift`): an RFC-4180 tokenizer (quoted fields with
+  embedded delimiters/newlines + doubled `""`), delimiter detection (`;` only if it out-counts `,` on
+  line 1), header→column mapping with a positional fallback to Trail's order, km/mi handling, and
+  `splitServices` (`|`/`/`/`;`, trim, drop empties) — lifted from Trail's `splitServices`. Lenient like
+  Trail: optional header; a row missing a name or parseable distance is skipped + counted
+  (`Result.skippedRows`).
+- **`[PlannedAidStation].distanceToNextKm(after:)`** — cumulative legs, so a view can show "→ next
+  aid: N km".
+- **`RaceDraft.replaceAidStations(with:)`** (renumber to 1-based) + **`CreateRaceView`** import button +
+  `.fileImporter` (`.commaSeparatedText`/`.plainText`, security-scoped read, UTF-8) → replaces the
+  aid-station list with a result alert. Footer updated.
+
+**Bug found + fixed (Swift grapheme gotcha):** the first full run failed — the two CRLF test inputs
+parsed to **zero** stations and the test then trapped on `stations[0]` (this is the crash report that
+surfaced mid-run: an `Index out of range` in the **test process**, not the app). Cause: Swift treats
+`"\r\n"` as a **single `Character`** (one grapheme cluster), so a Character-by-Character tokenizer
+never matched CRLF against `"\n"`/`"\r"` — CRLF files never split into rows (everything collapsed into
+the header → no data rows). Fix: `parse()` normalises CRLF/CR → LF up front; the tokenizer now only
+needs `"\n"`. Added a count-guard in the quoted-field test so a future regression fails as an assertion
+rather than trapping the suite. LF inputs were unaffected (lone `\n` is its own Character), which is
+why only the explicit-`\r\n` tests failed.
+
+**Verified** (from `systems/track/Track/`, iPhone 15 / iOS 17.4):
+- `xcodebuild build … -sdk iphonesimulator` → **BUILD SUCCEEDED** (no warnings).
+- `xcodebuild test …` → **TEST SUCCEEDED** — **TrackTests: 40** (+12 WI-5: canonical Trail export,
+  services separators, RFC-4180 quoted comma-name + doubled quote, miles→km, malformed-row skip,
+  headerless positional, `;`-delimiter + EU decimal, CRLF+BOM, empty input; `distanceToNextKm`;
+  `replaceAidStations` renumber; CSV→draft→`Race`→bundle round-trip). **TrackUITests: 2** (the
+  create-form test also asserts the `importAidCsv` affordance).
+
+**Notes / scope:** the `.fileImporter` **Files-app picker is system UI — not XCUITest-automatable**, so
+the import is verified by the parser + integration unit tests (real Trail CSV in → correct stations →
+persisted `Race`) and the in-form affordance assertion, rather than an end-to-end picker tap. Import
+**replaces** the aid-station list (deliberate "load a plan's stations" action). Out of scope: CSV
+*export*; `.trail` ingestion (WI-9); `rest_min`/`cutoff`/`notes`.
+
+**Next:** **TRACK-006 (WI-6)** — race tracking view (the in-race four-tab surface; `tracking-view-spec.md`).
+The big one (L): category grids → `intake`, AID tab → enter/exit + Finish race, Feed projection,
+foreground voice notes, Undo→retraction; every action appends + fsyncs. Deps: TRACK-002/004/005.

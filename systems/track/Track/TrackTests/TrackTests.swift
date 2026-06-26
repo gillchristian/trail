@@ -337,4 +337,164 @@ final class TrackTests: XCTestCase {
         XCTAssertEqual(reloaded.races.map(\.name), ["Sunset 50K"], "the configured race persisted")
         XCTAssertEqual(reloaded.status(for: race), .configured)
     }
+
+    // MARK: - WI-5: aid-station CSV import (AidStationCSV)
+
+    /// A canonical Trail export: 6-column header, pipe-joined services, a quoted name with a comma,
+    /// an empty-services finish row. Only name / distance_km / services land in the tracker's model.
+    func testCsvImportsTrailExport() {
+        let csv = """
+        name,distance_km,rest_min,services,cutoff,notes
+        Saida / Start,0,0,water,,
+        Mirante,4.5,2,water|food,0:45,quick top-up
+        Cachoeira,9.0,5,water|food|warm food|wc,1:40,drop bag access
+        "Refugio, Le Tour",14.2,3,water|food|medical,2:50,last water
+        Chegada / Finish,20.0,0,,3:45,
+        """
+        let result = AidStationCSV.parse(csv)
+        XCTAssertEqual(result.skippedRows, 0)
+        XCTAssertEqual(result.stations.map(\.name),
+                       ["Saida / Start", "Mirante", "Cachoeira", "Refugio, Le Tour", "Chegada / Finish"])
+        XCTAssertEqual(result.stations.map(\.ordinal), [1, 2, 3, 4, 5])
+        XCTAssertEqual(result.stations.compactMap(\.distanceKm), [0, 4.5, 9.0, 14.2, 20.0])
+        XCTAssertEqual(result.stations[0].services, ["water"])
+        XCTAssertEqual(result.stations[2].services, ["water", "food", "warm food", "wc"])
+        XCTAssertEqual(result.stations[4].services, [], "an empty services cell is no services")
+    }
+
+    func testCsvServicesSplitOnPipeSlashAndSemicolon() {
+        let csv = """
+        name,distance_km,services
+        A,1,water|food
+        B,2,water/food
+        C,3,water;food
+        D,4,water | food / gel ; wc
+        """
+        let r = AidStationCSV.parse(csv)
+        XCTAssertEqual(r.stations[0].services, ["water", "food"])
+        XCTAssertEqual(r.stations[1].services, ["water", "food"])
+        XCTAssertEqual(r.stations[2].services, ["water", "food"], "';' is a service separator under a comma delimiter")
+        XCTAssertEqual(r.stations[3].services, ["water", "food", "gel", "wc"], "mixed separators, trimmed")
+    }
+
+    func testCsvQuotedFieldWithEmbeddedCommaAndDoubledQuote() {
+        let csv = "name,distance_km,services\r\n\"Base \"\"Camp\"\", North\",7.5,water|food\r\n"
+        let r = AidStationCSV.parse(csv)
+        guard r.stations.count == 1 else {
+            return XCTFail("expected exactly 1 station, got \(r.stations.count)")
+        }
+        XCTAssertEqual(r.stations[0].name, "Base \"Camp\", North", "RFC-4180: doubled quotes + embedded comma")
+        XCTAssertEqual(r.stations[0].distanceKm, 7.5)
+        XCTAssertEqual(r.stations[0].services, ["water", "food"])
+    }
+
+    func testCsvMilesHeaderConvertsToKm() {
+        let csv = """
+        name,distance_mi,services
+        Start,0,water
+        Mid,3,water/food
+        """
+        let r = AidStationCSV.parse(csv)
+        XCTAssertEqual(r.stations.count, 2)
+        XCTAssertEqual(r.stations[0].distanceKm ?? -1, 0, accuracy: 0.0001)
+        XCTAssertEqual(r.stations[1].distanceKm ?? -1, 3 * 1.609344, accuracy: 0.0001, "miles convert to km")
+    }
+
+    func testCsvSkipsRowsMissingNameOrDistance() {
+        let csv = """
+        name,distance_km,services
+        Good,5,water
+        ,7,food
+        Bad,abc,water
+        Also,9,food
+        """
+        let r = AidStationCSV.parse(csv)
+        XCTAssertEqual(r.stations.map(\.name), ["Good", "Also"], "rows lacking a name or parseable distance drop")
+        XCTAssertEqual(r.stations.map(\.ordinal), [1, 2], "ordinals are positional over the kept rows")
+        XCTAssertEqual(r.skippedRows, 2)
+    }
+
+    func testCsvHeaderlessUsesPositionalOrder() {
+        // No recognisable header -> Trail's positional order (name, distance_km, rest_min, services).
+        let csv = """
+        Start,0,0,water
+        Mid,5,2,water|food
+        """
+        let r = AidStationCSV.parse(csv)
+        XCTAssertEqual(r.stations.map(\.name), ["Start", "Mid"])
+        XCTAssertEqual(r.stations.compactMap(\.distanceKm), [0, 5])
+        XCTAssertEqual(r.stations[1].services, ["water", "food"])
+        XCTAssertEqual(r.skippedRows, 0)
+    }
+
+    func testCsvSemicolonDelimiterWithEuropeanDecimal() {
+        let csv = """
+        name;distance_km;services
+        Alpha;1,5;water|food
+        Beta;10;medical
+        """
+        let r = AidStationCSV.parse(csv)
+        XCTAssertEqual(r.stations.map(\.name), ["Alpha", "Beta"])
+        XCTAssertEqual(r.stations[0].distanceKm ?? -1, 1.5, accuracy: 0.0001, "comma is the decimal separator")
+        XCTAssertEqual(r.stations[1].distanceKm ?? -1, 10, accuracy: 0.0001)
+        XCTAssertEqual(r.stations[0].services, ["water", "food"])
+    }
+
+    func testCsvHandlesCRLFAndBOM() {
+        let csv = "\u{FEFF}name,distance_km,services\r\nStart,0,water\r\nMid,5,water|food\r\n"
+        let r = AidStationCSV.parse(csv)
+        XCTAssertEqual(r.stations.map(\.name), ["Start", "Mid"], "BOM stripped, CRLF + trailing newline handled")
+        XCTAssertEqual(r.stations.compactMap(\.distanceKm), [0, 5])
+    }
+
+    func testCsvEmptyInputYieldsNoStations() {
+        XCTAssertEqual(AidStationCSV.parse("").stations, [])
+        XCTAssertEqual(AidStationCSV.parse("   \n  \n").stations, [])
+        XCTAssertEqual(AidStationCSV.parse("").skippedRows, 0)
+    }
+
+    func testDistanceToNextKm() {
+        let stations = [
+            PlannedAidStation(ordinal: 1, name: "A", distanceKm: 0),
+            PlannedAidStation(ordinal: 2, name: "B", distanceKm: 4.5),
+            PlannedAidStation(ordinal: 3, name: "C", distanceKm: 12.0),
+            PlannedAidStation(ordinal: 4, name: "D", distanceKm: nil),
+        ]
+        XCTAssertEqual(stations.distanceToNextKm(after: 0) ?? -1, 4.5, accuracy: 0.0001)
+        XCTAssertEqual(stations.distanceToNextKm(after: 1) ?? -1, 7.5, accuracy: 0.0001)
+        XCTAssertNil(stations.distanceToNextKm(after: 2), "next station has no distance")
+        XCTAssertNil(stations.distanceToNextKm(after: 3), "no station after the last")
+        XCTAssertNil(stations.distanceToNextKm(after: 9), "index out of range")
+    }
+
+    func testRaceDraftReplaceAidStationsRenumbers() {
+        var draft = RaceDraft()
+        draft.addAidStation(name: "old")
+        draft.replaceAidStations(with: [
+            PlannedAidStation(ordinal: 99, name: "X", distanceKm: 1),
+            PlannedAidStation(ordinal: 7, name: "Y", distanceKm: 2),
+        ])
+        XCTAssertEqual(draft.aidStations.map(\.name), ["X", "Y"], "import replaces the manual entry")
+        XCTAssertEqual(draft.aidStations.map(\.ordinal), [1, 2], "ordinals renumber to 1-based")
+    }
+
+    /// End-to-end at the model level: CSV → draft → built Race → persisted bundle round-trips.
+    func testCsvImportPopulatesRaceViaDraft() throws {
+        let csv = """
+        name,distance_km,services
+        Trailhead,0,water
+        Ridge,8.3,water|food|medical
+        """
+        var draft = RaceDraft()
+        draft.name = "Import Test"
+        draft.replaceAidStations(with: AidStationCSV.parse(csv).stations)
+        let race = draft.build(createdAt: t(1000))
+        XCTAssertEqual(race.aidStations.map(\.name), ["Trailhead", "Ridge"])
+        XCTAssertEqual(race.aidStations.compactMap(\.distanceKm), [0, 8.3])
+        XCTAssertEqual(race.aidStations[1].services, ["water", "food", "medical"])
+        XCTAssertEqual(race.aidStations.distanceToNextKm(after: 0) ?? -1, 8.3, accuracy: 0.0001)
+        try storage().saveRace(race)
+        XCTAssertEqual(storage().loadRace(id: race.id)?.aidStations.map(\.name), ["Trailhead", "Ridge"],
+                       "imported stations persist through the WI-2 bundle spine")
+    }
 }
