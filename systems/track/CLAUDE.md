@@ -1,9 +1,10 @@
-# CLAUDE.md — track (system entry · pre-code)
+# CLAUDE.md — track (system entry · in build)
 
 **track** is the **Execute** system in the product arc Plan (**trail**) → Execute (**track**) →
-Reflect (**reflect**): a race-day execution/tracking companion. **Code pending** — the MVP is
-designed + backlogged (specs in `knowledge/reference/`); **TRACK-000** (Swift/iOS bootstrap) is next.
-When code arrives, build from this directory (`systems/track/`).
+Reflect (**reflect**): a race-day execution/tracking companion. **Code has started** — the
+Swift/SwiftUI app builds + runs in the iOS Simulator. **TRACK-000** (toolchain bootstrap) and
+**TRACK-001** (WI-1 skeleton) are done; **TRACK-002** (WI-2 durable domain spine) is next. Build from
+`systems/track/Track/` (commands in `knowledge/reference/local-ci.md`).
 
 **Read these, in order, before doing anything else:**
 1. the repo-root manifest `/knowledge/README.md` (repo-wide rules track inherits),
@@ -20,13 +21,15 @@ When code arrives, build from this directory (`systems/track/`).
 5. **Journal everything** in `systems/track/knowledge/progress/journal.md`.
 6. **When stuck, follow `knowledge/framework/when-stuck.md`.** Log blockers to `systems/track/knowledge/progress/blockers.md`, then pivot.
 
-## Status: pre-code (speced + backlogged)
+## Status: in build — WI-1 done (TRACK-000/001)
 
-No code/build target yet. The MVP is designed and seeded into `knowledge/planning/BACKLOG.md` (epic
-"Tracker MVP") as `TRACK-000…010`; the canonical specs are `knowledge/reference/mvp-plan.md` +
-`knowledge/reference/tracking-view-spec.md` (wireframes in `knowledge/reference/design/`), with
-`knowledge/reference/project-brief.md` as orientation. **Next: TRACK-000** — Swift/iOS toolchain
-bootstrap (prerequisite). Start at the brief.
+The Swift/SwiftUI app lives at `Track/` and builds + runs in the iOS Simulator (see
+`knowledge/reference/local-ci.md`). **Done:** TRACK-000 (toolchain bootstrap, PR #161), TRACK-001 (WI-1
+project skeleton — a Races list over a `Documents/Races/<id>/race.json` bundle, PR #162). The canonical
+specs are `knowledge/reference/mvp-plan.md` + `knowledge/reference/tracking-view-spec.md` (wireframes in
+`knowledge/reference/design/`), with `knowledge/reference/project-brief.md` as orientation. **Next:
+TRACK-002** — WI-2 domain model + durable persistence (the append-only `events.log` / fsync spine;
+`mvp-plan.md` §4 + §7). Start from `CURRENT.md`.
 
 ## Quick map (track)
 

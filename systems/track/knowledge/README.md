@@ -1,9 +1,10 @@
-# systems/track/knowledge/ — track system manifest (pre-code)
+# systems/track/knowledge/ — track system manifest (in build)
 
-**track** is the **Execute** system (Plan → Execute → Reflect): a race-day execution/tracking app,
-not yet built — **code pending**. The MVP is designed + backlogged (specs in `reference/`; work
-queued as `TRACK-000…010`). **Read the repo-root manifest first** (`/knowledge/README.md`) for the
-repo-wide rules this system inherits.
+**track** is the **Execute** system (Plan → Execute → Reflect): a race-day execution/tracking app.
+**Code has started** — the SwiftUI app builds + runs in the iOS Simulator (TRACK-000/001 done;
+TRACK-002 next). The MVP is designed + backlogged (specs in `reference/`; work queued as
+`TRACK-000…010`). **Read the repo-root manifest first** (`/knowledge/README.md`) for the repo-wide
+rules this system inherits.
 
 Reading chain: root `CLAUDE.md` → root manifest → **this file** → `knowledge/framework/` (the shared
 copy at the repo root) → the `pr` profile in `framework/delivery.md`.
@@ -32,14 +33,16 @@ The standard framework loop (see `framework/README.md`): orient from the plannin
 acceptance criteria before code, branch `track/<task-id>-<slug>`, verify from `systems/track/` once code
 exists, PR + squash-merge, journal, advance. Stuck? `framework/when-stuck.md` — not asking the user.
 
-## Status: speced + backlogged — no code yet
+## Status: in build — WI-1 done (TRACK-000/001)
 
-The MVP is designed and seeded into `planning/BACKLOG.md` (epic "Tracker MVP", 2026-06-25): the
-canonical specs are in `reference/` (`mvp-plan.md`, `tracking-view-spec.md`, `design/` wireframes),
-and the work items are queued as **TRACK-000…TRACK-010**. **Next: TRACK-000** — the Swift/iOS
-toolchain bootstrap (prerequisite; the build owner is new to Swift/iOS). When started: promote it
-into `CURRENT.md` (copy the acceptance criteria from its BACKLOG line), branch `track/track-000-…`,
-and record build/run/test commands in a new `reference/local-ci.md` as the toolchain appears.
+The Swift/SwiftUI app lives at `Track/` and builds + runs in the iOS Simulator (build/run/test commands
+in `reference/local-ci.md`). **Done:** TRACK-000 (toolchain bootstrap + ADR-0001, PR #161), TRACK-001
+(WI-1 project skeleton — a Races list over a `Documents/Races/<id>/race.json` bundle; iOS deployment
+target pinned 17.0; shared scheme committed; PR #162). The canonical specs are in `reference/`
+(`mvp-plan.md`, `tracking-view-spec.md`, `design/` wireframes); the work items are queued as
+**TRACK-000…TRACK-010** in `planning/BACKLOG.md`. **Next: TRACK-002** — WI-2 domain model + durable
+persistence (the append-only `events.log` / fsync spine; `mvp-plan.md` §4 + §7). Promote it from
+`BACKLOG.md` into `CURRENT.md` (copy its AC), branch `track/track-002-…`.
 
 ## Layout (track instance)
 
