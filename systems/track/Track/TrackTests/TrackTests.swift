@@ -680,4 +680,35 @@ final class TrackTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: storage().audioURL(for: race.id, filename: filename).path),
                       "the clip was written into the race bundle")
     }
+
+    func testRaceTrackerCancelAidRemovesVisitAndRestoresUpcoming() throws {
+        let race = Race(name: "R", aidStations: [
+            PlannedAidStation(ordinal: 1, name: "A", distanceKm: 0),
+            PlannedAidStation(ordinal: 2, name: "B", distanceKm: 5),
+        ])
+        try storage().saveRace(race)
+        let tracker = RaceTracker(race: race, storage: storage())
+        tracker.start()
+        tracker.arrive(at: try XCTUnwrap(tracker.board.upcoming))      // arrive A
+        XCTAssertEqual(tracker.board.current?.label, "A")
+
+        tracker.cancelAid(try XCTUnwrap(tracker.board.current))         // mistaken arrival → cancel it
+        XCTAssertNil(tracker.board.current, "cancelling retracts the arrival, removing the visit")
+        XCTAssertTrue(tracker.board.passed.isEmpty, "it does not become a passed visit (that's what Finish would do)")
+        XCTAssertEqual(tracker.board.upcoming?.name, "A", "the planned station returns to Upcoming")
+        XCTAssertNil(tracker.lastAction, "the now-stale Undo toast for that arrival is cleared")
+        XCTAssertFalse(tracker.feed.contains { if case .aidArrived = $0.kind { return true } else { return false } },
+                       "the arrival is gone from the Feed too")
+    }
+
+    func testRaceTrackerCancelAdHocAid() throws {
+        let race = Race(name: "R")   // plan-less
+        try storage().saveRace(race)
+        let tracker = RaceTracker(race: race, storage: storage())
+        tracker.start()
+        tracker.startAdHocAid()
+        tracker.cancelAid(try XCTUnwrap(tracker.board.current))
+        XCTAssertNil(tracker.board.current, "the ad-hoc visit disappears")
+        XCTAssertFalse(tracker.feed.contains { if case .aidArrived = $0.kind { return true } else { return false } })
+    }
 }

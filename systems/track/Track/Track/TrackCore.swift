@@ -880,6 +880,20 @@ extension Array where Element == RaceEvent {
                undoable: "Left \(visit.label)")
     }
 
+    /// Remove an aid-station visit by retracting its *arrival* event — for a mistaken or wrong-station
+    /// arrival, once the most-recent-only Undo toast no longer covers it (its only alternative would be
+    /// to Finish, logging a bogus departed visit). The fold drops the visit entirely: in planned mode
+    /// the station returns to Upcoming; a plan-less ad-hoc visit just disappears. A retraction, never a
+    /// mutation — same one-rule invariant as Undo.
+    func cancelAid(_ visit: AidStationVisit) {
+        guard let arrival = events.first(where: {
+            if case let .aidStationEntered(visitID, _, _) = $0.kind { return visitID == visit.visitID }
+            return false
+        }) else { return }
+        appendSilently(RaceEvent(kind: .retraction(target: arrival.id)))
+        if lastAction?.id == arrival.id { lastAction = nil }   // clear a now-stale toast for this arrival
+    }
+
     /// The distinct Finish-race control (§3, confirmed upstream) → `raceEnded`. No-op unless in progress.
     func finishRace() {
         guard status == .inProgress else { return }
