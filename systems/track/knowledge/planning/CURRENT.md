@@ -4,16 +4,31 @@
 
 ## Active
 
-_(none active. **TRACK-009 complete** (✓ PR #173): always-in-race-mode — the active race is locked to the
+### TRACK-010 — on-device testing prep (icon + run-on-phone guide)
+**Source:** user request (get the app ready to test on the phone for the next race; use Trail's icon)
+**Branch:** track/track-010-device-testing-prep
+**Acceptance criteria:**
+- [ ] **App icon** = Trail's mountain-peak logo, as a 1024×1024 **opaque, no-alpha** iOS icon (iOS masks
+      its own corners). _(verify: simulator build compiles the AppIcon; visual check)_
+- [ ] **Device-install guide** the user can follow — direct Xcode install on a **free** Apple ID
+      (recommended; covers signing, the 7-day expiry, trust step) + TestFlight as the paid alternative,
+      plus a race-day checklist. At `reference/device-testing.md`.
+- [ ] **Nothing else blocks device testing** — confirm the mic usage string (present ✓), entitlements are
+      free-team-compatible (macOS-sandbox keys only ✓), automatic signing, iOS 17.0 target.
+- [ ] **Verify** the app builds for real-device arm64 (no-signing) — signing itself is the user's Team.
+**Notes:** Icon rasterized from `systems/trail/public/icon.svg` (full-bleed square, `rx` removed) via QuickLook
+(WebKit — ImageMagick's SVG renderer dropped the gradients), flattened to opaque sRGB. `DEVELOPMENT_TEAM` is
+left unset deliberately (it's the user's Apple ID, chosen in Xcode). Also un-reserved the deferred WI task ids in
+`BACKLOG.md`: they carry no speculative `TRACK-NNN` now (assigned on promotion) — avoids the recurring collision
+with ad-hoc tasks; `WI-N` stays the `mvp-plan.md` spec reference.
+
+_(**TRACK-009 complete** (✓ PR #173): always-in-race-mode — the active race is locked to the
 forefront. (1) **Can't leave a started race** — `TrackingView` hides its back button (also disables swipe-back);
 the AID finish flow is the only exit, and the back button returns on the finished (read) view. (2) **Reopen into
 the active race** — a cold launch with an in-progress race opens straight to its tracking view (no list flash),
 via a typed `NavigationStack(path: [RaceRoute])` whose initial path is computed in `RacesView.init` from
 `RaceStore.inProgressRace`. Browsing configured/finished races + the library is unchanged (push + back). `RaceStore`
-gained `inProgressRace` + `race(for:)`. All AC met. Verified from `systems/track/Track/`: **BUILD SUCCEEDED** (no
-warnings); **TrackTests 63→64 · TrackUITests 6→7** (new lock+relaunch test; the WI-6 durability test updated to
-expect the tracking view on relaunch). Note: this used the ad-hoc id TRACK-009, so the deferred WIs in `BACKLOG.md`
-were renumbered TRACK-010+ — `WI-N` stays the spec reference.)_
+gained `inProgressRace` + `race(for:)`. Verified: **BUILD SUCCEEDED**; **TrackTests 63→64 · TrackUITests 6→7**.)_
 
 _(**TRACK-008 complete** (✓ PR #172): tracking-view fixes from the first simulated race. (1)
 **Aid-station notes** — a free-text `notes` field on `PlannedAidStation` (tolerant decode), editable per station

@@ -9,6 +9,7 @@ xcuserdata/
 
 ## Derived data / build output
 build/
+build-device/
 DerivedData/
 *.moved-aside
 *.hmap

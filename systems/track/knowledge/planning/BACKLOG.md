@@ -43,9 +43,10 @@ effective-end / visit-state are projections. **Critical path:** TRACK-000 → 00
 
 Deferred MVP tail (from `mvp-plan.md` §7 — promote with appetite / once the vocabulary settles):
 
-> Task ids are assigned in work order (TRACK-008/009 went to the post-MVP fix tasks below), so the deferred
-> WIs are renumbered TRACK-010+; the `WI-N` label stays as the `mvp-plan.md` spec reference.
+> `TRACK-NNN` ids are assigned **in work order, on promotion** — not pre-reserved — since ad-hoc tasks
+> interleave with the planned WIs (e.g. TRACK-008/009/010 went to post-MVP work). These deferred items are
+> tracked by their `mvp-plan.md` `WI-N` label until promoted, when they get the next free `TRACK-NNN`.
 
-- [ ] TRACK-010 — **WI-8: `.trace` export.** Self-contained **zip** (manifest = resolved metadata + events, + audio assets). **Deferred** until ≥2–3 real races settle the event vocabulary; finalize the manifest schema then, in shared `knowledge/reference/specs/`. — (M)
-- [ ] TRACK-011 — **WI-9: `.trail` ingestion.** Palette + schedule + UI adaptation + `planRef`; unlocks deviation classification and a dedicated AID-notes field. **Deferred.** — (M/L)
-- [ ] TRACK-012 — **WI-10: Live Activity.** Foreground-started, system-rendered timer; WidgetKit extension; gated by the active-time cap + a restart-on-foreground continuity hack. **Deferred.** — (M)
+- [ ] **WI-8 — `.trace` export.** Self-contained **zip** (manifest = resolved metadata + events, + audio assets). **Deferred** until ≥2–3 real races settle the event vocabulary; finalize the manifest schema then, in shared `knowledge/reference/specs/`. — (M)
+- [ ] **WI-9 — `.trail` ingestion.** Palette + schedule + UI adaptation + `planRef`; unlocks deviation classification and a dedicated AID-notes field. **Deferred.** — (M/L)
+- [ ] **WI-10 — Live Activity.** Foreground-started, system-rendered timer; WidgetKit extension; gated by the active-time cap + a restart-on-foreground continuity hack. **Deferred.** — (M)

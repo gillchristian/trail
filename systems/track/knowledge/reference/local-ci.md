@@ -128,3 +128,20 @@ was **updated** (relaunch now reopens the tracking view, so it asserts that + `a
 the list's in-progress badge). **TEST SUCCEEDED — TrackTests 64 · TrackUITests 7** (iPhone 15 / iOS 17.4),
 no warnings. Note: `.navigationBarBackButtonHidden(true)` on a pushed view also disables the interactive
 swipe-back-to-pop — the lock is escape-proof, asserted by the absent back button.
+
+TRACK-010 (2026-06-26): on-device testing prep — no Swift change (unit tests stay **64**), so verification
+is the two builds + the icon. **Simulator BUILD SUCCEEDED**: `actool` compiled the new `AppIcon` (generated
+`AppIcon60x60@2x.png` … `76x76@2x~ipad.png` from the single 1024 → the asset is valid). **Device build for
+real arm64 hardware, no signing, BUILD SUCCEEDED**:
+
+```sh
+xcodebuild build -project Track.xcodeproj -scheme Track -sdk iphoneos \
+  -configuration Debug -derivedDataPath build-device \
+  CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=""
+# → ** BUILD SUCCEEDED **
+```
+
+(The signed install needs the user's Apple ID Team — done from Xcode, per `reference/device-testing.md`.)
+Icon: SVG→PNG via **QuickLook** `qlmanage -t -s 1024` (WebKit renders the gradients; ImageMagick's internal
+SVG renderer does not — it dropped the gradient fill + the peak path), then `magick … -flatten -alpha off`
+to an opaque sRGB 1024 (iOS icons reject alpha). `build-device/` is also gitignored build output.

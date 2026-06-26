@@ -581,3 +581,45 @@ i.e. we're not on the list). A good sign the lock works: the change *forced* tha
 
 **Next:** unchanged — WI-8 (`.trace`) / WI-9 (`.trail`) deferred. The MVP is feature-complete and now behaves
 like a race-day companion: start a race and the app stays on it, through a kill/relaunch, until you finish.
+
+---
+## 2026-06-26 — TRACK-010 COMPLETE: on-device testing prep (icon + run-on-phone guide)
+
+User wants the app on their phone for the next race: use Trail's icon, and a guide for running it (they asked "is
+it TestFlight?"). Branch `track/track-010-device-testing-prep` → **PR #174** (squash-merged). Worked autonomously.
+
+**Audited what's needed for a real-device install** — most of it was already in place:
+- **Microphone usage string** — already set (`INFOPLIST_KEY_NSMicrophoneUsageDescription`). This was the big risk
+  (a missing string crashes the app on the first record tap); it's fine.
+- **Signing** — `CODE_SIGN_STYLE = Automatic`, no `DEVELOPMENT_TEAM` (correct — that's the user's Apple ID, set
+  in Xcode). **Entitlements** are only macOS-sandbox keys (`app-sandbox`, `files.user-selected.read-only`),
+  harmless on iOS and not in the free-team restricted set — so a free Apple ID works.
+- **Version** 1.0 / build 1, **deployment target iOS 17.0**, no network/GPS/background. Minimal footprint.
+- The real gap was the **app icon** (the `AppIcon.appiconset` had a placeholder `Contents.json`, no image).
+
+**Icon.** Rasterized Trail's `systems/trail/public/icon.svg` (the navy mountain-peak with amber/green
+trail-marker dots — same palette as the app's `Theme`). For iOS: removed the SVG's `rx` rounding so the
+background is a **full-bleed opaque square** (iOS masks its own corners), rendered at **1024×1024 via QuickLook**
+(WebKit renders the gradients faithfully — ImageMagick's internal SVG renderer dropped the gradient + the peak
+path, leaving only the dots), then flattened to **opaque sRGB, no alpha** (App Store-clean). Wired it as the
+single modern iOS icon (`Contents.json` → one `universal/ios/1024x1024` entry; dropped the vestigial mac slots
+from the multiplatform template).
+
+**Guide.** `reference/device-testing.md` — written for someone new to iOS deployment. Recommends **direct install
+from Xcode on a free Apple ID** (no $99, no TestFlight) with the full signing/trust steps and the **7-day
+free-provisioning expiry** caveat (re-Run within a week of the race); covers **TestFlight** as the paid
+alternative (90-day builds, OTA) and why it's overkill for one race; plus a **race-day checklist** (install within
+7 days, pre-configure the race, dry-run incl. mic-permission grant, **Auto-Lock → Never**, power bank, airplane
+mode OK) and reassurance that the TRACK-009 lock keeps you in the race through sleeps/kills.
+
+**Verified** (from `systems/track/Track/`): **Simulator BUILD SUCCEEDED** — `actool` generated all icon sizes
+(`AppIcon60x60@2x.png` … `76x76@2x~ipad.png`) from the single 1024, confirming the asset is valid. **Device
+arm64 build (no signing) BUILD SUCCEEDED** (`-sdk iphoneos CODE_SIGNING_ALLOWED=NO`) — the app compiles for real
+hardware; only the user's Team-based signing remains, which is a one-click Xcode step. Unit tests still **64**
+(no Swift changed). Could not do the final signed install myself (needs the user's Apple ID) — that's the guide.
+
+**Housekeeping.** Stopped pre-reserving `TRACK-NNN` for the deferred WIs in `BACKLOG.md` (they were colliding with
+ad-hoc tasks each time one was pulled). They're now tracked by `WI-N` only and get a `TRACK` id on promotion.
+
+**Next:** the app is ready for a real-device race test. After the first real race, revisit WI-8 (`.trace` export)
+once the event vocabulary has settled (the `mvp-plan.md` deferral condition).
