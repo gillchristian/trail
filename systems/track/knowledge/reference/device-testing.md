@@ -106,6 +106,18 @@ phone sleeps or the app gets killed, **reopening it returns straight to the acti
 - **Version** 1.0 (build 1); **deployment target iOS 17.0** — your phone must run iOS 17+.
 - **Automatic signing** — you just pick your Team (step 4 above).
 - **No network, no GPS, no background mode** — the only permission is the microphone.
+- **No custom entitlements** — the app needs none on iOS (the entitlements file is empty), so signing is clean.
+
+## Troubleshooting
+
+- **"Untrusted Developer"** → Settings → General → VPN & Device Management → tap your Apple ID → Trust.
+- **App won't open after a few days** → the 7-day free-provisioning expiry; plug in and **Run** again.
+- **iPhone not offered as a destination** → check the cable, unlock the phone, tap **Trust** on it.
+- **"…is not available" / bundle-id error** → change the Bundle Identifier to `com.<yourname>.Track`.
+- **"Entitlements file 'Track.entitlements' was modified during the build"** → fixed in the repo: the
+  entitlements file is now empty (the app needs none on iOS). If it ever recurs, open
+  `Track/Track.entitlements` and make sure it's just `<dict/>` — no `com.apple.security.*` keys (those are
+  macOS-only and break iOS signing).
 
 ## Build/verify commands (for reference)
 

@@ -4,7 +4,17 @@
 
 ## Active
 
-_(none active. **TRACK-011 complete** (✓ PR #175): race-day hardening. **Portrait-locked** the iPhone
+_(none active. **TRACK-012 complete** (✓ PR #176): fixed iOS device signing. `Track.entitlements` carried
+**macOS App Sandbox** keys (`com.apple.security.app-sandbox` + `files.user-selected.read-only`) — a multiplatform-
+template vestige. iOS signing strips them, which fails the build with *"entitlements file … was modified during
+the build."* (My simulator / no-signing builds never sign, so I missed it in the TRACK-010 audit — runtime-harmless
+≠ sign-time-harmless.) The app needs **no** entitlements on iOS (mic is an Info.plist string; `.fileImporter` uses
+security-scoped URLs), so the file is now empty `<dict/>`. **Verified with a real signed device build** using the
+user's team: `codesign` succeeded → `** BUILD SUCCEEDED **`. (The user had independently removed the App Sandbox
+capability in Xcode — same fix.) Guide gained a troubleshooting entry. NOTE: `project.pbxproj` working-tree
+changes (the user's `DEVELOPMENT_TEAM` + Xcode-added display-name/category) left **uncommitted** — personal/local.)_
+
+_(**TRACK-011 complete** (✓ PR #175): race-day hardening. **Portrait-locked** the iPhone
 (`INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone` → Portrait only) so a glanced-at, one-handed app
 can't flip to landscape mid-run; and **keep the screen awake during a race** (`UIApplication.isIdleTimerDisabled`
 held while `TrackingView` is up, released on leave) since the foreground-only app would otherwise stop recording
