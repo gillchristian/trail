@@ -22,11 +22,21 @@ struct CreateRaceView: View {
     @State private var importMessage: String?
     @State private var library: TrackableLibraryStore
     private let onSave: (Race) -> Void
+    /// The race being edited, or `nil` to create a new one (TRACK-014). In edit mode the form is pre-filled
+    /// and Save preserves the race's identity (`applied(to:)`); in create mode it mints a new race (`build()`).
+    private let editing: Race?
 
-    init(library: TrackableLibraryStore = TrackableLibraryStore(),
+    init(editing: Race? = nil,
+         library: TrackableLibraryStore = TrackableLibraryStore(),
          onSave: @escaping (Race) -> Void) {
+        self.editing = editing
         _library = State(initialValue: library)
         self.onSave = onSave
+        if let editing {
+            _draft = State(initialValue: RaceDraft(from: editing))
+            _hasDate = State(initialValue: editing.date != nil)
+            _scheduledDate = State(initialValue: editing.date ?? Date())
+        }
     }
 
     var body: some View {
@@ -36,7 +46,7 @@ struct CreateRaceView: View {
                 aidStationsSection
                 paletteSection
             }
-            .navigationTitle("New Race")
+            .navigationTitle(editing == nil ? "New Race" : "Edit Race")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -69,7 +79,8 @@ struct CreateRaceView: View {
 
     private func save() {
         draft.date = hasDate ? scheduledDate : nil
-        onSave(draft.build())
+        // Edit mode preserves the race's identity (applied); create mode mints a new race (build).
+        onSave(editing.map(draft.applied(to:)) ?? draft.build())
         dismiss()
     }
 

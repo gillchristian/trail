@@ -184,3 +184,10 @@ finished view's Export control: `reference/design/track-013-finished-export.png`
 > `-destination 'platform=iOS Simulator,name=iPhone 15,OS=17.4'` (or target a current device, e.g. `name=iPhone 17`).
 > The plain `xcodebuild build` (no destination) is unaffected. Also: piping xcodebuild through `tail`/`grep` masks its
 > exit code with the filter's — read the captured output for `** TEST SUCCEEDED **`, don't trust the pipeline's exit 0.
+
+TRACK-014 (2026-06-27): edit a configured race. `TrackTests` → **71** (+3: `RaceDraft(from:)`→`applied(to:)` preserves
+id/createdAt/planRef while applying edits; `RaceStore.update` persists + survives reload + keeps status Configured;
+`RaceTracker.updateConfiguration` applies pre-start but is a no-op once started). `TrackUITests` → **8** (+1
+`testEditingAConfiguredRaceAppliesBeforeStart`: create → open the Configured screen → Edit opens the form **pre-filled**
+→ add an aid station → save → the Start screen's aid-station count goes 0→1, no relaunch). **TEST SUCCEEDED —
+TrackTests 71 · TrackUITests 8 (+2 launch)** (iPhone 15 / iOS 17.4).

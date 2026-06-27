@@ -106,11 +106,24 @@ enum Theme {
         offsets.map { races[$0] }.forEach(delete)
     }
 
-    /// Re-fold every race's log to refresh the projected status + finished-duration badges. Called
-    /// when the list reappears (e.g. after starting/finishing a race in the detail view, WI-6), since
-    /// status/duration are projections, never stored flags.
-    func refreshStatuses() {
-        for race in races { project(race) }
+    /// Persist an edit to a Configured race's metadata (TRACK-014): atomic overwrite of `race.json`, then
+    /// mirror it in the in-memory list so the row updates. Status/duration are projections over `events.log`,
+    /// which this doesn't touch — so they're unaffected (the race stays Configured).
+    func update(_ race: Race) {
+        do {
+            try storage.saveRace(race)
+            if let index = races.firstIndex(where: { $0.id == race.id }) { races[index] = race }
+        } catch {
+            print("Track: failed to update race \(race.id): \(error)")
+        }
+    }
+
+    /// Re-read every race bundle from disk — metadata **and** the projected status/duration badges. Called
+    /// when the list reappears: status/duration are projections over `events.log` (e.g. after starting or
+    /// finishing a race, WI-6), and the metadata re-read also surfaces a pre-start **edit** made on the
+    /// Configured screen (TRACK-014), which is persisted to `race.json` out of band from this array.
+    func reload() {
+        load()
     }
 
     private func load() {
@@ -191,7 +204,7 @@ struct RacesView: View {
                     TrackableLibraryView()
                 }
             }
-            .onAppear { store.refreshStatuses() }   // status/duration are projections — refresh on return
+            .onAppear { store.reload() }   // re-read metadata + projections on return (status, finished duration, edits)
             .navigationTitle("Races")
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {

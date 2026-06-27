@@ -64,6 +64,48 @@ final class TrackUITests: XCTestCase {
                       "and is still Configured")
     }
 
+    /// TRACK-014: a Configured race can be edited before it starts — the Edit control opens the configure
+    /// form **pre-filled**, and saving applies the change to the Configured screen immediately.
+    func testEditingAConfiguredRaceAppliesBeforeStart() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-uitest-reset"]
+        app.launch()
+
+        // Create a plan-less race (0 aid stations).
+        app.buttons["addRace"].tap()
+        let nameField = app.textFields["raceName"]
+        XCTAssertTrue(nameField.waitForExistence(timeout: 10))
+        expectation(for: NSPredicate(format: "isHittable == true"), evaluatedWith: nameField)
+        waitForExpectations(timeout: 10)
+        nameField.tap()
+        nameField.typeText("Edit Me")
+        let save = app.buttons["saveRace"]
+        expectation(for: NSPredicate(format: "isEnabled == true"), evaluatedWith: save)
+        waitForExpectations(timeout: 10)
+        save.tap()
+
+        // Open it → the Configured (Start) screen, showing 0 aid stations.
+        app.staticTexts["Edit Me"].tap()
+        XCTAssertTrue(app.buttons["startRace"].waitForExistence(timeout: 10), "a Configured race opens to Start")
+        let aidCount = app.staticTexts["aidStationCount"]
+        XCTAssertTrue(aidCount.waitForExistence(timeout: 10))
+        XCTAssertEqual(aidCount.label, "0", "no aid stations yet")
+
+        // Edit: the form opens pre-filled with the existing race; add an aid station, then save.
+        app.buttons["editRace"].tap()
+        XCTAssertTrue(app.navigationBars["Edit Race"].waitForExistence(timeout: 10), "the Edit form opens")
+        let editField = app.textFields["raceName"]
+        XCTAssertTrue(editField.waitForExistence(timeout: 10))
+        XCTAssertEqual(editField.value as? String, "Edit Me", "the form is pre-filled with the existing race")
+        app.buttons["addAidStation"].tap()
+        app.buttons["saveRace"].tap()
+
+        // Back on the Start screen, the edit is reflected immediately (no relaunch).
+        expectation(for: NSPredicate(format: "label == %@", "1"), evaluatedWith: app.staticTexts["aidStationCount"])
+        waitForExpectations(timeout: 10)
+        XCTAssertTrue(app.buttons["startRace"].exists, "still the Configured screen, now edited")
+    }
+
     /// WI-3: the trackable library opens from the Races toolbar, a created trackable appears, and
     /// it survives a relaunch.
     func testTrackablePersistsAcrossRelaunch() throws {

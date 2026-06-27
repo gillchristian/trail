@@ -172,6 +172,23 @@ struct RaceDraft: Equatable {
     }
 }
 
+// ── Editing an existing race (TRACK-014; in an extension so the memberwise init survives) ──
+extension RaceDraft {
+    /// Seed the draft from an existing race, for the pre-start edit. `id`/`createdAt`/`planRef` are the
+    /// race's identity — not edited here; `applied(to:)` carries them back unchanged.
+    init(from race: Race) {
+        self.init(name: race.name, date: race.date,
+                  aidStations: race.aidStations, palette: race.palette)
+    }
+
+    /// The counterpart to `build()` for editing: apply the draft's fields onto an existing race, **preserving
+    /// its identity** (`id`, `createdAt`, `planRef`). Used by the Configured-race Edit flow (TRACK-014).
+    func applied(to race: Race) -> Race {
+        Race(id: race.id, name: trimmedName, createdAt: race.createdAt, date: date,
+             aidStations: aidStations, palette: palette, planRef: race.planRef)
+    }
+}
+
 // MARK: - Aid-station distances (derived)
 
 extension Array where Element == PlannedAidStation {
@@ -1070,7 +1087,10 @@ extension Array where Element == RaceEvent {
 /// authoritative: a relaunch reconstructs `events` from it. Every mutating method honours the invariant
 /// *open → append → fsync → done*; **Undo and Finish are events, never mutations** (mvp-plan.md §2).
 @Observable final class RaceTracker {
-    let race: Race
+    /// The race's configuration. Mutable only before the race starts (TRACK-014's pre-start edit, via
+    /// `updateConfiguration`); frozen once running/finished. `private(set)` so callers read it but can't
+    /// bypass the guard. Being `@Observable`, an edit re-renders the Configured (Start) screen.
+    private(set) var race: Race
     private(set) var events: [RaceEvent]
     /// The most-recent undoable tracking action (intake / aid arrival·departure / voice note), surfaced
     /// by the Undo toast. Cleared after a timeout or once undone. Start/Finish are deliberate and are
@@ -1100,6 +1120,21 @@ extension Array where Element == RaceEvent {
     /// The race's storage, exposed for the export action (FinishedRaceView, TRACK-013). `RaceStorage` is a
     /// value type (one URL) → `Sendable`, so the export's file I/O + zip can run off the main actor.
     var exportStorage: RaceStorage { storage }
+
+    /// Apply a pre-start configuration edit (TRACK-014): atomically overwrite `race.json` and mirror it in
+    /// memory so the Configured (Start) screen re-renders. **Guarded** — a no-op once the race is running or
+    /// finished (config is frozen then; the only post-start edit is the finish-time *correction*, an event),
+    /// and only for this race's id. Config lives apart from `events.log`, so this never touches the log and
+    /// the status projection is unaffected (stays `.configured`). The Races list re-reads metadata on appear.
+    func updateConfiguration(_ updated: Race) {
+        guard status == .configured, updated.id == race.id else { return }
+        do {
+            try storage.saveRace(updated)
+            race = updated
+        } catch {
+            print("Track: failed to update race configuration \(race.id): \(error)")
+        }
+    }
 
     /// What the Undo toast shows + the event it retracts. `token` bumps on each action so the toast's
     /// auto-dismiss timer restarts when a newer action replaces it.
