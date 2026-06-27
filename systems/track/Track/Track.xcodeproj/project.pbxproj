@@ -9,15 +9,15 @@
 /* Begin PBXBuildFile section */
 		559A13542FEDB1FB009F8D06 /* TrackApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 559A13532FEDB1FB009F8D06 /* TrackApp.swift */; };
 		559A13562FEDB1FB009F8D06 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 559A13552FEDB1FB009F8D06 /* ContentView.swift */; };
-		AA0000000000000000000002 /* TrackCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000001 /* TrackCore.swift */; };
-		AA0000000000000000000004 /* TrackableLibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000003 /* TrackableLibrary.swift */; };
-		AA0000000000000000000006 /* CreateRaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000005 /* CreateRaceView.swift */; };
-		AA0000000000000000000008 /* TrackingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000007 /* TrackingView.swift */; };
 		559A13582FEDB1FC009F8D06 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 559A13572FEDB1FC009F8D06 /* Assets.xcassets */; };
 		559A135C2FEDB1FC009F8D06 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 559A135B2FEDB1FC009F8D06 /* Preview Assets.xcassets */; };
 		559A13662FEDB1FC009F8D06 /* TrackTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 559A13652FEDB1FC009F8D06 /* TrackTests.swift */; };
 		559A13702FEDB1FC009F8D06 /* TrackUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 559A136F2FEDB1FC009F8D06 /* TrackUITests.swift */; };
 		559A13722FEDB1FC009F8D06 /* TrackUITestsLaunchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 559A13712FEDB1FC009F8D06 /* TrackUITestsLaunchTests.swift */; };
+		AA0000000000000000000002 /* TrackCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000001 /* TrackCore.swift */; };
+		AA0000000000000000000004 /* TrackableLibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000003 /* TrackableLibrary.swift */; };
+		AA0000000000000000000006 /* CreateRaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000005 /* CreateRaceView.swift */; };
+		AA0000000000000000000008 /* TrackingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000007 /* TrackingView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -41,10 +41,6 @@
 		559A13502FEDB1FB009F8D06 /* Track.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Track.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		559A13532FEDB1FB009F8D06 /* TrackApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrackApp.swift; sourceTree = "<group>"; };
 		559A13552FEDB1FB009F8D06 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
-		AA0000000000000000000001 /* TrackCore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrackCore.swift; sourceTree = "<group>"; };
-		AA0000000000000000000003 /* TrackableLibrary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrackableLibrary.swift; sourceTree = "<group>"; };
-		AA0000000000000000000005 /* CreateRaceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreateRaceView.swift; sourceTree = "<group>"; };
-		AA0000000000000000000007 /* TrackingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrackingView.swift; sourceTree = "<group>"; };
 		559A13572FEDB1FC009F8D06 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		559A13592FEDB1FC009F8D06 /* Track.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Track.entitlements; sourceTree = "<group>"; };
 		559A135B2FEDB1FC009F8D06 /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
@@ -53,6 +49,10 @@
 		559A136B2FEDB1FC009F8D06 /* TrackUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TrackUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		559A136F2FEDB1FC009F8D06 /* TrackUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrackUITests.swift; sourceTree = "<group>"; };
 		559A13712FEDB1FC009F8D06 /* TrackUITestsLaunchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrackUITestsLaunchTests.swift; sourceTree = "<group>"; };
+		AA0000000000000000000001 /* TrackCore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrackCore.swift; sourceTree = "<group>"; };
+		AA0000000000000000000003 /* TrackableLibrary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrackableLibrary.swift; sourceTree = "<group>"; };
+		AA0000000000000000000005 /* CreateRaceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreateRaceView.swift; sourceTree = "<group>"; };
+		AA0000000000000000000007 /* TrackingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrackingView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -436,8 +436,11 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"Track/Preview Content\"";
+				DEVELOPMENT_TEAM = U959A2354F;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = Track;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.healthcare-fitness";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Track records short voice notes during a race when you tap the microphone button.";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
@@ -473,8 +476,11 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"Track/Preview Content\"";
+				DEVELOPMENT_TEAM = U959A2354F;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = Track;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.healthcare-fitness";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Track records short voice notes during a race when you tap the microphone button.";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
