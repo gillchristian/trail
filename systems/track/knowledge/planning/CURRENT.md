@@ -4,7 +4,21 @@
 
 ## Active
 
-_(none active. **TRACK-013 complete** (✓ PR #177): raw race export — the data-safety net the user asked for ahead of
+_(none active. **TRACK-014 complete** (✓ PR #178): edit a race before it has started. A **Configured** race re-opens
+in the configure form, **pre-filled**, and its metadata can be changed — name, scheduled date, aid stations (incl. CSV
+re-import + notes), palette — then saved, **preserving identity** (`id`/`createdAt`/`planRef`). Reuses `CreateRaceView`
+via an `editing: Race?` mode (title "Edit Race"; `RaceDraft(from:)` → `applied(to:)` instead of `build()`).
+`RaceStore.update` atomically overwrites `race.json`; `RaceTracker.race` became `private(set) var` + a guarded
+`updateConfiguration` so the **Start screen re-renders on save**; the Races list re-reads metadata on appear
+(`RaceStore.reload`). Edit lives on the **Configured (Start) screen** toolbar only — in-progress/finished races stay
+**frozen** (the finish-time correction remains the sole post-start edit, and it's an *event*, not a mutation). Editing
+touches `race.json` only, never `events.log`, so status stays Configured. **No `mvp-plan.md` change** (config edit, not
+a new event kind). **Verified** from `systems/track/Track/`: **BUILD SUCCEEDED** (no warnings); **TrackTests 68→71 ·
+TrackUITests 7→8** — 3 unit (identity-preserving `applied(to:)`; `RaceStore.update` persists + survives reload + keeps
+status Configured; `updateConfiguration` no-ops once started) + 1 UI (`testEditingAConfiguredRaceAppliesBeforeStart`:
+open pre-filled → add an aid station → the Start screen's count goes 0→1).)_
+
+_(**TRACK-013 complete** (✓ PR #177): raw race export — the data-safety net the user asked for ahead of
 their first real race. `RaceStorage.exportZip(for:)` builds a `<RaceName>-<stamp>.zip` holding a combined,
 human-readable **`export.json`** (race metadata + the **full RAW event list** — retractions included, nothing dropped;
 ISO-8601 dates, pretty-printed) **+** the verbatim bundle (`race.json`, `events.log`, `audio/*.m4a`) for byte-fidelity.

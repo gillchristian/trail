@@ -958,4 +958,61 @@ final class TrackTests: XCTestCase {
         XCTAssertTrue(store.exportBaseName(for: Race(name: "   ", createdAt: t(0)), at: t(0)).hasPrefix("race-"),
                       "a blank name falls back to \"race\"")
     }
+
+    // MARK: - Edit a configured race (TRACK-014)
+
+    func testRaceDraftEditPreservesIdentityAndAppliesEdits() {
+        let original = Race(id: UUID(), name: "Old", createdAt: t(1000), date: t(2000),
+                            aidStations: [PlannedAidStation(ordinal: 1, name: "A")],
+                            palette: [TrackableElement(label: "Gel", category: .nutrition)],
+                            planRef: PlanRef(planID: UUID(), integrityHash: "h"))
+        var draft = RaceDraft(from: original)
+        XCTAssertEqual(draft.name, "Old", "the draft is seeded from the race")
+        XCTAssertEqual(draft.aidStations.count, 1)
+        draft.name = "New"
+        draft.addAidStation(name: "B")
+
+        let edited = draft.applied(to: original)
+        XCTAssertEqual(edited.id, original.id, "identity preserved")
+        XCTAssertEqual(edited.createdAt, original.createdAt, "createdAt preserved")
+        XCTAssertEqual(edited.planRef, original.planRef, "planRef preserved")
+        XCTAssertEqual(edited.name, "New", "name edit applied")
+        XCTAssertEqual(edited.aidStations.map(\.name), ["A", "B"], "aid-station edit applied + renumbered")
+        XCTAssertEqual(edited.date, original.date, "untouched fields carry through")
+    }
+
+    func testRaceStoreUpdatePersistsEditedConfiguredRace() throws {
+        let store = RaceStore(storage: storage())
+        let race = Race(id: UUID(), name: "Old", createdAt: t(1000))
+        store.add(race)
+        var edited = race
+        edited.name = "New"
+        edited.aidStations = [PlannedAidStation(ordinal: 1, name: "AS")]
+        store.update(edited)
+
+        XCTAssertEqual(store.races.first?.name, "New", "the in-memory list reflects the edit")
+        XCTAssertEqual(store.races.first?.aidStations.count, 1)
+        XCTAssertEqual(store.status(for: edited), .configured, "editing config does not change status")
+        XCTAssertEqual(RaceStore(storage: storage()).races.first?.name, "New", "the edit survives a relaunch")
+    }
+
+    func testRaceTrackerUpdateConfigurationGatedToConfigured() throws {
+        let store = storage()
+        let race = Race(id: UUID(), name: "Old", createdAt: t(1000))
+        try store.saveRace(race)
+        let tracker = RaceTracker(race: race, storage: store)
+
+        var edited = race
+        edited.name = "New"
+        tracker.updateConfiguration(edited)
+        XCTAssertEqual(tracker.race.name, "New", "a pre-start edit applies in memory")
+        XCTAssertEqual(store.loadRace(id: race.id)?.name, "New", "and is persisted to race.json")
+
+        tracker.start()                                  // race is now in progress
+        var blocked = edited
+        blocked.name = "Nope"
+        tracker.updateConfiguration(blocked)
+        XCTAssertEqual(tracker.race.name, "New", "config is frozen once the race has started — edit is a no-op")
+        XCTAssertEqual(store.loadRace(id: race.id)?.name, "New")
+    }
 }

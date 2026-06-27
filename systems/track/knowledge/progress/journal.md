@@ -742,3 +742,45 @@ Both noted in `reference/local-ci.md`.
 **Next:** the user pulls `master`, rebuilds + reinstalls via `reference/device-testing.md`, and has a one-tap export
 on the finished view (and a swipe on the list). After the real race, the exported zip's `events.log`/`export.json`
 become the concrete data that settles the vocabulary → promote the finalized **WI-8 `.trace`** (and WI-9 `.trail`).
+
+---
+## 2026-06-27 — TRACK-014 COMPLETE: edit a race before it has started
+
+User asked: "Can we add an option to edit a race before it has started?" Configured races could only be Started, not
+tweaked — so a typo'd name or a wrong aid station meant deleting and re-creating. Promoted as **TRACK-014**, branch
+`track/track-014-edit-configured-race` → **PR #178** (squash-merged). Autonomous per the framework.
+
+**Design — reuse the create form; preserve identity; gate to Configured.**
+- `CreateRaceView` gained an `editing: Race?` mode: `nil` = create (mint a new race via `build()`), non-nil =
+  edit (pre-fill the form from the race, title "Edit Race", and on Save call `applied(to:)` which rebuilds the `Race`
+  **keeping `id`/`createdAt`/`planRef`** — only name/date/aid/palette change). One form, two modes; the existing
+  trailing-closure call site (`CreateRaceView { store.add($0) }`) is unchanged since `editing` defaults to `nil`.
+- `RaceDraft` got `init(from:)` + `applied(to:)` in an **extension** (so the struct's synthesised memberwise/`init()`
+  — used as `RaceDraft()` across the tests — survives; adding an init in the main body would suppress it).
+- Edit lives on the **Configured (Start) screen** toolbar (a pencil, next to nothing else) — the intuitive spot: you
+  open a race, see Start, and can fix it first. **Not** in the in-race view: once a race starts, config is frozen
+  (the only post-start edit is the finish-time *correction*, which is an event, not a mutation — mvp-plan.md §2).
+
+**The data-flow wrinkle (worth recording).** The detail screen renders from a `RaceTracker` snapshot
+(`RaceDetailView` builds it once), while the Races list renders from `RaceStore.races`. An edit has to reach **both**
+in-memory copies, with `race.json` on disk as the source of truth. Chosen resolution:
+- `RaceTracker.race` `let` → `private(set) var` + `updateConfiguration(_:)` — guarded (`status == .configured` &&
+  same id), it persists via `storage.saveRace` then mirrors `race` in memory. Being `@Observable`, the Start screen
+  re-renders **immediately** on save. The guard is what enforces "can't edit a started race" at the model layer.
+- `RaceStore.refreshStatuses()` (called on list `.onAppear`) became `reload()` — it now re-reads **metadata** too
+  (not just re-projecting status/duration), so an edit made on the detail screen shows up in the list row on return.
+  (`RaceStore.update(_:)` also exists for a store-routed edit and is unit-tested, though the shipped UI edits via the
+  tracker.) Both copies converge through disk; no shared-mutable-state coupling between tracker and store.
+
+**Verified** (from `systems/track/Track/`, iPhone 15 / iOS 17.4): **BUILD SUCCEEDED** (no warnings); **TrackTests
+68→71 · TrackUITests 7→8**, **TEST SUCCEEDED**. Unit: `RaceDraft(from:)`→`applied(to:)` preserves identity while
+applying edits; `RaceStore.update` persists + survives a fresh-instance reload + leaves status Configured;
+`RaceTracker.updateConfiguration` applies before `start()` and is a **no-op after** (asserts the freeze). UI
+(`testEditingAConfiguredRaceAppliesBeforeStart`): create a plan-less race → open it (Start screen, 0 aid stations) →
+Edit opens the form **pre-filled** (`raceName` == the race's name — proves it loads existing data) → add an aid
+station → Save → the Start screen's `aidStationCount` goes **0→1** with no relaunch (proves the in-place re-render).
+Deterministic (button taps + an a11y-id'd count — no fragile text-field clearing).
+
+**Next:** the user pulls `master` + rebuilds to pick up TRACK-013 (export) **and** TRACK-014 (edit) together. Still no
+`mvp-plan.md`/domain change since WI-2; the deferred tail (finalized WI-8 `.trace`, WI-9 `.trail`, WI-10 Live Activity)
+waits on real-race data.

@@ -41,6 +41,7 @@ struct RaceDetailView: View {
 /// (tracking-view-spec.md §1 — race start happens here, upstream of the tracking tabs).
 private struct StartRaceView: View {
     let tracker: RaceTracker
+    @State private var editing = false
 
     var body: some View {
         VStack(spacing: 20) {
@@ -53,7 +54,7 @@ private struct StartRaceView: View {
                 Text(date.formatted(date: .long, time: .omitted)).foregroundStyle(.secondary)
             }
             HStack(spacing: 28) {
-                summary("\(tracker.race.aidStations.count)", "aid stations")
+                summary("\(tracker.race.aidStations.count)", "aid stations", id: "aidStationCount")
                 summary("\(tracker.race.palette.count)", "palette items")
             }
             .padding(.top, 4)
@@ -67,11 +68,22 @@ private struct StartRaceView: View {
         }
         .padding(24)
         .navigationTitle(tracker.race.name).navigationBarTitleDisplayMode(.inline)
+        // Edit the race before it starts (TRACK-014): re-open the configure form pre-filled. Only here, on
+        // the Configured screen — once started, config is frozen (the in-race view has no Edit).
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button { editing = true } label: { Label("Edit", systemImage: "pencil") }
+                    .accessibilityIdentifier("editRace")
+            }
+        }
+        .sheet(isPresented: $editing) {
+            CreateRaceView(editing: tracker.race) { tracker.updateConfiguration($0) }
+        }
     }
 
-    private func summary(_ value: String, _ caption: String) -> some View {
+    private func summary(_ value: String, _ caption: String, id: String? = nil) -> some View {
         VStack(spacing: 2) {
-            Text(value).font(.title2.weight(.bold))
+            Text(value).font(.title2.weight(.bold)).accessibilityIdentifier(id ?? "")
             Text(caption).font(.caption).foregroundStyle(.secondary)
         }
     }
