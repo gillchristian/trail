@@ -219,6 +219,10 @@ final class TrackUITests: XCTestCase {
                       "the finished race opens to the summary with a total duration")
         XCTAssertTrue(app.staticTexts.matching(aidRow).firstMatch.waitForExistence(timeout: 10),
                       "the chronological timeline lists the aid-station visit")
+        // TRACK-013: the finished view offers Export (the share-sheet itself is system UI — not
+        // XCUITest-drivable, like the .fileImporter — so we assert the control is present, not the sheet).
+        XCTAssertTrue(app.buttons["exportRace"].waitForExistence(timeout: 10),
+                      "the finished race offers an Export control")
         attach(app, "track-007-summary")
 
         // The edit-finish-time flow opens and a correction commits, returning to the summary.

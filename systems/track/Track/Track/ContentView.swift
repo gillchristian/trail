@@ -10,6 +10,25 @@
 //
 
 import SwiftUI
+import UIKit
+
+// MARK: - Share sheet (TRACK-013)
+
+/// A self-contained, `Identifiable` wrapper so a freshly-built export zip can drive `.sheet(item:)`.
+struct ExportFile: Identifiable {
+    let id = UUID()
+    let url: URL
+}
+
+/// Bridges `UIActivityViewController` — the iOS share sheet (AirDrop / Mail / Messages / **Save to Files**) —
+/// into SwiftUI, to share a built export zip (TRACK-013). Presented via `.sheet(item:)`.
+struct ShareSheet: UIViewControllerRepresentable {
+    let items: [Any]
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: items, applicationActivities: nil)
+    }
+    func updateUIViewController(_ controller: UIActivityViewController, context: Context) {}
+}
 
 // MARK: - Theme
 
@@ -55,6 +74,10 @@ enum Theme {
 
     /// Look up a loaded race by id (for value-based navigation).
     func race(for id: RaceID) -> Race? { races.first { $0.id == id } }
+
+    /// The storage backing the list, exposed for the per-row Export swipe action (TRACK-013). `RaceStorage`
+    /// is a value type → `Sendable`, so the export's zip build can run off the main actor.
+    var exportStorage: RaceStorage { storage }
 
     /// Persist a fully-configured race (WI-4) and show it at the top — newest first, matching
     /// `loadAllRaces()`'s order. The race enters Configured (no events yet).
@@ -123,6 +146,8 @@ struct RacesView: View {
     @State private var store: RaceStore
     @State private var path: [RaceRoute]
     @State private var creatingRace = false
+    @State private var exportFile: ExportFile?       // set → present the share sheet (TRACK-013)
+    @State private var exportError: String?
 
     init() {
         let store = RaceStore()
@@ -143,6 +168,15 @@ struct RacesView: View {
                             NavigationLink(value: RaceRoute.race(race.id)) {
                                 RaceRow(race: race, status: store.status(for: race),
                                         duration: store.duration(for: race))
+                            }
+                            // Safety-net export, reachable for any race straight off its bundle — doesn't
+                            // depend on opening the detail view (TRACK-013). Leading swipe = Export (blue),
+                            // trailing swipe = the existing Delete (red): two clearly-distinct directions.
+                            .swipeActions(edge: .leading) {
+                                Button { startExport(race) } label: {
+                                    Label("Export", systemImage: "square.and.arrow.up")
+                                }
+                                .tint(Color(red: 47/255, green: 111/255, blue: 176/255))
                             }
                         }
                         .onDelete(perform: store.delete(at:))
@@ -177,6 +211,30 @@ struct RacesView: View {
             }
             .sheet(isPresented: $creatingRace) {
                 CreateRaceView { store.add($0) }
+            }
+            .sheet(item: $exportFile) { ShareSheet(items: [$0.url]) }
+            .alert("Export failed", isPresented: Binding(
+                get: { exportError != nil }, set: { if !$0 { exportError = nil } }
+            )) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(exportError ?? "")
+            }
+        }
+    }
+
+    /// Build the export zip off the main actor (capturing the `Sendable` storage + race), then present the
+    /// share sheet (or surface an error). See `RaceStorage.exportZip`.
+    private func startExport(_ race: Race) {
+        let storage = store.exportStorage
+        Task { @MainActor in
+            do {
+                let url = try await Task.detached(priority: .userInitiated) {
+                    try storage.exportZip(for: race, exportedAt: Date())
+                }.value
+                exportFile = ExportFile(url: url)
+            } catch {
+                exportError = error.localizedDescription
             }
         }
     }

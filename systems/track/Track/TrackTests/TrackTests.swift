@@ -879,4 +879,83 @@ final class TrackTests: XCTestCase {
         XCTAssertEqual(TrackingTab.others.next(excludingFeed: false), .feed)
         XCTAssertEqual(TrackingTab.nutrition.previous(excludingFeed: false), .feed)
     }
+
+    // MARK: - Race export (TRACK-013)
+
+    /// Seed a saved race + a known raw event mix that *includes a retraction* (of the intake) and a voice
+    /// note with known bytes — so the export tests can assert losslessness (the retraction survives) and
+    /// that the clip is carried. Integer-second dates so the export's ISO-8601 (whole-second) encoding
+    /// round-trips exactly. Returns the storage, the race, and the clip's event id.
+    private func seededExportRace() throws -> (store: RaceStorage, race: Race, clipID: EventID) {
+        let store = storage()
+        let race = Race(id: UUID(), name: "Sunset 50K", createdAt: t(1000),
+                        aidStations: [PlannedAidStation(ordinal: 1, name: "Ridge",
+                                                        services: ["water"], distanceKm: 8.3)],
+                        palette: [TrackableElement(label: "Gel", category: .nutrition)])
+        try store.saveRace(race)
+        let intakeID = UUID()
+        try store.append(RaceEvent(id: UUID(), at: t(100), kind: .raceStarted), to: race.id)
+        try store.append(RaceEvent(id: intakeID, at: t(150), kind: .intake(trackableID: nil, label: "Gel")), to: race.id)
+        try store.append(RaceEvent(id: UUID(), at: t(160), kind: .retraction(target: intakeID)), to: race.id)
+        let clipID = UUID()
+        try store.appendVoiceNote(audio: Data("clip-bytes".utf8), durationSec: 2.0,
+                                  to: race.id, id: clipID, at: t(300))
+        return (store, race, clipID)
+    }
+
+    func testExportJSONRoundTripsRaceAndRawEvents() throws {
+        let (store, race, _) = try seededExportRace()
+        let data = try store.exportJSONData(for: race, exportedAt: t(9999))
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let export = try decoder.decode(RaceExport.self, from: data)
+
+        XCTAssertEqual(export.race, race, "the export carries the race metadata verbatim")
+        XCTAssertEqual(export.events, store.loadEvents(for: race.id),
+                       "the export's events are the raw on-disk log — generated JSON out of the event list")
+        XCTAssertEqual(export.events.count, 4, "all four raw events are present")
+        XCTAssertTrue(export.events.contains { if case .retraction = $0.kind { return true } else { return false } },
+                      "a retraction is NOT resolved away — the raw export is lossless")
+        XCTAssertEqual(export.formatVersion, 0, "flagged as the pre-.trace draft format")
+        XCTAssertEqual(export.exportedAt, t(9999))
+    }
+
+    func testStageExportIncludesJSONRawLogAndAudio() throws {
+        let (store, race, clipID) = try seededExportRace()
+        let folder = try store.stageExport(for: race, exportedAt: t(9999), in: root)
+        let fileManager = FileManager.default
+        XCTAssertTrue(fileManager.fileExists(atPath: folder.appending(path: "export.json").path),
+                      "the combined human-readable JSON is staged")
+        XCTAssertTrue(fileManager.fileExists(atPath: folder.appending(path: "race.json").path),
+                      "the raw race.json is staged (byte-fidelity safety net)")
+        XCTAssertTrue(fileManager.fileExists(atPath: folder.appending(path: "events.log").path),
+                      "the raw append-only events.log is staged")
+        let clip = folder.appending(path: "audio").appending(path: "\(clipID.uuidString).m4a")
+        XCTAssertEqual(try Data(contentsOf: clip), Data("clip-bytes".utf8),
+                       "the audio clip is copied into the export byte-for-byte")
+    }
+
+    func testExportZipIsCreatedNamedAndNonEmpty() throws {
+        let (store, race, _) = try seededExportRace()
+        let zipURL = try store.exportZip(for: race, exportedAt: t(9999))
+        addTeardownBlock { try? FileManager.default.removeItem(at: zipURL.deletingLastPathComponent()) }
+        XCTAssertEqual(zipURL.pathExtension, "zip")
+        XCTAssertTrue(zipURL.lastPathComponent.hasPrefix("Sunset-50K-"),
+                      "the zip is named after the race + a stamp, got \(zipURL.lastPathComponent)")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: zipURL.path), "the zip is written to disk")
+        let size = (try FileManager.default.attributesOfItem(atPath: zipURL.path)[.size] as? Int) ?? 0
+        XCTAssertGreaterThan(size, 200, "the zip holds the JSON + raw bundle + clip, so it's non-trivial")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: zipURL.deletingPathExtension().path),
+                       "the uncompressed staging copy is removed — only the zip remains")
+    }
+
+    func testExportBaseNameSanitisesNameAndStamps() {
+        let store = storage()
+        let name = store.exportBaseName(for: Race(name: "Trail / Race: 2026", createdAt: t(0)), at: t(0))
+        XCTAssertTrue(name.hasPrefix("Trail-Race-2026-"),
+                      "slashes/colons/spaces collapse to single dashes, got \(name)")
+        XCTAssertFalse(name.contains("/")); XCTAssertFalse(name.contains(":")); XCTAssertFalse(name.contains(" "))
+        XCTAssertTrue(store.exportBaseName(for: Race(name: "   ", createdAt: t(0)), at: t(0)).hasPrefix("race-"),
+                      "a blank name falls back to \"race\"")
+    }
 }

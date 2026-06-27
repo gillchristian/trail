@@ -4,7 +4,21 @@
 
 ## Active
 
-_(none active. **TRACK-012 complete** (✓ PR #176): fixed iOS device signing. `Track.entitlements` carried
+_(none active. **TRACK-013 complete** (✓ PR #177): raw race export — the data-safety net the user asked for ahead of
+their first real race. `RaceStorage.exportZip(for:)` builds a `<RaceName>-<stamp>.zip` holding a combined,
+human-readable **`export.json`** (race metadata + the **full RAW event list** — retractions included, nothing dropped;
+ISO-8601 dates, pretty-printed) **+** the verbatim bundle (`race.json`, `events.log`, `audio/*.m4a`) for byte-fidelity.
+Zipped via **`NSFileCoordinator(.forUploading)`** — Foundation-only, no new dependency (spiked first: valid archive,
+audio bytes intact). Reachable from the **finished-race toolbar** and a **Races-list leading swipe**, each presenting
+the iOS **share sheet** (AirDrop / Mail / **Save to Files**). A deliberately *preliminary* slice of **WI-8** — the
+**finalized `.trace`** (resolved manifest, shared spec, settled vocabulary) stays deferred until ≥2–3 real races
+(`mvp-plan.md` §7–8); `export.json` carries `formatVersion: 0` + a `note` flagging the draft. **Verified** from
+`systems/track/Track/`: **BUILD SUCCEEDED** (no warnings); **TrackTests 64→68 · TrackUITests 7** (the 4 export tests
+build a real zip and assert its structure + byte-exact audio; the finished-race UI test asserts the `exportRace`
+control). Share sheet is system UI (not XCUITest-drivable, like `.fileImporter`/clip playback) → covered by unit tests
++ the screenshot `reference/design/track-013-finished-export.png`.)_
+
+_(**TRACK-012 complete** (✓ PR #176): fixed iOS device signing. `Track.entitlements` carried
 **macOS App Sandbox** keys (`com.apple.security.app-sandbox` + `files.user-selected.read-only`) — a multiplatform-
 template vestige. iOS signing strips them, which fails the build with *"entitlements file … was modified during
 the build."* (My simulator / no-signing builds never sign, so I missed it in the TRACK-010 audit — runtime-harmless
