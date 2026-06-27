@@ -684,3 +684,61 @@ reordering. Personal/local signing state; flagged to the user to commit if they 
 fix is just the emptied entitlements (+ guide).
 
 **Next:** unchanged — real-race test is the next signal; deferred WIs wait.
+
+---
+## 2026-06-27 — TRACK-013 COMPLETE: raw race export (safety-net zip — JSON + audio → share / Files)
+
+The user is configuring their first real race and said they're afraid of losing the data once it finishes — could we
+do the export feature, even unfinished: "generate JSON out of the list of events and zip everything (incl. the audio
+files) and save to files (or share, maybe even better)." That's a deliberately *preliminary* slice of the deferred
+**WI-8 (`.trace`)**, which the backlog itself anticipated. Promoted as **TRACK-013**, branch
+`track/track-013-race-export` → **PR #177** (squash-merged). Worked autonomously per the framework.
+
+**Framing — this is NOT WI-8 done.** WI-8 is the *finalized* `.trace` (resolved manifest, shared spec in
+`knowledge/reference/specs/`), still deferred until ≥2–3 real races settle the event vocabulary. TRACK-013 is the
+**lossless raw archive** that gets the data off the phone *now*: `export.json` carries `formatVersion: 0` + a `note`
+flagging it as the pre-`.trace` draft, so a future consumer can tell drafts apart. Updated the WI-8 backlog entry to
+say so (reconcile on finalize: bump version, decide resolved-vs-raw).
+
+**The export was cheap because the bundle is already self-describing.** Each race is `Races/<id>/race.json` +
+append-only `events.log` (JSONL) + `audio/<eventID>.m4a` (WI-2's spine). So "export" = serialise the events into one
+readable JSON + carry the raw bundle + zip + share. Engine (`TrackCore.swift`, Foundation-only, testable):
+- `RaceExport` (`Codable` wrapper over the already-`Codable` `Race` + `[RaceEvent]`) + `RaceStorage.exportZip(for:)`.
+- `export.json` = race metadata + the **full RAW event list read from disk** (retractions **included** — lossless;
+  resolving is the finalized format's job). Encoded pretty + sorted-keys + **ISO-8601 dates** (eyeball-readable),
+  deliberately distinct from the on-disk compact/numeric coders.
+- Staged with the **verbatim bundle** alongside (`race.json`, `events.log`, `audio/`) — belt-and-suspenders: the JSON
+  is the convenient view, the raw files are the byte-for-byte safety net. Copying the bundle dir's contents carries
+  whatever's on disk (incl. clips) without re-enumerating event kinds.
+- Zipped via **`NSFileCoordinator` `.forUploading`** — the Foundation way to zip a directory with **no third-party
+  dependency** (the app stays dependency-free). De-risked with a macOS spike *before* wiring: it produces a standard
+  archive that `unzip` opens, top-level folder named after the race, **audio bytes preserved exactly** (2048→2048).
+  `exportZip` drops the uncompressed staging copy, keeping only `<RaceName>-<stamp>.zip`. Off-main-actor safe:
+  `RaceStorage` is a one-`URL` value type (`Sendable`), captured into a `Task.detached` so a clip-heavy race doesn't
+  hitch the UI.
+
+**Two entry points, one share sheet.** (1) **Finished-race toolbar** — an Export (share) button next to Edit-finish;
+the explicit "once the race finishes" ask, and reachable for *any* finished race (you tap into it from the list). (2)
+**Races-list leading swipe** — a robust net that exports straight off the bundle without opening the detail view
+(leading=Export blue, trailing=Delete red — two distinct directions). Both build the zip off-main then present
+`UIActivityViewController` (`ShareSheet`, in ContentView.swift) — which *is* "Save to Files" **and** AirDrop/Mail in
+one, so the share sheet covers the user's "save to files **or** share" outright.
+
+**Verified** (from `systems/track/Track/`, iPhone 15 / iOS 17.4): **BUILD SUCCEEDED** (no warnings); **TrackTests
+64→68 · TrackUITests 7** (+2 launch), **TEST SUCCEEDED**. The 4 new unit tests build a *real* zip on the simulator and
+assert: `export.json` round-trips the race + raw events (incl. a retraction); the staging dir holds JSON + raw
+log/race.json + the clip **byte-for-byte**; the zip is named/non-empty and the uncompressed copy is gone; the name is
+sanitised. The finished-race UI test now also asserts the `exportRace` control. Screenshot (extracted from that test's
+attachment — shows the Export icon live in the toolbar): `reference/design/track-013-finished-export.png`. The **share
+sheet itself is system UI** (not XCUITest-drivable — same as `.fileImporter` and clip playback), so its presentation
+is the one manually-confirmed seam; everything upstream of it is automated.
+
+**Snag worth recording:** the Mac's toolchain has moved to **Xcode 17F113 / iOS 26.5 SDK** since TRACK-000. A bare
+`-destination '…name=iPhone 15'` now implies `OS:latest` (26.5) — where iPhone 15 doesn't exist — so the first test
+run failed with *"Unable to find a device."* Fix: pin `OS=17.4`. Also: piping `xcodebuild` through `tail`/`grep`
+masks its exit code with the filter's (saw a misleading exit 0), so read the captured log for `** TEST SUCCEEDED **`.
+Both noted in `reference/local-ci.md`.
+
+**Next:** the user pulls `master`, rebuilds + reinstalls via `reference/device-testing.md`, and has a one-tap export
+on the finished view (and a swipe on the list). After the real race, the exported zip's `events.log`/`export.json`
+become the concrete data that settles the vocabulary → promote the finalized **WI-8 `.trace`** (and WI-9 `.trail`).

@@ -166,3 +166,21 @@ xcodebuild build -project Track.xcodeproj -scheme Track -sdk iphoneos \
 
 (`timeout` is not on macOS — exit 127; run long builds via background + monitor instead. `build-device/`
 is gitignored.)
+
+TRACK-013 (2026-06-27): raw race export. `TrackTests` → **68** (+4: `export.json` round-trips the race + the **raw**
+event list incl. a retraction; the staging dir holds `export.json` + the verbatim `race.json`/`events.log` + the
+audio clip byte-for-byte; `exportZip` writes a named non-empty `.zip` and drops the uncompressed copy;
+`exportBaseName` sanitises a name → single-dash tokens + stamp). `TrackUITests` stays **7** (the finished-race test
+also asserts the `exportRace` toolbar control). **TEST SUCCEEDED — TrackTests 68 · TrackUITests 7 (+2 launch)**. The
+**share sheet** (`UIActivityViewController`) is system UI — not XCUITest-drivable, like `.fileImporter` / clip
+playback — so it's covered by the unit tests (which build a *real* zip on the sim) + a macOS spike confirming
+`NSFileCoordinator(.forUploading)` yields a valid archive that unzips with audio bytes intact. Screenshot of the
+finished view's Export control: `reference/design/track-013-finished-export.png`.
+
+> ⚠️ **Toolchain moved (2026-06-27): Xcode is now 17F113 / iOS 26.5 SDK** (was 15.3 / 17.4 in the header above —
+> update that when convenient). Consequence for `xcodebuild test`: a bare `-destination 'platform=iOS Simulator,name=iPhone 15'`
+> now resolves to `OS:latest` (26.5), where **iPhone 15 doesn't exist** (only iPhone 17 / Air do) → *"Unable to find a
+> device matching the provided destination specifier."* **Pin the OS:**
+> `-destination 'platform=iOS Simulator,name=iPhone 15,OS=17.4'` (or target a current device, e.g. `name=iPhone 17`).
+> The plain `xcodebuild build` (no destination) is unaffected. Also: piping xcodebuild through `tail`/`grep` masks its
+> exit code with the filter's — read the captured output for `** TEST SUCCEEDED **`, don't trust the pipeline's exit 0.

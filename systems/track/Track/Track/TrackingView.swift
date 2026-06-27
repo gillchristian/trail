@@ -620,6 +620,9 @@ private struct FinishedRaceView: View {
     let tracker: RaceTracker
     @State private var player = AudioPlayer()
     @State private var editingFinish = false
+    @State private var exportFile: ExportFile?       // set → present the share sheet (TRACK-013)
+    @State private var isExporting = false
+    @State private var exportError: String?
 
     var body: some View {
         let summary = tracker.summary
@@ -652,6 +655,16 @@ private struct FinishedRaceView: View {
         }
         .navigationTitle(tracker.race.name).navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            // Export the whole race (metadata + raw events + audio) as a shareable zip — the safety net the
+            // user asked for so a finished race's data can leave the phone (Save to Files / AirDrop). TRACK-013.
+            ToolbarItem(placement: .topBarTrailing) {
+                if isExporting {
+                    ProgressView().accessibilityIdentifier("exportProgress")
+                } else {
+                    Button { startExport() } label: { Label("Export", systemImage: "square.and.arrow.up") }
+                        .accessibilityIdentifier("exportRace")
+                }
+            }
             ToolbarItem(placement: .topBarTrailing) {
                 Button { editingFinish = true } label: { Label("Edit finish", systemImage: "pencil") }
                     .accessibilityIdentifier("editFinish")
@@ -662,7 +675,34 @@ private struct FinishedRaceView: View {
                 tracker.correctEndTime(to: $0)
             }
         }
+        .sheet(item: $exportFile) { ShareSheet(items: [$0.url]) }
+        .alert("Export failed", isPresented: Binding(
+            get: { exportError != nil }, set: { if !$0 { exportError = nil } }
+        )) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(exportError ?? "")
+        }
         .onDisappear { player.stop() }
+    }
+
+    /// Build the export zip off the main actor (capturing the `Sendable` storage + race), then present the
+    /// share sheet — or surface the error. See `RaceStorage.exportZip`.
+    private func startExport() {
+        isExporting = true
+        let storage = tracker.exportStorage
+        let race = tracker.race
+        Task { @MainActor in
+            do {
+                let url = try await Task.detached(priority: .userInitiated) {
+                    try storage.exportZip(for: race, exportedAt: Date())
+                }.value
+                exportFile = ExportFile(url: url)
+            } catch {
+                exportError = error.localizedDescription
+            }
+            isExporting = false
+        }
     }
 }
 

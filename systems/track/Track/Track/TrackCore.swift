@@ -636,6 +636,146 @@ enum DurableFile {
     }
 }
 
+// MARK: - Race export (TRACK-013 — preliminary raw archive, ahead of WI-8 `.trace`)
+
+/// A self-contained, human-readable snapshot of one race: its metadata plus the **full raw event list**
+/// (retractions included — nothing is resolved away, so the archive is lossless and reconstructable). This
+/// is the *draft* export the user asked for ahead of the finalized `.trace` (mvp-plan.md §7–8); the
+/// `formatVersion`/`note` flag it as pre-final, so a later `.trace` consumer can tell drafts apart. `Race`
+/// and `RaceEvent` are already `Codable`, so they fall straight into this wrapper.
+struct RaceExport: Codable, Equatable {
+    var format: String
+    var formatVersion: Int
+    var note: String
+    var exportedAt: Date
+    var app: AppInfo
+    var race: Race
+    var events: [RaceEvent]
+
+    struct AppInfo: Codable, Equatable {
+        var name: String
+        var version: String     // CFBundleShortVersionString
+        var build: String       // CFBundleVersion
+    }
+}
+
+private extension Bundle {
+    var shortVersion: String { (infoDictionary?["CFBundleShortVersionString"] as? String) ?? "?" }
+    var buildNumber: String { (infoDictionary?["CFBundleVersion"] as? String) ?? "?" }
+}
+
+extension RaceStorage {
+    /// The combined export document for a race — its metadata + the raw log read from disk (the
+    /// authoritative bytes that survived a force-quit, which is exactly what a safety-net export captures).
+    func exportDocument(for race: Race, exportedAt: Date = Date()) -> RaceExport {
+        RaceExport(
+            format: "trail/track race export",
+            formatVersion: 0,
+            note: "Preliminary raw export, ahead of the finalized .trace format. Events are RAW — "
+                + "retractions are NOT applied. Audio clips are in audio/, named by their voice-note event id.",
+            exportedAt: exportedAt,
+            app: .init(name: "Track", version: Bundle.main.shortVersion, build: Bundle.main.buildNumber),
+            race: race,
+            events: loadEvents(for: race.id))
+    }
+
+    /// Pretty, portable JSON for `exportDocument`: ISO-8601 dates (eyeball-readable timestamps) + sorted
+    /// keys. Deliberately distinct from the on-disk coders (compact, numeric dates) — this file is for
+    /// humans and other tools, not the durability spine.
+    private static let exportEncoder: JSONEncoder = {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+        encoder.dateEncodingStrategy = .iso8601
+        return encoder
+    }()
+
+    func exportJSONData(for race: Race, exportedAt: Date = Date()) throws -> Data {
+        try Self.exportEncoder.encode(exportDocument(for: race, exportedAt: exportedAt))
+    }
+
+    /// Filename-safe base name: `<sanitised race name>-<yyyy-MM-dd-HHmm>`. Every non-alphanumeric run
+    /// (spaces, slashes, punctuation) collapses to a single `-`; Unicode letters/digits are kept (an
+    /// accented race name stays readable). A blank name falls back to "race".
+    func exportBaseName(for race: Race, at date: Date = Date()) -> String {
+        let source = race.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let tokens = String((source.isEmpty ? "race" : source).unicodeScalars
+            .map { CharacterSet.alphanumerics.contains($0) ? Character($0) : " " })
+            .split(whereSeparator: { $0 == " " })
+        let name = tokens.joined(separator: "-")
+        return "\(name.isEmpty ? "race" : name)-\(Self.stampFormatter.string(from: date))"
+    }
+
+    private static let stampFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd-HHmm"
+        return formatter
+    }()
+
+    /// Stage the export tree in a throwaway temp dir: a named folder holding `export.json` (the combined
+    /// readable JSON) + the verbatim bundle contents (`race.json`, `events.log`, `audio/`). Returns the
+    /// folder URL. Belt-and-suspenders: `export.json` is the convenient combined view; the raw files are
+    /// the byte-for-byte safety net. `parent` is injectable for tests.
+    func stageExport(for race: Race, exportedAt: Date = Date(), in parent: URL? = nil) throws -> URL {
+        let fileManager = FileManager.default
+        let root = (parent ?? fileManager.temporaryDirectory)
+            .appending(path: "track-export-\(UUID().uuidString)", directoryHint: .isDirectory)
+        let folder = root.appending(path: exportBaseName(for: race, at: exportedAt), directoryHint: .isDirectory)
+        try fileManager.createDirectory(at: folder, withIntermediateDirectories: true)
+
+        // The headline: the combined, human-readable JSON.
+        try exportJSONData(for: race, exportedAt: exportedAt)
+            .write(to: folder.appending(path: "export.json"))
+
+        // The raw bundle, verbatim (race.json, events.log, audio/). Copying the directory's contents
+        // preserves whatever is on disk — including the clips — without re-enumerating event kinds.
+        let bundle = bundleDir(for: race.id)
+        let entries = (try? fileManager.contentsOfDirectory(at: bundle, includingPropertiesForKeys: nil)) ?? []
+        for entry in entries {
+            try fileManager.copyItem(at: entry, to: folder.appending(path: entry.lastPathComponent))
+        }
+        return folder
+    }
+
+    /// Build the shareable zip: stage the tree, zip it (Foundation-only, `DirectoryArchive`), drop the
+    /// uncompressed staging copy, and return the `<name>-<stamp>.zip` URL (in temp). The caller hands it to
+    /// the iOS share sheet (Save to Files / AirDrop / Mail). `RaceStorage` is a value type (one URL) →
+    /// `Sendable`, so the caller can run this off the main actor for a clip-heavy race.
+    func exportZip(for race: Race, exportedAt: Date = Date()) throws -> URL {
+        let folder = try stageExport(for: race, exportedAt: exportedAt)
+        let destination = folder.deletingLastPathComponent()
+            .appending(path: folder.lastPathComponent + ".zip")
+        try DirectoryArchive.zip(directory: folder, to: destination)
+        try? FileManager.default.removeItem(at: folder)   // keep only the zip
+        return destination
+    }
+}
+
+/// Zip a directory with no third-party dependency: `NSFileCoordinator`'s `.forUploading` reading intent
+/// hands back a temporary zip of the coordinated directory's contents; we copy it to `destination`
+/// synchronously inside the accessor (the coordinator reclaims its own temp afterwards). Spiked + verified
+/// to produce a standard archive whose audio bytes survive a round-trip (TRACK-013).
+enum DirectoryArchive {
+    static func zip(directory: URL, to destination: URL) throws {
+        let coordinator = NSFileCoordinator()
+        var coordinationError: NSError?
+        var thrownError: Error?
+        coordinator.coordinate(readingItemAt: directory, options: [.forUploading],
+                               error: &coordinationError) { zippedURL in
+            do {
+                if FileManager.default.fileExists(atPath: destination.path) {
+                    try FileManager.default.removeItem(at: destination)
+                }
+                try FileManager.default.copyItem(at: zippedURL, to: destination)
+            } catch {
+                thrownError = error
+            }
+        }
+        if let coordinationError { throw coordinationError }
+        if let thrownError { throw thrownError }
+    }
+}
+
 // MARK: - Trackable library storage
 
 /// The trackable library — a flat list persisted as `trackables.json` at the persistence root
@@ -956,6 +1096,10 @@ extension Array where Element == RaceEvent {
 
     /// Where a feed voice-note's clip lives in the bundle — the post-race view plays it inline (WI-7).
     func clipURL(filename: String) -> URL { storage.audioURL(for: race.id, filename: filename) }
+
+    /// The race's storage, exposed for the export action (FinishedRaceView, TRACK-013). `RaceStorage` is a
+    /// value type (one URL) → `Sendable`, so the export's file I/O + zip can run off the main actor.
+    var exportStorage: RaceStorage { storage }
 
     /// What the Undo toast shows + the event it retracts. `token` bumps on each action so the toast's
     /// auto-dismiss timer restarts when a newer action replaces it.
