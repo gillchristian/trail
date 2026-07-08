@@ -3,6 +3,18 @@
 Verification commands for track. The Xcode project lives at `systems/track/Track/` — run the
 `xcodebuild`/`simctl` commands from there. Mark each **verified** (run, output quoted) vs **pending**.
 
+## One command: `scripts/verify.sh`
+
+`systems/track/scripts/verify.sh` runs the full suite with the pinned destination
+(`iPhone 15, OS=17.4`), captures the complete output, greps it for
+`** TEST SUCCEEDED **` (never trusting a filtered pipeline's exit code — the
+2026-06-27 lesson below), and enforces the **test-floor ratchet**:
+**TrackTests ≥ 71 · TrackUITests ≥ 8**. The floors only move up — bump them in
+the same PR that adds tests. Exit 0 = suite green + floors held. Added per the
+framework's scripts-over-re-derivation rule (MONO-008). It covers the *test*
+gate; build-only checks and the manual smoke (gates 2–3) still apply where a
+task touches UI behavior.
+
 ## Toolchain (verified 2026-06-25)
 
 - **Platform:** macOS 14.3 (Sonoma), Apple Silicon.

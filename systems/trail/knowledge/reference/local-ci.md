@@ -22,6 +22,15 @@ exit 0 before a PR opens.
   still works as a fallback but is no longer required.
 - **Node pinned to v22** via `.nvmrc` (`nvm use`); the smoke harnesses run on it.
 
+## One command: `npm run ci`
+
+`npm run ci` (from `systems/trail/`) chains the whole gate table below —
+type-check → build → every smoke harness (including `smoke:i18n`, which
+post-dates the table) — and exits non-zero on the first failure. It **covers
+the table, not the manual smoke test**: the "run the actual thing in a
+browser" checks (verification gates 2–3) still apply where a task touches UI
+behavior. Added per the framework's scripts-over-re-derivation rule (MONO-008).
+
 ## The gates
 
 | Gate | Command | What it proves |

@@ -16,6 +16,7 @@
     "smoke:changelog": "node scripts/smoke-changelog.mjs",
     "smoke:identity": "node scripts/smoke-identity.mjs",
     "smoke:i18n": "node scripts/smoke-i18n.mjs",
+    "ci": "npx --no-install elm make src/Main.elm --output=/dev/null && npm run build && npm run smoke && npm run smoke:aidcsv && npm run smoke:sections && npm run smoke:calibration && npm run smoke:trailsync && npm run smoke:merge && npm run smoke:changelog && npm run smoke:identity && npm run smoke:i18n",
     "perf:trace": "node scripts/profile-trace.mjs"
   },
   "devDependencies": {
