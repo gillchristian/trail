@@ -3143,3 +3143,30 @@ blocker" as *default* would contradict when-stuck's pivot design — defaults mu
 own failure philosophy.
 **Next:** MONO-007 — framework v4→v5 (decidable criteria, countable caps, scripts rule), pulled into
 `CURRENT.md` by this close PR.
+
+---
+## 2026-07-08 15:40 — MONO-007: framework v5 — decidable criteria, countable caps, scripts rule
+
+**Task:** MONO-007 (framework-loops review #6/#7/#4/#5c).
+**What I did:** Framework v4→v5. verification.md: "Writing acceptance criteria" (a criterion names its
+decider — command+expected output / countable delta / named manual probe; litmus: a fresh evaluator
+could check it), referenced from loop step 2; gate 5 quotes measurements vs recorded budgets; gate 3
+runs recorded executable procedures and quotes output. when-stuck rung 7 → "Three attempts and pivot"
+(fact-less attempts, numbered; readable clocks only). working-style: task size = one verifiable slice;
+"went badly" = four-way checkable floor; new "Scripts over re-derivation" (three prose runs earn a
+script; judgment never scripted). delivery.md: close-PR mechanical shell may be scripted (authored
+prose stays input; never a task-PR merge decision). Root manifest v5.
+**What I verified:** AC greps quoted in PR #183 (decider rule + step-2 ref, executable hook l.21,
+attempts-based rung 7 with zero "30 minutes" matches, one-verifiable-slice l.7, went-badly floor l.77,
+scripts rule l.41, mechanical-shell clause l.122, v5 ×2); instance-free guard empty. **Fresh-context
+review:** AC1–6 PASS; consistency sweep clean (no time-box residue, SETUP skeletons compatible with
+the decider rule); two minors fixed in `84685fa` — root CLAUDE.md's Map said v3 (stale since v4;
+neither bump had touched it) and "last three journal entries" → "last three tasks' journal entries"
+(entries ≠ tasks — my own no-vibes rule was itself imprecise).
+**What changed:** knowledge/framework/{README,verification,when-stuck,working-style,delivery}.md,
+knowledge/README.md, CLAUDE.md. PR #183, merged `7f575be`. D3 vacuous (no recorded remote check).
+**What I learned:** The version-mention sweep needs to include the root CLAUDE.md — two consecutive
+bumps missed it because the grep targeted knowledge/ only. The reviewer's "entries ≠ tasks" catch is
+the decider rule applied to the rule that defines it — pleasing, and evidence the litmus is usable.
+**Next:** MONO-008 (instance ritual scripts: close-pr.sh, trail npm run ci, track verify.sh + ratchet),
+pulled into CURRENT.md by this close PR. Its close will be the script's own first live run.

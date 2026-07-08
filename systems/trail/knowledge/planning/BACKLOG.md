@@ -173,8 +173,8 @@ amortize version bumps (review follow-up #2). **Tier 4 (#8–#16) is appetite-ga
   backlog; unresolvable → blockers; plus one end-of-session sweep line.
   One version bump; instance-free wording throughout. Per-system remote-check
   commands are system follow-ups. — (M/L)
-- [ ] MONO-007 — **Framework v4→v5: decidable criteria, countable caps, scripts
-  rule (review #4, #5c, #6, #7).** "A criterion names its decider" rule in
+- [x] MONO-007 — **Framework v4→v5: decidable criteria, countable caps, scripts
+  rule (review #4, #5c, #6, #7).** ✓ PR #183, merged `7f575be` — "A criterion names its decider" rule in
   verification.md, referenced from loop step 2 (command + expected exit/output,
   a countable delta, or a named manual probe + expected observation; litmus: a
   fresh evaluator could check it); when-stuck rung 7 rewritten attempts-based
