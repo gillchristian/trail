@@ -43,12 +43,16 @@ whiteboard: systems/trail/knowledge/whiteboard
 5. **Verify** — gates in `framework/verification.md`; local-CI commands in the
    reference area's `local-ci.md` — **run from `systems/trail/`** (type-check,
    build, the smoke harnesses).
-6. **PR** — `gh pr create` (template in `framework/delivery.md`), then
-   `gh pr merge --squash --delete-branch`.
+6. **PR** — `gh pr create` (template in `framework/delivery.md`), then the
+   fresh-context review (verification gate 7: the reviewer gets only the diff +
+   the acceptance criteria; findings fixed or rebutted in the PR description),
+   then `gh pr merge --squash --delete-branch`.
 7. **Log** — journal entry with PR number, merge sha, quoted verification output.
 8. **Advance** — close PR (branch `docs/<task-id>-close`): move the task to
    `DONE.md`, append the journal entry, optionally pull the next task into
-   `CURRENT.md`; sync `master`.
+   `CURRENT.md`; sync `master`. Then check the session envelope
+   (`framework/working-style.md`) before starting the next task — an empty
+   backlog is a terminal state (sweep + stop), not an error.
 
 Stuck or unsure? `framework/when-stuck.md` — not asking the user.
 

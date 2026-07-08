@@ -89,6 +89,10 @@ whiteboard: knowledge/whiteboard
 
 - **Identity/attribution:** <whose name on commits/PRs; agent attribution
   allowed or not>.
+- **Session envelope (optional):** <when an unattended session stops — e.g.
+  "run until BACKLOG's active list is empty or the first hard blocker". Omit
+  the line to use the framework default, which is *not* that example: backlog's
+  active list empty, or the escape hatch fires; see `working-style.md`.>
 - <other standing rules: merge strategy, protected branches, bootstrap
   exceptions, where knowledge/ lives if not in-repo, …>
 - **Framework copy:** v<N>, copied from <upstream repo + path>. Don't edit

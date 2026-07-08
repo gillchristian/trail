@@ -1,7 +1,7 @@
 # Local CI
 
 The commands behind "run local CI" in the loop (manifest step 5), the
-verification gates (`framework/verification.md` gates 5 and 7), and the PR
+verification gates (`framework/verification.md` gates 5 and 8), and the PR
 cycle (`framework/delivery.md`, profile `pr`, full-cycle step 4). All must
 exit 0 before a PR opens.
 

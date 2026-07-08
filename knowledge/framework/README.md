@@ -1,16 +1,22 @@
 # The knowledge framework
 
-**Framework v3 (2026-06-24).** A file-based working system for autonomous
+**Framework v4 (2026-07-08).** A file-based working system for autonomous
 agent sessions: pick one task, verify it honestly, deliver it per the
 project's rules, write down what happened — so a future session with zero
 memory can pick up exactly where this one stopped.
 
-> **Changelog.** **v3 (2026-06-24):** path indirection — the framework names
-> instance areas by *role* ("the planning area", "the journal", "the manifest")
-> and each project's manifest maps roles → paths via a **Locations block**, so a
-> single framework copy can serve instance areas that live anywhere (e.g. a
-> monorepo's per-system knowledge trees). **v2 (2026-06-09):** framework
-> extracted from the project into this self-contained directory.
+> **Changelog.** **v4 (2026-07-08):** the unattended-delivery safety net —
+> a fresh-context review before task deliveries (verification gate 7 + the
+> `pr` profile's pre-merge review step; the old gate 7 is now gate 8), a
+> **session envelope** saying when the *session* stops, not just the task
+> (`working-style.md`; checked at the loop's Advance step), and the `pr`
+> profile's post-merge remote check (gate D3). **v3 (2026-06-24):** path
+> indirection — the framework names instance areas by *role* ("the planning
+> area", "the journal", "the manifest") and each project's manifest maps roles
+> → paths via a **Locations block**, so a single framework copy can serve
+> instance areas that live anywhere (e.g. a monorepo's per-system knowledge
+> trees). **v2 (2026-06-09):** framework extracted from the project into this
+> self-contained directory.
 
 This directory is project-agnostic and travels as a unit. The copy you are
 reading may be a downstream copy; the **project manifest** records which
@@ -67,16 +73,20 @@ them instantiated for the project.
 3. **Stage §** — Prepare per the delivery profile (`pr`: branch off the
    default branch; `commits` / `none`: nothing to do).
 4. **Execute** — Implement, checkpointing per the profile as I go.
-5. **Verify** — Run the gates in `verification.md`, including gate 7 (the
-   profile's delivery gates) and the project's local CI commands. If any
-   fail, fix before moving on.
-6. **Deliver §** — The profile's delivery steps (`pr`: open and merge the PR;
-   `commits`: final commit; `none`: verified tree + hand-off record).
+5. **Verify** — Run the gates in `verification.md`, including gates 7–8 (the
+   profile's review step and delivery gates) and the project's local CI
+   commands. If any fail, fix before moving on.
+6. **Deliver §** — The profile's delivery steps (`pr`: open the PR, pass the
+   fresh-context review, merge; `commits`: final commit; `none`: verified tree
+   + hand-off record).
 7. **Log** — Append a journal entry: timestamp, what was done, what was
    verified (with quoted output), the profile's delivery record, what's next.
 8. **Advance** — Move the task to `DONE.md`, do the profile's post-delivery
-   sync if it defines one (`pr`: sync the default branch; `commits` / `none`:
-   nothing), pull the next task into `CURRENT.md`.
+   sync if it defines one (`pr`: sync the default branch, resolve the remote
+   check where the project records one; `commits` / `none`: nothing), then
+   check the **session envelope** (`working-style.md`) before pulling the next
+   task into `CURRENT.md`. An empty backlog or a spent envelope is a terminal
+   state, not an error: run the end-of-session sweep and stop.
 
 If I ever feel stuck or unsure, the answer is in `when-stuck.md` — not in
 asking the user.
