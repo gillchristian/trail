@@ -122,6 +122,9 @@ each system is self-contained, and the structure keeps concurrent agents from co
 ## Layout (shared tier)
 
 - **framework/** — the reusable working system (v5; this repo is upstream).
+- **scripts/** (repo root) — shared delivery tooling: `close-pr.sh`, the close-PR
+  mechanical shell per `framework/delivery.md` (authored DONE/journal prose stays
+  input; it never touches a task PR).
 - **README.md** — this root manifest.
 - **reference/specs/** — cross-system contracts (today: the migration spec; the
   `.trail`/`.trace` contracts + `trail-integration.md` get lifted here as cadence
