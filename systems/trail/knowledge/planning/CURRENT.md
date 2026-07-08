@@ -14,49 +14,44 @@
 **Notes:** scope cuts, links, anything decided while planning.
 ```
 
-### MONO-007 — Framework v4→v5: decidable criteria, countable caps, scripts rule
+### MONO-008 — Instance tooling: scripts for the rituals
 
-**Source:** BACKLOG (framework-loops review triage, MONO-005). The spec is the
-whiteboard entry's narrowed recommendations: `/knowledge/whiteboard/
-framework-loops-review.md` #6 (decidable acceptance criteria), #7 (countable
-caps), #4 (scripts-over-re-derivation) + #5c (the executable-verification hook).
-**Branch:** `mono/mono-007-framework-v5-criteria-caps-scripts`
+**Source:** BACKLOG (framework-loops review triage, MONO-005). Spec: whiteboard
+entry #4 (instance half — the scripts the v5 rule now sanctions) + #6 (the
+test-floor ratchet). Preconditions met: MONO-007 (v5 rules) merged `7f575be`.
+**Branch:** `mono/mono-008-ritual-scripts`
 **Acceptance criteria:**
-- [ ] **#6 decidable criteria:** `verification.md` gains a "writing acceptance
-  criteria" rule referenced from the loop's Plan step (`framework/README.md`
-  step 2): a criterion is valid iff it names its decider — a command + expected
-  exit/output, a countable delta, or a named manual probe + its expected
-  observation — litmus: "if a fresh evaluator couldn't check it, rewrite or
-  split it"; plus one sentence at the gates: where the reference area records a
-  numeric budget, quote the measured number against it. (Verify: grep "decider"
-  + "fresh evaluator" in verification.md; grep the step-2 reference.)
-- [ ] **#5c executable hook:** one sentence in `verification.md`: if the project
-  records an executable verification procedure for the surface touched, run it
-  and quote its output. (Verify: grep.)
-- [ ] **#7 countable caps:** `when-stuck.md` rung 7 is attempts-based ("three
-  distinct attempts at the same obstacle with no new information — not just no
-  fix, no new *fact* — stop"), with numbered tries in the blocker entry and
-  readable timestamps (`date`, journal times) as the only clock; no "30
-  minutes" wall-clock trigger remains. `working-style.md`: task size expressed
-  as "one verifiable slice" first, minutes second; "went badly" defined as a
-  checkable floor (opened a blocker / dropped or rewrote a criterion under
-  gate 1 / corrective delivery / attempt budget exhausted — assessable from the
-  last three journal entries). (Verify: greps in both files.)
-- [ ] **#4 scripts rule:** `working-style.md`: "a deterministic procedure
-  performed from prose three times earns a script, recorded in the reference
-  area; thereafter invoke it and quote its output." `delivery.md` close-PR
-  clause: the close PR's mechanical shell may be scripted if the project
-  records one; journal/DONE prose remain authored input; no script ever
-  performs the task-PR merge decision. (Verify: greps in both files.)
-- [ ] Version bump: `framework/README.md` header reads **v5** with a changelog
-  line; the root manifest's "Framework copy" line reads v5. (Verify: grep.)
-- [ ] Instance-free guard: `grep -riE '\btrail\b|\belm\b|batman|gillchristian|coros|samples/'
-  knowledge/framework/` returns nothing (empty run quoted in the PR).
-- [ ] Delivered per `pr`: pre-merge fresh-context review (gate 7); D3 per the
-  recorded remote checks (none for the shared tier — vacuous, noted).
-**Notes:** docs-only. Keep the edits minimal; the whiteboard's narrowed wording
-is the spec. The instance *scripts* themselves (close-pr.sh, npm run ci,
-verify.sh) are MONO-008, not this task.
+- [ ] **close-pr.sh:** `scripts/close-pr.sh` (repo root, shared tier) wraps the
+  close-PR **mechanical shell** only: run after the authored close edits sit in
+  the working tree; it verifies HEAD is master + only knowledge-area files are
+  dirty, branches `docs/<task-id>-close`, commits with the standard message,
+  pushes, opens the close PR with the standard body, squash-merges, syncs
+  master, printing each step. Deciders: `bash scripts/close-pr.sh --help`
+  exits 0 printing usage; **MONO-008's own close PR is produced by running
+  it** (the journal quotes the script's output).
+- [ ] Root manifest Layout lists `scripts/` (decider: grep `scripts/` in
+  `/knowledge/README.md` Layout).
+- [ ] **trail `npm run ci`:** chains type-check + build + every smoke harness
+  (incl. `smoke:i18n`, which the gate table predates). Deciders: `npm run ci`
+  from `systems/trail/` exits 0, output quoted; `local-ci.md` documents it as
+  covering the gate table without replacing the manual smoke (grep).
+- [ ] **track `verify.sh`:** `systems/track/scripts/verify.sh` — pinned
+  destination (`iPhone 15,OS=17.4`), captures the full output then greps
+  `** TEST SUCCEEDED **` (the exit-code-masking lesson), and enforces the
+  ratchet floor **TrackTests ≥ 71 · TrackUITests ≥ 8** (floor bumps in the
+  same PR that adds tests). Deciders: run from `systems/track/` → prints the
+  counts + PASS, exits 0, output quoted; `local-ci.md` documents it (grep).
+- [ ] No framework edits: `git diff master --stat -- knowledge/framework/`
+  is empty (quoted in the PR).
+- [ ] Delivered per `pr`: gate-7 fresh-context review; **D3 note** — trail's
+  Vercel deploy fires (package.json is inside the trail root) but no
+  remote-check command is recorded yet, so D3 is formally vacuous; flag the
+  recording gap in the PR + journal (it stays a system follow-up).
+**Notes:** touches track's instance (scripts + local-ci.md) — sanctioned for a
+`MONO-` task; no track agent is running concurrently (parallelism model noted
+in the journal). Track toolchain reality: Xcode 17F113 with the iOS 17.4
+runtime still installed — `verify.sh` encodes exactly the local-ci warning's
+two lessons.
 
 ---
 
@@ -75,7 +70,7 @@ federated knowledge base (shared root `framework/` + root manifest; per-system v
 - **Optional cleanup (non-blocking):** trail's Vercel "include files outside the Root Directory"
   toggle is ON — it can be turned OFF (trail is self-contained); a dashboard step, no rush.
 
-**Active task: MONO-007 (above).** New work is **per-system**: pull it into that system's own
+**Active task: MONO-008 (above).** New work is **per-system**: pull it into that system's own
 `CURRENT.md` under its branch prefix (`trail/`/`TRAIL-`, `cadence/`/`CAD-`, `gateway/`/`GW-`,
 `track/`/`TRACK-`, `reflect/`/`REFLECT-`); shared/structural work is a `MONO-` task. **Pull the next
 item only on a fresh user steer.** Open follow-ups: reflect's scope (its BLOCKER-001), and trail's
