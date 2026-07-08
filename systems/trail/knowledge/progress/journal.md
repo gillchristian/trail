@@ -3106,3 +3106,40 @@ the article's values. The fresh-context reviewer caught two misquotes self-revie
 very first try: cheap, real signal for MONO-006's gate.
 **Next:** MONO-006 — framework v3→v4 (the unattended-merging safety net), pulled into `CURRENT.md`
 by this close PR. Its AC are written; the whiteboard entry's narrowed #1–#3 are the spec.
+
+---
+## 2026-07-08 15:05 — MONO-006: framework v4 — the unattended-merging safety net
+
+**Task:** MONO-006 (Tier 1 of the framework-loops review: whiteboard #1–#3).
+**What I did:** Framework v3→v4. (1) **Fresh-context review gate** — new verification gate 7 (old 7→8):
+before a task PR merges, a fresh-context reviewer gets only the diff + acceptance criteria and grades
+each criterion; findings fixed or rebutted in the PR description; close PRs exempt; degradation path
+when no second-agent facility exists. `pr` profile: full-cycle step 7, D2 clause, when-not-to-merge
+line. (2) **Session envelope** — working-style.md section + loop step 8 check + SETUP skeleton line;
+default = backlog's active list empty or the escape hatch; empty backlog is a terminal state. (3) **D3
+— remote check resolved** — post-merge, pre-close-PR; green/red only; red → hotfix jumps the backlog;
+unresolvable → blockers; sweep line. Renumber sweep: framework README (gates 7–8), both gate-8
+checklist headings, trail local-ci ("gates 5 and 8"); trail + cadence manifest loops gained the review
+step + envelope check. Root manifest → v4.
+**What I verified:** AC greps quoted in PR #181 (fresh-context ×5, envelope in 3 files, D3 ×3, v4 ×2);
+instance-free guard → empty; repo-wide stale-reference grep → none. **Fresh-context review** (PR #181,
+practicing the gate on the PR introducing it): AC1/3/4/5 PASS; AC2 flagged a real blocker — the
+envelope default was stated as escape-hatch in working-style.md while SETUP.md claimed the
+"first hard blocker" example was "that same default". Resolution per the whiteboard spec: the default
+IS escape-hatch (pivot past individual blockers); the AC line had mis-transcribed the spec — rebutted
+in the PR, SETUP reworded ("the framework default, which is *not* that example"). Reviewer minors all
+fixed: stale v3 in root-manifest Layout; gate-7 rebuttal target (now "the profile's delivery surface");
+trail/cadence verbatim loops missing the new steps (a manifest-verbatim session would have skipped the
+v4 review — good catch). Fix commit `9f4071d`. D3 on itself: vacuous — no remote-check command
+recorded, and `knowledge/` is outside both Vercel roots (path-filtered deploys don't fire).
+**What changed:** knowledge/framework/{README,verification,delivery,working-style,SETUP}.md,
+knowledge/README.md, systems/{trail,cadence}/knowledge/README.md, systems/trail/…/local-ci.md.
+PR #181, merged `43a3aa3`.
+**What I learned:** The review gate paid for itself on the PR that introduced it — two sessions in a
+row now (misquotes in #179, a real semantic contradiction in #181). Also: renumbering a gate cascades
+into instance files (trail's local-ci cited "gates 5 and 7"); the reviewer's repo-wide sweep is the
+right check for that class. And the envelope default vs example distinction matters: "first hard
+blocker" as *default* would contradict when-stuck's pivot design — defaults must match the framework's
+own failure philosophy.
+**Next:** MONO-007 — framework v4→v5 (decidable criteria, countable caps, scripts rule), pulled into
+`CURRENT.md` by this close PR.

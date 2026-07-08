@@ -155,8 +155,8 @@ amortize version bumps (review follow-up #2). **Tier 4 (#8–#16) is appetite-ga
 - [x] MONO-005 — **Land the cross-system whiteboard (framework-loops review).**
   `knowledge/whiteboard/` (README index + the review entry), the root-manifest
   Layout line, and this triage. — (S) — ✓ PR #179, merged `1ff8dfa`
-- [ ] MONO-006 — **Framework v3→v4: the unattended-merging safety net (review
-  #1–#3).** (a) Fresh-context review gate: before merging a *task* PR, a
+- [x] MONO-006 — **Framework v3→v4: the unattended-merging safety net (review
+  #1–#3).** ✓ PR #181, merged `43a3aa3` — (a) Fresh-context review gate: before merging a *task* PR, a
   fresh-context reviewer gets only the diff + the `CURRENT.md` acceptance
   criteria, grades each criterion pass/fail; findings fixed or rebutted in the PR
   description (delivery.md `pr` profile D-gate + a verification.md gate between
