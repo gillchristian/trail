@@ -62,8 +62,9 @@ Outside this list, squash-only / `master`-sacred admit no exceptions.
 
 ## The framework (shared)
 
-- **Framework copy:** v4 (2026-07-08, MONO-006 — review gate + session envelope +
-  remote check D3) — one canonical copy at `knowledge/framework/`, shared by
+- **Framework copy:** v5 (2026-07-08; v4 = MONO-006 review gate + session envelope
+  + remote check D3; v5 = MONO-007 decidable criteria + countable caps + scripts
+  rule) — one canonical copy at `knowledge/framework/`, shared by
   every system. This repo is the **upstream** (`gillchristian/trail` →
   `knowledge/framework/`). v3's path indirection (MONO-000) is what lets one copy
   serve every system: the framework names instance areas by role; each system's
@@ -120,7 +121,7 @@ each system is self-contained, and the structure keeps concurrent agents from co
 
 ## Layout (shared tier)
 
-- **framework/** — the reusable working system (v4; this repo is upstream).
+- **framework/** — the reusable working system (v5; this repo is upstream).
 - **README.md** — this root manifest.
 - **reference/specs/** — cross-system contracts (today: the migration spec; the
   `.trail`/`.trace` contracts + `trail-integration.md` get lifted here as cadence

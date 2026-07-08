@@ -1,11 +1,19 @@
 # The knowledge framework
 
-**Framework v4 (2026-07-08).** A file-based working system for autonomous
+**Framework v5 (2026-07-08).** A file-based working system for autonomous
 agent sessions: pick one task, verify it honestly, deliver it per the
 project's rules, write down what happened — so a future session with zero
 memory can pick up exactly where this one stopped.
 
-> **Changelog.** **v4 (2026-07-08):** the unattended-delivery safety net —
+> **Changelog.** **v5 (2026-07-08):** decidable contracts and countable caps —
+> acceptance criteria must name their decider (`verification.md`, new "writing
+> acceptance criteria" rule; numeric budgets quoted against measurements; run
+> recorded executable verification procedures and quote their output);
+> when-stuck rung 7 pivots on **three fact-less attempts**, not felt minutes;
+> "went badly" is a checkable floor and task size is "one verifiable slice"
+> (`working-style.md`); deterministic rituals done from prose three times earn
+> a script (never the merge decision). **v4 (2026-07-08):** the
+> unattended-delivery safety net —
 > a fresh-context review before task deliveries (verification gate 7 + the
 > `pr` profile's pre-merge review step; the old gate 7 is now gate 8), a
 > **session envelope** saying when the *session* stops, not just the task
@@ -69,7 +77,9 @@ them instantiated for the project.
 
 1. **Orient** — Read the manifest, then the planning area's `CURRENT.md` for
    the active task. If empty, refill from `BACKLOG.md`.
-2. **Plan** — Write the acceptance criteria into `CURRENT.md` before touching code.
+2. **Plan** — Write the acceptance criteria into `CURRENT.md` before touching
+   code — each naming its decider (the "writing acceptance criteria" rule in
+   `verification.md`).
 3. **Stage §** — Prepare per the delivery profile (`pr`: branch off the
    default branch; `commits` / `none`: nothing to do).
 4. **Execute** — Implement, checkpointing per the profile as I go.
