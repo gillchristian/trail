@@ -22,6 +22,11 @@ files may be dirty. Example:
 Steps performed (each printed): guard checks -> branch docs/<task-id>-close ->
 commit -> push -> gh pr create -> gh pr merge --squash --delete-branch ->
 checkout master + pull --ff-only.
+
+If gh fails mid-flow the close edits are already committed on the docs branch —
+nothing is lost. Finish manually from that branch (gh pr create / gh pr merge
+--squash --delete-branch, then git checkout master && git pull --ff-only); the
+master guard intentionally blocks re-running the script from that state.
 EOF
 }
 
@@ -34,7 +39,9 @@ TITLE="docs: close ${TASK_ID} (merged ${SHA})${SUFFIX:+; ${SUFFIX}}"
 
 echo "== guards"
 [ "$(git rev-parse --abbrev-ref HEAD)" = "master" ] || { echo "FAIL: not on master"; exit 1; }
-DIRTY=$(git status --porcelain | awk '{print $2}')
+# One path per line; --no-renames lists both sides of a rename so a
+# knowledge -> non-knowledge move can't slip past the filter.
+DIRTY=$( { git diff --name-only --no-renames HEAD; git ls-files --others --exclude-standard; } | sort -u )
 [ -n "$DIRTY" ] || { echo "FAIL: nothing to close — the authored edits must be in the tree"; exit 1; }
 BAD=$(echo "$DIRTY" | grep -vE '^(knowledge/|systems/[^/]+/knowledge/)' || true)
 [ -z "$BAD" ] || { echo "FAIL: non-knowledge files dirty:"; echo "$BAD"; exit 1; }

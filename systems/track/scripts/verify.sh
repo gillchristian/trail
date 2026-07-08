@@ -13,7 +13,7 @@ set -uo pipefail
 UNIT_FLOOR=71
 UI_FLOOR=8
 
-cd "$(dirname "$0")/../Track"
+cd "$(dirname "$0")/../Track" || { echo "FAIL: cannot cd to the Track project dir"; exit 1; }
 OUT="${TMPDIR:-/tmp}/track-verify-$$.log"
 
 echo "== xcodebuild test (iPhone 15, OS=17.4) -> $OUT"
