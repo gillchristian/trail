@@ -62,7 +62,8 @@ Outside this list, squash-only / `master`-sacred admit no exceptions.
 
 ## The framework (shared)
 
-- **Framework copy:** v3 — one canonical copy at `knowledge/framework/`, shared by
+- **Framework copy:** v4 (2026-07-08, MONO-006 — review gate + session envelope +
+  remote check D3) — one canonical copy at `knowledge/framework/`, shared by
   every system. This repo is the **upstream** (`gillchristian/trail` →
   `knowledge/framework/`). v3's path indirection (MONO-000) is what lets one copy
   serve every system: the framework names instance areas by role; each system's

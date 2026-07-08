@@ -92,11 +92,18 @@ Examples: `feat/task-007-user-auth`, `fix/task-012-trailing-slash-redirect`.
 6. **Open the PR** (e.g. `gh pr create`): title imperative ≤ 72 chars
    mirroring the task; body from the template below; identity/attribution per
    the manifest.
-7. **Merge** per the manifest's declared strategy (default
+7. **Obtain the fresh-context review** (verification gate 7): hand the
+   reviewer only the diff and the task's acceptance criteria — never the
+   authoring transcript — and have it grade each criterion pass/fail. Fix
+   each confirmed correctness finding, or rebut it explicitly in the PR
+   description, before merging.
+8. **Merge** per the manifest's declared strategy (default
    `gh pr merge --squash --delete-branch`).
-8. **Sync the local default branch** (`pull --ff-only`).
-9. **Close the task** with a small follow-up PR (see below).
-10. **Pick the next task.**
+9. **Sync the local default branch** (`pull --ff-only`).
+10. **Run the remote check, if the project records one** (gate D3 below) —
+    resolve it before the close PR merges.
+11. **Close the task** with a small follow-up PR (see below).
+12. **Pick the next task.**
 
 ### The close PR
 
@@ -108,7 +115,10 @@ no exceptions), so it ships as its own tiny PR immediately after the task PR:
   merge sha), tick it off in `BACKLOG.md` if it was queued there, append the
   journal entry quoting the PR URL and merge commit.
 - This is the one PR class that carries no acceptance criteria of its own —
-  it documents the task that just merged. Merge it the same way.
+  it documents the task that just merged. Merge it the same way (it is exempt
+  from the fresh-context review, per verification gate 7).
+- Where the project records a remote check (gate D3), the close PR also notes
+  the task PR's remote-check outcome.
 - When the next task is already known, the close PR may also pull it into
   `CURRENT.md` — closing and orienting in one step.
 
@@ -116,16 +126,31 @@ no exceptions), so it ships as its own tiny PR immediately after the task PR:
 
 How "delivered" is written in `DONE.md` and the journal: ``PR #N, merged `sha` ``.
 
-### Delivery gates (the gate-7 checklist for this profile)
+### Delivery gates (the gate-8 checklist for this profile)
 
 - **D1 — Committed.** One commit per logical change, message explains *why*,
   attribution per the manifest, working tree clean before the next task.
-- **D2 — PR merged.** Local CI green before opening; template body; merged
-  per the manifest's strategy; branch deleted; default branch synced.
+- **D2 — PR merged.** Local CI green before opening; the fresh-context review
+  passed (verification gate 7 — findings fixed or rebutted in the PR
+  description); template body; merged per the manifest's strategy; branch
+  deleted; default branch synced.
+- **D3 — Remote check resolved.** If the reference area's local-CI file
+  records a remote-check command (the CI/deploy status a default-branch merge
+  triggers), run it after the merge and before merging the close PR — close-PR
+  prep absorbs the remote latency. The command must resolve to **green or
+  red**; "in progress" is neither — poll, or use the command's wait mode,
+  until it resolves or times out. **Red:** the fix (per the Hotfix exception)
+  becomes the next task, jumping the backlog, and the close PR notes it.
+  **Unresolvable** (outage, auth): log it to the blockers log — this gate is
+  never ticked on an unresolved state. If the local-CI file records no remote
+  check, this gate is vacuous — and recording one the first time a remote
+  check exists is part of keeping that file true.
 
 ### End-of-session sweep (this profile)
 
 - `git status` clean? (Or every dirty file accounted for in `CURRENT.md`?)
+- The last merge's remote check resolved green (or its unresolved state is
+  logged)?
 
 ### PR description template
 
@@ -152,6 +177,8 @@ Anything reviewers (future-me, the user) should know: follow-ups, known limitati
 
 - Local CI is failing.
 - A `verification.md` gate failed and was not addressed.
+- The fresh-context review confirmed a correctness finding that is neither
+  fixed nor rebutted in the PR description.
 - I'm uncertain about behavior and would normally want a second pair of eyes —
   open the PR as draft, log the uncertainty in `blockers.md`, pivot to another
   task. Better one held PR than a bad merge.
@@ -209,7 +236,7 @@ happened.
 In the journal entry: `handed off YYYY-MM-DD — verified <how>; files touched: <list>`.
 `DONE.md` points at that entry instead of a PR number.
 
-### Delivery gates (the gate-7 checklist for this profile)
+### Delivery gates (the gate-8 checklist for this profile)
 
 - **D1 — Accounted for.** Every file I modified is listed in the journal entry
   (and in `CURRENT.md` while the task stays open).

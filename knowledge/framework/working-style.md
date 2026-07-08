@@ -8,6 +8,28 @@ How I pace myself across a long autonomous session.
 - **Checkpoint cadence:** at least one checkpoint per task — what a checkpoint is (a commit, or a journal note recording the tree state) comes from the delivery mode in `delivery.md`. Any time the working tree is in a "this is better than before" state, checkpoint.
 - **Journal cadence:** one entry per task minimum. Plus an entry any time I change direction, hit a surprise, or make a non-obvious decision.
 
+## Session envelope
+
+The verification gates say when a *task* stops; this says when the *session*
+stops. The loop's Advance step checks the envelope before pulling another task.
+
+- **Default envelope** (when the manifest declares none): run until the
+  backlog's active list has no unchecked item, or until the escape hatch fires
+  (`when-stuck.md` — everything blocked). An empty backlog is a **terminal
+  state, not an error**: run the end-of-session sweep and stop — don't invent
+  work to keep going.
+- **Manifest default.** A project may declare its own default envelope as a
+  rule line in its manifest ("Session envelope: …"); that declaration wins over
+  the built-in default above.
+- **Session-specific envelope.** The user can set one for a single session
+  ("stop after the export task", "three tasks tonight"). Like a per-task
+  delivery override (`delivery.md`), it is in effect only once written into the
+  planning area before the work starts — a grant that lives only in
+  conversation does not survive a restart — and it expires with the session.
+- **After the circuit breaker** (three bad tasks → sweep, under Energy
+  management below): resume only if the envelope still permits; a sweep that
+  concludes the plan itself is wrong ends the session instead.
+
 ## Scope discipline
 
 - The task in `CURRENT.md` is the scope. Anything else is a distraction.
