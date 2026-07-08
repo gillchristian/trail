@@ -119,6 +119,11 @@ no exceptions), so it ships as its own tiny PR immediately after the task PR:
   from the fresh-context review, per verification gate 7).
 - Where the project records a remote check (gate D3), the close PR also notes
   the task PR's remote-check outcome.
+- The close PR's **mechanical shell** — branch, title, file moves, open, merge,
+  sync — may be scripted if the project records one in the reference area
+  (`working-style.md`, scripts over re-derivation). The journal entry and
+  `DONE.md` prose remain **authored input** to the script; no script ever
+  performs a task PR's merge decision.
 - When the next task is already known, the close PR may also pull it into
   `CURRENT.md` — closing and orienting in one step.
 

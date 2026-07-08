@@ -4,7 +4,7 @@ How I pace myself across a long autonomous session.
 
 ## Cadence
 
-- **Task size target:** 15–60 minutes of work each. Larger means split it; smaller means batch related ones.
+- **Task size target:** one verifiable slice — a change whose acceptance criteria can all be checked in one sitting (as rough wall-clock guidance: 15–60 minutes). Larger means split it; smaller means batch related ones.
 - **Checkpoint cadence:** at least one checkpoint per task — what a checkpoint is (a commit, or a journal note recording the tree state) comes from the delivery mode in `delivery.md`. Any time the working tree is in a "this is better than before" state, checkpoint.
 - **Journal cadence:** one entry per task minimum. Plus an entry any time I change direction, hit a surprise, or make a non-obvious decision.
 
@@ -36,6 +36,15 @@ stops. The loop's Advance step checks the envelope before pulling another task.
 - Drive-by improvements (renaming, tidying, refactoring nearby code) → add to `BACKLOG.md`, don't do them now.
 - "While I'm here" is the phrase that ends nights.
 
+## Scripts over re-derivation
+
+A deterministic procedure performed from prose three times earns a script,
+recorded in the reference area; thereafter invoke it and quote its output.
+Re-deriving a fixed ritual step-by-step spends reasoning on something a script
+does cheaper and the same way every time. (Same threshold as premature
+abstraction below: three concrete runs, not two.) Judgment steps never move
+into scripts — a script runs checks and mechanics, not decisions.
+
 ## Reading > writing
 
 - For the first hour on any new area, read more than I write. Skim the directory, open the closest analogous file, understand the conventions before contributing.
@@ -65,7 +74,7 @@ justified in the delivery record.
 ## Energy management (mine, not literal)
 
 - After a hard task, pick an easy task next. Alternate cognitive load.
-- If three tasks in a row went badly, *stop new work* and do a sweep: read the last journal entries, look for a pattern, write an ADR or update planning. Often the problem is that the plan is wrong, not that I am.
+- If three tasks in a row went badly, *stop new work* and do a sweep: read the last journal entries, look for a pattern, write an ADR or update planning. Often the problem is that the plan is wrong, not that I am. A task **went badly** if, at minimum, any of: it opened a blockers-log entry; it dropped or rewrote an acceptance criterion at gate 1; it required a corrective delivery (a revert or repair of already-delivered work); or it exhausted an attempt budget (`when-stuck.md` rung 7). Checkable from the last three tasks' journal entries at orient time — no vibes required.
 
 ## Communication style in artifacts
 

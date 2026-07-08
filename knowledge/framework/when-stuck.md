@@ -12,7 +12,7 @@ Walk down this ladder when blocked. Don't skip rungs.
 4. **Read the docs.** For external libraries/APIs, fetch fresh documentation with whatever docs tooling the environment provides (e.g. a context7 MCP server, or the published docs themselves). Training data is stale; published docs are not.
 5. **Reduce the problem.** Build the smallest possible reproduction. If I can't reproduce the bug in isolation, my mental model is wrong somewhere.
 6. **Try the boring option.** When choosing between a clever path and an obvious path, pick obvious. The boring option is reversible; the clever one usually isn't.
-7. **Time-box and pivot.** If 30 minutes of focused effort hasn't moved the needle, stop. Write down (a) what I tried, (b) what I observed, (c) what I currently believe, (d) what would unblock me. Move that to the blockers log (the progress area's `blockers.md`) and pick a different task from the backlog.
+7. **Three attempts and pivot.** If three distinct attempts at the same obstacle have produced no new information — not just no fix, no new *fact* — stop. Number the attempts as I go; the blocker entry lists them. Anchor any time reasoning to clocks I can actually read (`date`, journal-entry timestamps), never to felt time. Write down (a) what each attempt tried, (b) what I observed, (c) what I currently believe, (d) what would unblock me. Move that to the blockers log (the progress area's `blockers.md`) and pick a different task from the backlog.
 
 ## Classes of "stuck" and the right response
 
