@@ -42,7 +42,7 @@ may narrow them, never widen.
 
 ## Map
 
-- `knowledge/` — **shared tier**: `framework/` (the working system, v3, instance-
+- `knowledge/` — **shared tier**: `framework/` (the working system, v5, instance-
   free), `README.md` (root manifest), `reference/specs/` (cross-system contracts).
   Edited only via `MONO-` tasks.
 - `systems/<s>/` — each system's code + its **own** `knowledge/` instance + its

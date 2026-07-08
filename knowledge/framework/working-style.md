@@ -74,7 +74,7 @@ justified in the delivery record.
 ## Energy management (mine, not literal)
 
 - After a hard task, pick an easy task next. Alternate cognitive load.
-- If three tasks in a row went badly, *stop new work* and do a sweep: read the last journal entries, look for a pattern, write an ADR or update planning. Often the problem is that the plan is wrong, not that I am. A task **went badly** if, at minimum, any of: it opened a blockers-log entry; it dropped or rewrote an acceptance criterion at gate 1; it required a corrective delivery (a revert or repair of already-delivered work); or it exhausted an attempt budget (`when-stuck.md` rung 7). Checkable from the last three journal entries at orient time — no vibes required.
+- If three tasks in a row went badly, *stop new work* and do a sweep: read the last journal entries, look for a pattern, write an ADR or update planning. Often the problem is that the plan is wrong, not that I am. A task **went badly** if, at minimum, any of: it opened a blockers-log entry; it dropped or rewrote an acceptance criterion at gate 1; it required a corrective delivery (a revert or repair of already-delivered work); or it exhausted an attempt budget (`when-stuck.md` rung 7). Checkable from the last three tasks' journal entries at orient time — no vibes required.
 
 ## Communication style in artifacts
 
