@@ -14,44 +14,34 @@
 **Notes:** scope cuts, links, anything decided while planning.
 ```
 
-### MONO-008 — Instance tooling: scripts for the rituals
+### MONO-009 — Per-system verification skills (review #5b)
 
 **Source:** BACKLOG (framework-loops review triage, MONO-005). Spec: whiteboard
-entry #4 (instance half — the scripts the v5 rule now sanctions) + #6 (the
-test-floor ratchet). Preconditions met: MONO-007 (v5 rules) merged `7f575be`.
-**Branch:** `mono/mono-008-ritual-scripts`
+entry #5b. Preconditions met: MONO-007 (the #5c executable hook, `7f575be`);
+MONO-008 (the commands to wrap: `npm run ci`, `scripts/verify.sh`, `6cf5582`).
+**TASK-072 precondition resolved by design:** the skills *execute what
+`local-ci.md` records* (commands live only there, so a skill can't drift) —
+when TASK-072 later records trail's browser-drive procedure, the skill covers
+it automatically. Noted here per principle 5 (plan updated explicitly).
+**Branch:** `mono/mono-009-verify-skills`
 **Acceptance criteria:**
-- [ ] **close-pr.sh:** `scripts/close-pr.sh` (repo root, shared tier) wraps the
-  close-PR **mechanical shell** only: run after the authored close edits sit in
-  the working tree; it verifies HEAD is master + only knowledge-area files are
-  dirty, branches `docs/<task-id>-close`, commits with the standard message,
-  pushes, opens the close PR with the standard body, squash-merges, syncs
-  master, printing each step. Deciders: `bash scripts/close-pr.sh --help`
-  exits 0 printing usage; **MONO-008's own close PR is produced by running
-  it** (the journal quotes the script's output).
-- [ ] Root manifest Layout lists `scripts/` (decider: grep `scripts/` in
-  `/knowledge/README.md` Layout).
-- [ ] **trail `npm run ci`:** chains type-check + build + every smoke harness
-  (incl. `smoke:i18n`, which the gate table predates). Deciders: `npm run ci`
-  from `systems/trail/` exits 0, output quoted; `local-ci.md` documents it as
-  covering the gate table without replacing the manual smoke (grep).
-- [ ] **track `verify.sh`:** `systems/track/scripts/verify.sh` — pinned
-  destination (`iPhone 15,OS=17.4`), captures the full output then greps
-  `** TEST SUCCEEDED **` (the exit-code-masking lesson), and enforces the
-  ratchet floor **TrackTests ≥ 71 · TrackUITests ≥ 8** (floor bumps in the
-  same PR that adds tests). Deciders: run from `systems/track/` → prints the
-  counts + PASS, exits 0, output quoted; `local-ci.md` documents it (grep).
+- [ ] `.claude/skills/verify-trail/SKILL.md` exists with valid frontmatter
+  (`name`, `description` that triggers on verifying trail changes). Body:
+  run `npm run ci` from `systems/trail/` and quote its exit; then apply the
+  non-scripted obligations trail's `local-ci.md` records (manual smoke where
+  UI behavior changed — verification gates 2–3); states that `local-ci.md`
+  is the authority the skill defers to. Deciders: file exists; grep the
+  frontmatter keys, the entry-point command, and the authority line.
+- [ ] `.claude/skills/verify-track/SKILL.md` — same shape wrapping
+  `systems/track/scripts/verify.sh` (+ the build-only/device checks and
+  manual smoke `local-ci.md` records). Deciders: same greps.
 - [ ] No framework edits: `git diff master --stat -- knowledge/framework/`
-  is empty (quoted in the PR).
-- [ ] Delivered per `pr`: gate-7 fresh-context review; **D3 note** — trail's
-  Vercel deploy fires (package.json is inside the trail root) but no
-  remote-check command is recorded yet, so D3 is formally vacuous; flag the
-  recording gap in the PR + journal (it stays a system follow-up).
-**Notes:** touches track's instance (scripts + local-ci.md) — sanctioned for a
-`MONO-` task; no track agent is running concurrently (parallelism model noted
-in the journal). Track toolchain reality: Xcode 17F113 with the iOS 17.4
-runtime still installed — `verify.sh` encodes exactly the local-ci warning's
-two lessons.
+  empty (quoted in the PR) — the framework half (#5c) already landed in v5.
+- [ ] Delivered per `pr`: gate-7 fresh-context review; D3 vacuous (touches
+  `.claude/` only — outside both Vercel roots; no recorded remote check).
+**Notes:** repo-tier `.claude/` is shared surface → correctly a `MONO-` task
+(per the whiteboard's own triage). Skills stay thin: trigger + entry command +
+defer-to-local-ci; no command bodies duplicated.
 
 ---
 
@@ -70,7 +60,7 @@ federated knowledge base (shared root `framework/` + root manifest; per-system v
 - **Optional cleanup (non-blocking):** trail's Vercel "include files outside the Root Directory"
   toggle is ON — it can be turned OFF (trail is self-contained); a dashboard step, no rush.
 
-**Active task: MONO-008 (above).** New work is **per-system**: pull it into that system's own
+**Active task: MONO-009 (above).** New work is **per-system**: pull it into that system's own
 `CURRENT.md` under its branch prefix (`trail/`/`TRAIL-`, `cadence/`/`CAD-`, `gateway/`/`GW-`,
 `track/`/`TRACK-`, `reflect/`/`REFLECT-`); shared/structural work is a `MONO-` task. **Pull the next
 item only on a fresh user steer.** Open follow-ups: reflect's scope (its BLOCKER-001), and trail's

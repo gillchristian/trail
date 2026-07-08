@@ -3170,3 +3170,38 @@ bumps missed it because the grep targeted knowledge/ only. The reviewer's "entri
 the decider rule applied to the rule that defines it — pleasing, and evidence the litmus is usable.
 **Next:** MONO-008 (instance ritual scripts: close-pr.sh, trail npm run ci, track verify.sh + ratchet),
 pulled into CURRENT.md by this close PR. Its close will be the script's own first live run.
+
+---
+## 2026-07-08 16:20 — MONO-008: ritual scripts (close-pr.sh · npm run ci · verify.sh)
+
+**Task:** MONO-008 (framework-loops review #4/#6 instance halves).
+**What I did:** The three scripts the v5 rule sanctions. `scripts/close-pr.sh` — the close-PR
+mechanical shell (master-only + knowledge-only-dirty guards, rename-aware; branch/commit/push/
+create/squash-merge/sync, each step printed; authored prose stays input; never a task PR; manual-
+resume note for gh mid-flow failures). trail `npm run ci` — type-check → build → all nine smokes.
+track `scripts/verify.sh` — pinned `iPhone 15,OS=17.4`, captured-output grep for TEST SUCCEEDED,
+ratchet floors 71/8. Docs in both local-ci.md files + root-manifest Layout (`scripts/`).
+**What I verified:** `bash scripts/close-pr.sh --help` → usage, exit 0. `npm run ci` from
+systems/trail → exit 0 (final harness: "PASS — Language codec + Settings resolution + Format
+localization hold"). `bash systems/track/scripts/verify.sh` → exit 0: "PASS: TEST SUCCEEDED —
+TrackTests 71 (floor 71) · TrackUITests 10 (floor 8)" (10 = 8 + the 2 launch-config tests).
+`git diff master --stat -- knowledge/framework/` → empty. **Fresh-context review** (ran the ci
+chain itself; reproduced a guard bypass in a temp repo; synthetic-log-tested the count parser):
+AC1–5 PASS, four minors fixed pre-merge (`46f7912`) — the dirty guard failed OPEN on a staged
+knowledge→non-knowledge rename (the sharpest catch of the day: a close-PR script that could
+smuggle code), failed closed on paths with spaces, verify.sh's unguarded `cd`, and the missing
+manual-resume documentation.
+**What changed:** scripts/close-pr.sh (new), systems/track/scripts/verify.sh (new),
+systems/trail/package.json (+`ci`), both local-ci.md files, knowledge/README.md (Layout).
+PR #185, merged `6cf5582`.
+**D3:** the merge fires trail's Vercel deploy (package.json sits in the Vercel root) and no
+remote-check command is recorded in trail's local-ci.md — the gap the review's #3 anticipated;
+recording one stays a trail follow-up. The change is build-inert (adds an npm script only).
+**What I learned:** Reviewing scripts as code (not prose) changes what the reviewer finds — the
+rename fail-open would never surface from reading the diff as documentation. The ratchet floor
+met reality immediately: the UI suite executes 10 tests (8 + 2 launch-config), so floors must
+track *executed* counts, not the narrative "TrackUITests 8".
+**This close PR is `scripts/close-pr.sh`'s first live run** — the mechanical shell below is the
+script's own output (quoted in the next entry or session summary), closing the loop on the AC's
+runtime decider.
+**Next:** MONO-009 (per-system verify skills), pulled into CURRENT.md by this close.
