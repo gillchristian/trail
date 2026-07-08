@@ -46,9 +46,13 @@ repo-root-relative.)
 4. **Execute** — implement from `systems/cadence/`, committing as I go.
 5. **Verify** — gates in `framework/verification.md`; **run from `systems/cadence/`**:
    `npm run build` (tsc + vite), `npm run lint`.
-6. **PR** — `gh pr create`, then `gh pr merge --squash --delete-branch`.
+6. **PR** — `gh pr create`, then the fresh-context review (verification gate 7:
+   diff + acceptance criteria only; findings fixed or rebutted in the PR
+   description), then `gh pr merge --squash --delete-branch`.
 7. **Log** — journal entry with PR number, merge sha, quoted verification.
-8. **Advance** — close PR; move task to `DONE.md`; sync `master`.
+8. **Advance** — close PR; move task to `DONE.md`; sync `master`; check the
+   session envelope (`framework/working-style.md`) before the next task — an
+   empty backlog is a terminal state, not an error.
 
 Stuck? `framework/when-stuck.md` — not asking the user.
 

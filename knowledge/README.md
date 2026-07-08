@@ -120,7 +120,7 @@ each system is self-contained, and the structure keeps concurrent agents from co
 
 ## Layout (shared tier)
 
-- **framework/** — the reusable working system (v3; this repo is upstream).
+- **framework/** — the reusable working system (v4; this repo is upstream).
 - **README.md** — this root manifest.
 - **reference/specs/** — cross-system contracts (today: the migration spec; the
   `.trail`/`.trace` contracts + `trail-integration.md` get lifted here as cadence
