@@ -14,34 +14,20 @@
 **Notes:** scope cuts, links, anything decided while planning.
 ```
 
-### MONO-009 — Per-system verification skills (review #5b)
+### (no active task) — framework-loops adopted tier COMPLETE ✅ (2026-07-08)
 
-**Source:** BACKLOG (framework-loops review triage, MONO-005). Spec: whiteboard
-entry #5b. Preconditions met: MONO-007 (the #5c executable hook, `7f575be`);
-MONO-008 (the commands to wrap: `npm run ci`, `scripts/verify.sh`, `6cf5582`).
-**TASK-072 precondition resolved by design:** the skills *execute what
-`local-ci.md` records* (commands live only there, so a skill can't drift) —
-when TASK-072 later records trail's browser-drive procedure, the skill covers
-it automatically. Noted here per principle 5 (plan updated explicitly).
-**Branch:** `mono/mono-009-verify-skills`
-**Acceptance criteria:**
-- [ ] `.claude/skills/verify-trail/SKILL.md` exists with valid frontmatter
-  (`name`, `description` that triggers on verifying trail changes). Body:
-  run `npm run ci` from `systems/trail/` and quote its exit; then apply the
-  non-scripted obligations trail's `local-ci.md` records (manual smoke where
-  UI behavior changed — verification gates 2–3); states that `local-ci.md`
-  is the authority the skill defers to. Deciders: file exists; grep the
-  frontmatter keys, the entry-point command, and the authority line.
-- [ ] `.claude/skills/verify-track/SKILL.md` — same shape wrapping
-  `systems/track/scripts/verify.sh` (+ the build-only/device checks and
-  manual smoke `local-ci.md` records). Deciders: same greps.
-- [ ] No framework edits: `git diff master --stat -- knowledge/framework/`
-  empty (quoted in the PR) — the framework half (#5c) already landed in v5.
-- [ ] Delivered per `pr`: gate-7 fresh-context review; D3 vacuous (touches
-  `.claude/` only — outside both Vercel roots; no recorded remote check).
-**Notes:** repo-tier `.claude/` is shared surface → correctly a `MONO-` task
-(per the whiteboard's own triage). Skills stay thin: trigger + entry command +
-defer-to-local-ci; no command bodies duplicated.
+**MONO-005 → MONO-009 all landed** (the whiteboard review + its queued tiers 1–3):
+framework v5 (fresh-context review gate · session envelope · post-merge D3 ·
+decidable criteria · countable caps · scripts rule), the ritual scripts
+(`scripts/close-pr.sh`, trail `npm run ci`, track `verify.sh` + ratchet), and the
+per-system verify skills. Full records in `DONE.md` + the journal.
+
+The MONO- queue is empty — per the v4 **session envelope**, that is a terminal
+state for shared-tier work: sweep done, stop. **Tier 4 (#8–#16) stays parked**
+in `/knowledge/whiteboard/framework-loops-review.md` (appetite-gated — promote
+on a fresh user steer). Open trail follow-ups: TASK-072 (browser-drive
+verification; unlocks verify-trail's UI step), recording a Vercel remote-check
+command in trail's `local-ci.md` (the D3 gap flagged in MONO-008).
 
 ---
 
@@ -60,7 +46,7 @@ federated knowledge base (shared root `framework/` + root manifest; per-system v
 - **Optional cleanup (non-blocking):** trail's Vercel "include files outside the Root Directory"
   toggle is ON — it can be turned OFF (trail is self-contained); a dashboard step, no rush.
 
-**Active task: MONO-009 (above).** New work is **per-system**: pull it into that system's own
+**No active task.** New work is **per-system**: pull it into that system's own
 `CURRENT.md` under its branch prefix (`trail/`/`TRAIL-`, `cadence/`/`CAD-`, `gateway/`/`GW-`,
 `track/`/`TRACK-`, `reflect/`/`REFLECT-`); shared/structural work is a `MONO-` task. **Pull the next
 item only on a fresh user steer.** Open follow-ups: reflect's scope (its BLOCKER-001), and trail's

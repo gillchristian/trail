@@ -1,8 +1,9 @@
 # Framework v3 vs. the loops playbook — improvement review
 
-**Status:** open — triaged 2026-07-08 (MONO-005): tiers 1–3 queued as MONO-006…MONO-009
-(+ TASK-072 in trail's parking lot); Tier 4 (#8–#16) parked here, appetite-gated;
-nothing adopted into the framework yet
+**Status:** open — **tiers 1–3 adopted 2026-07-08** (MONO-006 framework v4 · MONO-007
+framework v5 · MONO-008 ritual scripts · MONO-009 verify skills; delivery records in
+trail's `DONE.md`); Tier 4 (#8–#16) parked here, appetite-gated; TASK-072 (trail
+browser-drive) still parked
 
 **Context.** The Claude Code team published "Getting started with loops" (2026-07-06):
 a taxonomy of agent loops — turn-based / goal-based / time-based / proactive — classified

@@ -195,12 +195,13 @@ amortize version bumps (review follow-up #2). **Tier 4 (#8–#16) is appetite-ga
   `** TEST SUCCEEDED **` — encoding the exit-code-masking lesson) + a test-floor
   ratchet. Preconditions: MONO-007 (the rules these instantiate). Track-side
   edits coordinate with track's instance (one writer per system). — (M)
-- [ ] MONO-009 — **Per-system verification skills (review #5b).** Thin
+- [x] MONO-009 — **Per-system verification skills (review #5b).** Thin
   `.claude/skills/verify-trail` + `verify-track` that execute each system's
   `local-ci.md` gates + interactive-drive steps; commands live only in
   local-ci.md so a skill can't drift from the authority. Preconditions: MONO-007
-  (the #5c hook); TASK-072 (trail's browser-drive procedure, parked in trail's
-  parking lot). — (M)
+  (the #5c hook); TASK-072 dissolved by design (the skill defers to local-ci.md,
+  so the browser-drive step joins it when TASK-072 lands). — (M) — ✓ PR #187,
+  merged `ca9f39a` — **framework-loops adopted tier COMPLETE (MONO-005…009)**
 
 ## Parking lot
 

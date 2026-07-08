@@ -3205,3 +3205,33 @@ track *executed* counts, not the narrative "TrackUITests 8".
 script's own output (quoted in the next entry or session summary), closing the loop on the AC's
 runtime decider.
 **Next:** MONO-009 (per-system verify skills), pulled into CURRENT.md by this close.
+
+---
+## 2026-07-08 16:55 — MONO-009: verify skills — and the framework-loops adopted tier is COMPLETE
+
+**Task:** MONO-009 (framework-loops review #5b; closes the MONO-005…009 arc).
+**What I did:** `.claude/skills/verify-trail` + `verify-track` — thin wrappers that trigger at
+verification time, run the recorded entry command (`npm run ci` / `scripts/verify.sh`), then apply
+the non-scripted obligations each `local-ci.md` records. Commands live only in local-ci.md (each
+skill names it as the authority it defers to) — which dissolved the TASK-072 precondition: the
+browser-drive step joins verify-trail automatically when trail records it (plan updated per
+principle 5, noted in CURRENT before work).
+**What I verified:** frontmatter heads quoted; entry-command greps (verify-trail l.15 `npm run ci`,
+verify-track l.15 `bash systems/track/scripts/verify.sh`); authority-line grep = 1 each;
+`git diff master --stat -- knowledge/framework/` empty. **Fresh-context review:** every factual
+claim checked against the repo (incl. that gates 2–3/5/8 point correctly *after* the v4
+renumbering) — AC1–3 PASS, **FINDINGS: none**, the run's first zero-finding review. D3 vacuous
+(`.claude/` outside both Vercel roots). PR #187, merged `ca9f39a`.
+**Arc wrap (MONO-005…009, all 2026-07-08):** the loops-article review became: the whiteboard entry
+(#179) → framework v4 (#181: review gate · session envelope · D3) → framework v5 (#183: decidable
+criteria · countable caps · scripts rule) → ritual scripts (#185: close-pr.sh, npm run ci,
+verify.sh + ratchet) → verify skills (#187). Ten PRs total incl. closes; every task PR passed a
+fresh-context review before merge; the review gate caught real defects in 3 of 4 task PRs
+(semantic blocker in #181, a fail-open guard in #185, misquotes in #179) and came up clean once
+(#187). MONO-008's close was close-pr.sh's own first live run — the framework now delivers itself
+with its own tooling.
+**End-of-session sweep (this envelope):** tree clean ✓; every task journaled ✓; CURRENT reflects
+the terminal state (MONO queue empty — the v4 envelope's sweep-and-stop) ✓; last merge's remote
+check: no recorded command (the flagged trail follow-up), unresolved-state logged here ✓.
+**Next:** nothing in the MONO queue. Tier 4 (#8–#16) parked in the whiteboard entry — promote on a
+fresh steer. Trail follow-ups open: TASK-072 (browser-drive), the Vercel remote-check command.
