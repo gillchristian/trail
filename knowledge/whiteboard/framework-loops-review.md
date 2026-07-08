@@ -215,7 +215,7 @@ sessions manually is not currently the bottleneck.
 
 **10. Make `local-ci.md` current-truth by rule (F10).** Track's `local-ci.md` has
 become a ~194-line changelog (TRACK-001…014) whose stale toolchain header is
-contradicted by a warning buried at line ~180 ("fix when convenient") — every session
+contradicted by a warning buried at line ~180 ("update that when convenient") — every session
 must read and reconcile the whole file to know which command currently works.
 *Change:* one instance-free sentence at gate 5 (and the SETUP stub): the local-CI file
 is *current-truth* — each gate lists the command, what it proves, and when it was last
@@ -250,7 +250,8 @@ the exact denied command so the operator can encode a grant."
 
 **13. An inbox role for inbound work (critic).** The article's canonical proactive loop
 starts by *checking for new reports* — and this repo's real work stream has exactly
-that shape (TRACK-008…014 are all sourced from user testing), yet loop step 1 orients
+that shape (TRACK-008…014 are all user-sourced — testing, feedback, requests), yet
+loop step 1 orients
 from `CURRENT.md`/`BACKLOG.md` only; user feedback has no defined landing place beyond
 a screenshot-hygiene aside.
 *Change:* add an `inbox` role to the framework's area roster (mapped per-system by the
