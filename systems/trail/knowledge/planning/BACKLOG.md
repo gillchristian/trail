@@ -142,6 +142,66 @@ never done autonomously.
   discipline. CI path-filtered per system. Preconditions: MONO-001 & MONO-002.
   Spec MONO-004. — (M) — ✓ PR #158, merged `f8dbf4a` — **monorepo migration epic COMPLETE**
 
+### Framework-loops review follow-ups (2026-07-08)
+
+Framework v3 was reviewed against the Claude Code "Getting started with loops"
+article (2026-07-06). The review — one-line verdict, 16 tiered improvements, and
+the considered-and-rejected paths — is the first cross-system whiteboard entry:
+**`/knowledge/whiteboard/framework-loops-review.md`** (numbered items below refer
+to it). These tasks carry the adopted tiers; framework-file edits batch per PR to
+amortize version bumps (review follow-up #2). **Tier 4 (#8–#16) is appetite-gated**
+— parked in the whiteboard entry, not queued here; promote on a user steer.
+
+- [ ] MONO-005 — **Land the cross-system whiteboard (framework-loops review).**
+  `knowledge/whiteboard/` (README index + the review entry), the root-manifest
+  Layout line, and this triage. — (S) — *(in flight — this PR)*
+- [ ] MONO-006 — **Framework v3→v4: the unattended-merging safety net (review
+  #1–#3).** (a) Fresh-context review gate: before merging a *task* PR, a
+  fresh-context reviewer gets only the diff + the `CURRENT.md` acceptance
+  criteria, grades each criterion pass/fail; findings fixed or rebutted in the PR
+  description (delivery.md `pr` profile D-gate + a verification.md gate between
+  gates 6 and 7; capability-role phrasing; close PRs exempt; no-facility
+  degradation path → note once in blockers, proceed under today's rules).
+  (b) Session envelope: manifest MAY declare a default as a project-rule line
+  (SETUP.md skeleton); default absent a declaration = "backlog's active list
+  empty or first hard blocker"; session-specific override recorded in planning
+  before work; loop step 8 checks the envelope + defines the empty-backlog
+  terminal state (working-style.md + framework README loop). (c) Post-merge
+  remote check D3: if the reference area's local-ci records a remote-check
+  command, run it after merge, before merging the close PR; resolved-state
+  semantics (green/red — "in progress" is neither); red → hotfix jumps the
+  backlog; unresolvable → blockers; plus one end-of-session sweep line.
+  One version bump; instance-free wording throughout. Per-system remote-check
+  commands are system follow-ups. — (M/L)
+- [ ] MONO-007 — **Framework v4→v5: decidable criteria, countable caps, scripts
+  rule (review #4, #5c, #6, #7).** "A criterion names its decider" rule in
+  verification.md, referenced from loop step 2 (command + expected exit/output,
+  a countable delta, or a named manual probe + expected observation; litmus: a
+  fresh evaluator could check it); when-stuck rung 7 rewritten attempts-based
+  ("three distinct attempts at the same obstacle with no new information — stop",
+  numbered tries in the blocker entry, readable timestamps as the only clock);
+  "went badly" floor in working-style.md (opened a blocker / dropped a criterion
+  under gate 1 / corrective delivery / attempt budget exhausted); the
+  scripts-over-re-derivation rule ("a deterministic procedure performed from
+  prose three times earns a script") + delivery.md close-PR scriptability clause
+  (mechanical shell only — the task-PR merge decision is never scripted); and the
+  one-sentence executable-verification hook in verification.md (#5c). One
+  version bump. — (M)
+- [ ] MONO-008 — **Instance tooling: scripts for the rituals (review #4/#6
+  instance halves).** `scripts/close-pr.sh` (inputs: task id, PR number, merge
+  sha, authored journal text); trail `npm run ci` aggregate (documented in
+  local-ci.md as covering the gate table, not replacing the manual smoke); track
+  `verify.sh` (pinned destination, captures output and greps for
+  `** TEST SUCCEEDED **` — encoding the exit-code-masking lesson) + a test-floor
+  ratchet. Preconditions: MONO-007 (the rules these instantiate). Track-side
+  edits coordinate with track's instance (one writer per system). — (M)
+- [ ] MONO-009 — **Per-system verification skills (review #5b).** Thin
+  `.claude/skills/verify-trail` + `verify-track` that execute each system's
+  `local-ci.md` gates + interactive-drive steps; commands live only in
+  local-ci.md so a skill can't drift from the authority. Preconditions: MONO-007
+  (the #5c hook); TASK-072 (trail's browser-drive procedure, parked in trail's
+  parking lot). — (M)
+
 ## Parking lot
 
 - ~~**Section-overlap bug.** `Planning.sectionsForRace` double-counts a km that straddles an aid distance (placed in *both* adjacent sections).~~ **→ shipped as TASK-039 (2026-06-15, ✓ PR #72; ADR-0004).** ~~Still parked: the section-card **Δ vs plan** has a moving-vs-clock apples-to-oranges bug at the section level; it needed a correct section partition underneath it, which TASK-039 now provides.~~ **→ shipped as TASK-045 (2026-06-15, ✓ PR #86; ADR-0008)** — section Time/Cum/Δ + section-mode CSV are now clock time (moving + the section's aid rest), so the section Δ-vs-plan is clock-vs-clock.
@@ -156,6 +216,13 @@ never done autonomously.
 - **TASK-071 — Localize `section.label` (the i18n residue).** The only app string the i18n epic (TASK-058–069) left English: `Planning.sectionsForRace` bakes "Start"/"Finish" into `section.label` ("Start → Aid 1"), shown on the section table + section card. It's **CSV-canonical** (`Csv.elm:207` writes it to the section-mode export, which must stay English), so localizing the *display* needs a display/canonical split — either expose the section's start/end as structured fields (`Maybe String`, `Nothing` = terminus) for the view to format with `Language`, or thread `Language` into `sectionsForRace` and call it with `English` from `Csv.elm`/`SectionsHarness` and with the UI language from `Main` (two render paths). Aid names in the label are user content (untranslated regardless). Small, isolated; pick up on a steer. `conflict.label` was the sibling case and was solved in TASK-069 (view re-derives from the typed `conflict.key`); a similar typed-key approach may fit here. — (S/M).
 - **TASK-070 — Unit selection (metric/imperial) in Profile/Settings.** Descoped from the i18n epic by the user (2026-06-18): a user *preference*, not a derived value built reflexively. Store SI (already true), convert at the display boundary, a toggle on `#/profile`. Extends `Settings`/`Context`/`Format` along the seams ADR-0014 leaves (per-field `D.oneOf`, the `Context` record) — `units` is purely additive. Back-compat: a settings blob without `units` → `Metric`. The spec's WI-2 `UnitSystem` + WI-5 conversion math (`reference/i18n-spec.md`) are the blueprint. Not promoted — pick up on a fresh steer. — (M).
 - Comparing planned vs actual after the race (post-MVP, would need an .fit upload).
+- **TASK-072 — Browser-drive verification for trail (review #5a —
+  `/knowledge/whiteboard/framework-loops-review.md`).** Trail — a browser PWA — has
+  no recorded way to see or drive its own UI: gate 3 ("it does the thing") leans on
+  the smoke harnesses plus manual checks a headless session can't run. Add browser
+  tooling (a Playwright-driven UI smoke script, or a browser-devtools MCP) and
+  record the UI smoke procedure in `reference/local-ci.md`. Precondition for the
+  `verify-trail` skill (MONO-009). Not promoted — pick up on a fresh steer. — (M).
 
 ## Proposals (not yet promoted — see `knowledge/reference/pace-prediction-roadmap.md`)
 

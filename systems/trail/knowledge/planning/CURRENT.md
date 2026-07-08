@@ -14,7 +14,39 @@
 **Notes:** scope cuts, links, anything decided while planning.
 ```
 
-### (no active task) — monorepo migration COMPLETE ✅
+### MONO-005 — Land the cross-system whiteboard (framework-loops review)
+
+**Source:** user request (2026-07-08) — framework v3 reviewed against the Claude Code
+"Getting started with loops" article (2026-07-06); the review document becomes the
+first cross-system whiteboard entry.
+**Branch:** `mono/mono-005-whiteboard-loops-review`
+**Acceptance criteria:**
+- [ ] `knowledge/whiteboard/README.md` exists (cross-system conventions + the
+  MONO--edit discipline) and indexes the review entry; the index link's target
+  path exists on the branch.
+- [ ] `knowledge/whiteboard/framework-loops-review.md` carries the review: Status
+  line, Context, strengths, the 16 tiered improvements, "Considered and rejected",
+  "Where we landed", "Follow-ups" (verify: grep the section headings).
+- [ ] Triage done (review follow-up #1): MONO-006…MONO-009 queued in `BACKLOG.md`'s
+  MONO- namespace mapping tiers 1–3; Tier 4 recorded as parked in the whiteboard
+  entry; TASK-072 (trail browser-drive verification) queued in trail's parking
+  lot; the whiteboard Status + Follow-ups point at the queued ids (verify: grep
+  the ids in both files).
+- [ ] Root manifest Layout: the `whiteboard/` line no longer reads "(none yet)" and
+  points at the index (verify: grep).
+- [ ] `knowledge/framework/` untouched: `git diff master --stat --
+  knowledge/framework/` is empty (quoted in the PR).
+- [ ] Delivered per `pr`: squash-merged PR from the branch above; before merging, a
+  fresh-context review of the diff against these criteria (practicing the
+  review's own #1) — findings fixed or explicitly rebutted in the PR description.
+**Notes:** docs-only — no build/test gates apply beyond the file checks above. The
+review itself (six-dimension analysis, adversarial verification of findings) ran
+in-session before this task; MONO-005 lands the durable record + the triage, not
+the analysis.
+
+---
+
+### Monorepo migration COMPLETE ✅ (context, 2026-06-24)
 
 The **monorepo migration epic (MONO-000 → MONO-004) is COMPLETE** (2026-06-24). Trail is now one
 system in a five-system monorepo (`systems/{trail,cadence,gateway,track,reflect}`) on a two-tier
@@ -29,10 +61,11 @@ federated knowledge base (shared root `framework/` + root manifest; per-system v
 - **Optional cleanup (non-blocking):** trail's Vercel "include files outside the Root Directory"
   toggle is ON — it can be turned OFF (trail is self-contained); a dashboard step, no rush.
 
-**No active task.** New work is **per-system**: pull it into that system's own `CURRENT.md` under its
-branch prefix (`trail/`/`TRAIL-`, `cadence/`/`CAD-`, `gateway/`/`GW-`, `track/`/`TRACK-`,
-`reflect/`/`REFLECT-`); shared/structural work is a `MONO-` task. **Pull the next item only on a fresh
-user steer.** Open follow-ups: reflect's scope (its BLOCKER-001), and trail's own parked items below.
+**Active task: MONO-005 (above).** New work is **per-system**: pull it into that system's own
+`CURRENT.md` under its branch prefix (`trail/`/`TRAIL-`, `cadence/`/`CAD-`, `gateway/`/`GW-`,
+`track/`/`TRACK-`, `reflect/`/`REFLECT-`); shared/structural work is a `MONO-` task. **Pull the next
+item only on a fresh user steer.** Open follow-ups: reflect's scope (its BLOCKER-001), and trail's
+own parked items below.
 
 ---
 
