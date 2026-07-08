@@ -126,8 +126,8 @@ each system is self-contained, and the structure keeps concurrent agents from co
   and the consumers arrive).
 - **decisions/** — *cross-cutting* ADRs only (none yet; per-system ADRs live in
   each system's instance). Created when the first one lands.
-- **whiteboard/** — cross-system discussions (none yet). Created when the first
-  one lands.
+- **whiteboard/** — cross-system discussions; index in `whiteboard/README.md`
+  (first entry: the framework-loops review, MONO-005).
 
 There is deliberately **no** shared `planning/` or `progress/` (see Shared-tier
 discipline). Each system declares its own areas via its manifest's Locations block.
