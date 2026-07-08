@@ -14,47 +14,49 @@
 **Notes:** scope cuts, links, anything decided while planning.
 ```
 
-### MONO-006 — Framework v3→v4: the unattended-merging safety net (review #1–#3)
+### MONO-007 — Framework v4→v5: decidable criteria, countable caps, scripts rule
 
 **Source:** BACKLOG (framework-loops review triage, MONO-005). The spec is the
 whiteboard entry's narrowed recommendations: `/knowledge/whiteboard/
-framework-loops-review.md` #1 (fresh-context review gate), #2 (session envelope),
-#3 (post-merge remote check D3).
-**Branch:** `mono/mono-006-framework-v4-safety-net`
+framework-loops-review.md` #6 (decidable acceptance criteria), #7 (countable
+caps), #4 (scripts-over-re-derivation) + #5c (the executable-verification hook).
+**Branch:** `mono/mono-007-framework-v5-criteria-caps-scripts`
 **Acceptance criteria:**
-- [ ] **#1 review gate:** the `pr` profile in `delivery.md` gains a D-gate, and
-  `verification.md` a gate between gates 6 and 7: before merging a *task* PR, a
-  fresh-context reviewer gets only the diff + the acceptance criteria (never the
-  authoring transcript) and grades each criterion pass/fail; confirmed
-  correctness findings fixed or explicitly rebutted in the PR description before
-  merge. Capability-role phrasing ("whatever second-agent facility the
-  environment provides"); close/bookkeeping PRs exempt; degradation path (no
-  facility → note once in the blockers log, proceed under the old rules).
-  (Verify: grep the new gate text in both files.)
-- [ ] **#2 session envelope:** `working-style.md` gains a "Session envelope"
-  section (manifest MAY declare a default as a project-rule line; absent one,
-  the default is "run until the backlog's active list is empty or the first
-  hard blocker"; a session-specific envelope is recorded in the planning area
-  before work, mirroring the per-task-override contract); the loop's step 8 in
-  `framework/README.md` checks the envelope and defines the empty-backlog
-  terminal state; `SETUP.md`'s manifest skeleton shows the optional default
-  line. (Verify: grep "envelope" in all three files.)
-- [ ] **#3 D3:** the `pr` profile gains "D3 — remote check resolved" (if the
-  reference area's local-CI file records a remote-check command: run it after
-  the merge, before merging the close PR; green/red only — "in progress" is
-  neither; red → the hotfix becomes the next task, jumping the backlog, noted
-  in the close PR; unresolvable → blockers log, D3 not ticked) plus one
-  end-of-session sweep line. (Verify: grep "D3" in `delivery.md`.)
-- [ ] Version bump: `framework/README.md` header reads **v4** with a changelog
-  line; the root manifest's "Framework copy: v3" line reads v4. (Verify: grep.)
+- [ ] **#6 decidable criteria:** `verification.md` gains a "writing acceptance
+  criteria" rule referenced from the loop's Plan step (`framework/README.md`
+  step 2): a criterion is valid iff it names its decider — a command + expected
+  exit/output, a countable delta, or a named manual probe + its expected
+  observation — litmus: "if a fresh evaluator couldn't check it, rewrite or
+  split it"; plus one sentence at the gates: where the reference area records a
+  numeric budget, quote the measured number against it. (Verify: grep "decider"
+  + "fresh evaluator" in verification.md; grep the step-2 reference.)
+- [ ] **#5c executable hook:** one sentence in `verification.md`: if the project
+  records an executable verification procedure for the surface touched, run it
+  and quote its output. (Verify: grep.)
+- [ ] **#7 countable caps:** `when-stuck.md` rung 7 is attempts-based ("three
+  distinct attempts at the same obstacle with no new information — not just no
+  fix, no new *fact* — stop"), with numbered tries in the blocker entry and
+  readable timestamps (`date`, journal times) as the only clock; no "30
+  minutes" wall-clock trigger remains. `working-style.md`: task size expressed
+  as "one verifiable slice" first, minutes second; "went badly" defined as a
+  checkable floor (opened a blocker / dropped or rewrote a criterion under
+  gate 1 / corrective delivery / attempt budget exhausted — assessable from the
+  last three journal entries). (Verify: greps in both files.)
+- [ ] **#4 scripts rule:** `working-style.md`: "a deterministic procedure
+  performed from prose three times earns a script, recorded in the reference
+  area; thereafter invoke it and quote its output." `delivery.md` close-PR
+  clause: the close PR's mechanical shell may be scripted if the project
+  records one; journal/DONE prose remain authored input; no script ever
+  performs the task-PR merge decision. (Verify: greps in both files.)
+- [ ] Version bump: `framework/README.md` header reads **v5** with a changelog
+  line; the root manifest's "Framework copy" line reads v5. (Verify: grep.)
 - [ ] Instance-free guard: `grep -riE '\btrail\b|\belm\b|batman|gillchristian|coros|samples/'
   knowledge/framework/` returns nothing (empty run quoted in the PR).
-- [ ] Delivered per `pr`, including its own pre-merge fresh-context review
-  (practicing #1 on the PR that introduces it).
-**Notes:** docs-only. Keep each edit minimal — the framework's core virtue is
-smallness; the whiteboard entry's narrowed wording is the spec, not a floor to
-build on. Per-system remote-check *commands* (Vercel/fly) are system follow-ups,
-not this task.
+- [ ] Delivered per `pr`: pre-merge fresh-context review (gate 7); D3 per the
+  recorded remote checks (none for the shared tier — vacuous, noted).
+**Notes:** docs-only. Keep the edits minimal; the whiteboard's narrowed wording
+is the spec. The instance *scripts* themselves (close-pr.sh, npm run ci,
+verify.sh) are MONO-008, not this task.
 
 ---
 
@@ -73,7 +75,7 @@ federated knowledge base (shared root `framework/` + root manifest; per-system v
 - **Optional cleanup (non-blocking):** trail's Vercel "include files outside the Root Directory"
   toggle is ON — it can be turned OFF (trail is self-contained); a dashboard step, no rush.
 
-**Active task: MONO-006 (above).** New work is **per-system**: pull it into that system's own
+**Active task: MONO-007 (above).** New work is **per-system**: pull it into that system's own
 `CURRENT.md` under its branch prefix (`trail/`/`TRAIL-`, `cadence/`/`CAD-`, `gateway/`/`GW-`,
 `track/`/`TRACK-`, `reflect/`/`REFLECT-`); shared/structural work is a `MONO-` task. **Pull the next
 item only on a fresh user steer.** Open follow-ups: reflect's scope (its BLOCKER-001), and trail's
