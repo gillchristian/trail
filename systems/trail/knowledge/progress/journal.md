@@ -3071,3 +3071,38 @@ sanctioned the merge (the user ran it). `git subtree add` imports the whole repo
 **Next:** **no active task.** New work is per-system (pull into that system's `CURRENT.md` under its
 prefix); shared/structural work is a `MONO-` task. Open follow-up: reflect's scope (BLOCKER-001 in its
 instance). Await a fresh steer.
+
+---
+## 2026-07-08 14:25 — MONO-005: framework-loops review → first cross-system whiteboard entry
+
+**Task:** MONO-005 (user steer: review the framework against the Claude Code "Getting started with
+loops" article, 2026-07-06, then land + work the result).
+**What I did:** Ran the review before the task (six parallel analysts — loop taxonomy /
+verification-as-skills / stop criteria / self-improvement / usage economy / recurrence — 24 raw gaps
+consolidated to 14 findings, each adversarially verified through an accuracy lens + a philosophy-fit
+lens; all 14 survived, most materially narrowed; a completeness critic added 3 more: permission
+envelope, inbox role, competitive spikes). Landed the review as
+`knowledge/whiteboard/framework-loops-review.md` (+ whiteboard README/index; root-manifest Layout
+line) and triaged it: **MONO-006** (Tier 1 — fresh-context review gate, session envelope, post-merge
+D3; framework v3→v4), **MONO-007** (decidable criteria, countable caps, scripts rule; v4→v5),
+**MONO-008** (instance ritual scripts), **MONO-009** (per-system verify skills), **TASK-072** (trail
+browser-drive tooling, parking lot); Tier 4 (#8–#16) parked appetite-gated in the entry.
+**What I verified:** All 6 AC green — index link target exists; section-heading grep (Status l.3 …
+Follow-ups l.339); exactly 16 numbered improvements; triage-id greps (9 hits in BACKLOG.md, 8 in the
+whiteboard entry); root-manifest Layout l.129; `git diff master --stat -- knowledge/framework/` →
+empty. Pre-merge **fresh-context review** (a subagent given only the diff + the AC — practicing the
+review's own #1): AC1–5 PASS, fact spot-checks clean (PR-#178 head, 101 journal entries, nine smoke
+harnesses, the ENOENT record, D1/D2-only profile, no id collisions); 2 minor misquotes found → fixed
+in `7a17146` before merge.
+**What changed:** `knowledge/whiteboard/{README,framework-loops-review}.md` (new),
+`knowledge/README.md` (Layout), trail `planning/{CURRENT,BACKLOG}.md` (orient + triage).
+PR #179, merged `1ff8dfa`.
+**What I learned:** The adversarial pass was where the value concentrated: no finding died outright,
+but the fit lens *rewrote* most recommendations (killed model-routing machinery, the reading-budget
+cut, MORNING.md resurrection, absolute perf thresholds) — the rejected variants are recorded in the
+entry per principle 7. And the review's meta-point held in practice: the framework's gaps are
+structural (who checks, when to stop, what executes), not philosophical — its prose already matches
+the article's values. The fresh-context reviewer caught two misquotes self-review had missed on the
+very first try: cheap, real signal for MONO-006's gate.
+**Next:** MONO-006 — framework v3→v4 (the unattended-merging safety net), pulled into `CURRENT.md`
+by this close PR. Its AC are written; the whiteboard entry's narrowed #1–#3 are the spec.

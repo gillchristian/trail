@@ -14,35 +14,47 @@
 **Notes:** scope cuts, links, anything decided while planning.
 ```
 
-### MONO-005 — Land the cross-system whiteboard (framework-loops review)
+### MONO-006 — Framework v3→v4: the unattended-merging safety net (review #1–#3)
 
-**Source:** user request (2026-07-08) — framework v3 reviewed against the Claude Code
-"Getting started with loops" article (2026-07-06); the review document becomes the
-first cross-system whiteboard entry.
-**Branch:** `mono/mono-005-whiteboard-loops-review`
+**Source:** BACKLOG (framework-loops review triage, MONO-005). The spec is the
+whiteboard entry's narrowed recommendations: `/knowledge/whiteboard/
+framework-loops-review.md` #1 (fresh-context review gate), #2 (session envelope),
+#3 (post-merge remote check D3).
+**Branch:** `mono/mono-006-framework-v4-safety-net`
 **Acceptance criteria:**
-- [ ] `knowledge/whiteboard/README.md` exists (cross-system conventions + the
-  MONO--edit discipline) and indexes the review entry; the index link's target
-  path exists on the branch.
-- [ ] `knowledge/whiteboard/framework-loops-review.md` carries the review: Status
-  line, Context, strengths, the 16 tiered improvements, "Considered and rejected",
-  "Where we landed", "Follow-ups" (verify: grep the section headings).
-- [ ] Triage done (review follow-up #1): MONO-006…MONO-009 queued in `BACKLOG.md`'s
-  MONO- namespace mapping tiers 1–3; Tier 4 recorded as parked in the whiteboard
-  entry; TASK-072 (trail browser-drive verification) queued in trail's parking
-  lot; the whiteboard Status + Follow-ups point at the queued ids (verify: grep
-  the ids in both files).
-- [ ] Root manifest Layout: the `whiteboard/` line no longer reads "(none yet)" and
-  points at the index (verify: grep).
-- [ ] `knowledge/framework/` untouched: `git diff master --stat --
-  knowledge/framework/` is empty (quoted in the PR).
-- [ ] Delivered per `pr`: squash-merged PR from the branch above; before merging, a
-  fresh-context review of the diff against these criteria (practicing the
-  review's own #1) — findings fixed or explicitly rebutted in the PR description.
-**Notes:** docs-only — no build/test gates apply beyond the file checks above. The
-review itself (six-dimension analysis, adversarial verification of findings) ran
-in-session before this task; MONO-005 lands the durable record + the triage, not
-the analysis.
+- [ ] **#1 review gate:** the `pr` profile in `delivery.md` gains a D-gate, and
+  `verification.md` a gate between gates 6 and 7: before merging a *task* PR, a
+  fresh-context reviewer gets only the diff + the acceptance criteria (never the
+  authoring transcript) and grades each criterion pass/fail; confirmed
+  correctness findings fixed or explicitly rebutted in the PR description before
+  merge. Capability-role phrasing ("whatever second-agent facility the
+  environment provides"); close/bookkeeping PRs exempt; degradation path (no
+  facility → note once in the blockers log, proceed under the old rules).
+  (Verify: grep the new gate text in both files.)
+- [ ] **#2 session envelope:** `working-style.md` gains a "Session envelope"
+  section (manifest MAY declare a default as a project-rule line; absent one,
+  the default is "run until the backlog's active list is empty or the first
+  hard blocker"; a session-specific envelope is recorded in the planning area
+  before work, mirroring the per-task-override contract); the loop's step 8 in
+  `framework/README.md` checks the envelope and defines the empty-backlog
+  terminal state; `SETUP.md`'s manifest skeleton shows the optional default
+  line. (Verify: grep "envelope" in all three files.)
+- [ ] **#3 D3:** the `pr` profile gains "D3 — remote check resolved" (if the
+  reference area's local-CI file records a remote-check command: run it after
+  the merge, before merging the close PR; green/red only — "in progress" is
+  neither; red → the hotfix becomes the next task, jumping the backlog, noted
+  in the close PR; unresolvable → blockers log, D3 not ticked) plus one
+  end-of-session sweep line. (Verify: grep "D3" in `delivery.md`.)
+- [ ] Version bump: `framework/README.md` header reads **v4** with a changelog
+  line; the root manifest's "Framework copy: v3" line reads v4. (Verify: grep.)
+- [ ] Instance-free guard: `grep -riE '\btrail\b|\belm\b|batman|gillchristian|coros|samples/'
+  knowledge/framework/` returns nothing (empty run quoted in the PR).
+- [ ] Delivered per `pr`, including its own pre-merge fresh-context review
+  (practicing #1 on the PR that introduces it).
+**Notes:** docs-only. Keep each edit minimal — the framework's core virtue is
+smallness; the whiteboard entry's narrowed wording is the spec, not a floor to
+build on. Per-system remote-check *commands* (Vercel/fly) are system follow-ups,
+not this task.
 
 ---
 
@@ -61,7 +73,7 @@ federated knowledge base (shared root `framework/` + root manifest; per-system v
 - **Optional cleanup (non-blocking):** trail's Vercel "include files outside the Root Directory"
   toggle is ON — it can be turned OFF (trail is self-contained); a dashboard step, no rush.
 
-**Active task: MONO-005 (above).** New work is **per-system**: pull it into that system's own
+**Active task: MONO-006 (above).** New work is **per-system**: pull it into that system's own
 `CURRENT.md` under its branch prefix (`trail/`/`TRAIL-`, `cadence/`/`CAD-`, `gateway/`/`GW-`,
 `track/`/`TRACK-`, `reflect/`/`REFLECT-`); shared/structural work is a `MONO-` task. **Pull the next
 item only on a fresh user steer.** Open follow-ups: reflect's scope (its BLOCKER-001), and trail's
