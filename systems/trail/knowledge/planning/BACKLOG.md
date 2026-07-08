@@ -187,8 +187,8 @@ amortize version bumps (review follow-up #2). **Tier 4 (#8–#16) is appetite-ga
   (mechanical shell only — the task-PR merge decision is never scripted); and the
   one-sentence executable-verification hook in verification.md (#5c). One
   version bump. — (M)
-- [ ] MONO-008 — **Instance tooling: scripts for the rituals (review #4/#6
-  instance halves).** `scripts/close-pr.sh` (inputs: task id, PR number, merge
+- [x] MONO-008 — **Instance tooling: scripts for the rituals (review #4/#6
+  instance halves).** ✓ PR #185, merged `6cf5582` — `scripts/close-pr.sh` (inputs: task id, PR number, merge
   sha, authored journal text); trail `npm run ci` aggregate (documented in
   local-ci.md as covering the gate table, not replacing the manual smoke); track
   `verify.sh` (pinned destination, captures output and greps for
